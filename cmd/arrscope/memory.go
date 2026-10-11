@@ -8,8 +8,8 @@ import (
 )
 
 func memoryTarget(configured int64, containerLimit string) int64 {
-	if limit, err := strconv.ParseInt(strings.TrimSpace(containerLimit), 10, 64); err == nil && limit > 0 && configured > limit/8*3 {
-		return limit / 8 * 3
+	if limit, err := strconv.ParseInt(strings.TrimSpace(containerLimit), 10, 64); err == nil && limit > 0 && configured > limit/4 {
+		return limit / 4
 	}
 	return configured
 }
@@ -17,10 +17,10 @@ func memoryTarget(configured int64, containerLimit string) int64 {
 func configureMemoryLimit() {
 	configured := debug.SetMemoryLimit(-1)
 	if os.Getenv("GOMEMLIMIT") == "" {
-		configured = 96 << 20
+		configured = 64 << 20
 	}
 	// Go's soft target excludes kernel page cache and some process allocations.
-	// Reserve five eighths of the container budget for those, including legacy
+	// Reserve three quarters of the container budget for those, including legacy
 	// Unraid templates that still set GOMEMLIMIT=192MiB.
 	limit, err := os.ReadFile("/sys/fs/cgroup/memory.max")
 	if err != nil {

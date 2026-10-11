@@ -24,7 +24,7 @@ COPY --from=backend /arrscope /usr/local/bin/arrscope
 ARG VERSION=0.3.2
 ARG SOURCE=https://github.com/Buffer379x/arrscope
 LABEL org.opencontainers.image.title="ArrScope" org.opencontainers.image.description="Filter your Radarr and Sonarr library without scanning media" org.opencontainers.image.source=$SOURCE org.opencontainers.image.version=$VERSION org.opencontainers.image.licenses="MIT"
-ENV ARRSCOPE_DATA_DIR=/data ARRSCOPE_LISTEN=:8080 GOMEMLIMIT=96MiB GOMAXPROCS=2 SQLITE_TMPDIR=/data
+ENV ARRSCOPE_DATA_DIR=/data ARRSCOPE_LISTEN=:8080 GOMEMLIMIT=64MiB GOMAXPROCS=2 SQLITE_TMPDIR=/data
 USER 99:100
 EXPOSE 8080
 VOLUME ["/data"]

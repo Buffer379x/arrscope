@@ -9,3 +9,9 @@
 - Release gates also require Go/frontend tests, both container architectures, vulnerability scans and the established 100,000-file Emby memory/HTTP stress check before stable promotion.
 
 Database schema remains 5. Production upgrades are initiated manually in Unraid.
+
+## Additional release memory finding
+
+The first release candidate passed sync and query checks but triggered an OOM event during the subsequent full-cache filename-rule reprocessing. Stable promotion and GitHub release publication were blocked. The corrected candidate reserves three quarters of a detected container limit for SQLite/process allocations and page cache (64 MiB Go soft target under 256 MiB), including legacy higher GOMEMLIMIT settings. Reclaimable Go heap pages are explicitly returned before backup and reprocessing, outside ordinary query paths. The same complete required checks and release gates must pass on this corrected source.
+
+Full-cache recognition updates reuse a prepared update statement and retain unchanged indexed language associations. Their authenticated request budget is bounded at 180 seconds to accommodate large caches on slower hosts; ordinary HTTP query limits and the 256 MiB/no-swap stress limit remain unchanged. Tests verify language index changes, preservation and removal, cancellation and atomic rollback.

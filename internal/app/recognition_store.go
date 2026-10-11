@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -71,9 +73,13 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	if engine.config.Revision == revision {
 		return engine.Config(), nil
 	}
+	// Large syncs may leave reclaimable heap pages behind. Release them before
+	// SQLite's backup and reprocessing allocations, outside the request hot path.
+	debug.FreeOSMemory()
 	if err = s.Backup(); err != nil {
 		return RecognitionConfig{}, err
 	}
+	debug.FreeOSMemory()
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return RecognitionConfig{}, err
@@ -94,6 +100,11 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	return engine.Config(), nil
 }
 func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) error {
+	update, err := tx.PrepareContext(ctx, "UPDATE files SET resolution=?,codec=?,family=?,source=?,processing=?,hdr=?,bitDepth=?,audio=?,channels=?,language=?,conflict=?,rule_conflict=?,emby_match=?,data=? WHERE rowid=?")
+	if err != nil {
+		return err
+	}
+	defer update.Close()
 	var last int64
 	for {
 		rows, err := tx.QueryContext(ctx, "SELECT rowid,data FROM files WHERE rowid>? ORDER BY rowid LIMIT 250", last)
@@ -128,17 +139,23 @@ func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) e
 			return nil
 		}
 		for _, item := range batch {
+			oldLanguage := item.file.Language
+			oldUnknownLanguage := slices.Contains(item.file.UnknownTraits, "language")
 			reparseFile(&item.file, engine)
 			f := item.file
 			data, err := json.Marshal(f)
 			if err != nil {
 				return err
 			}
-			if _, err = tx.ExecContext(ctx, "UPDATE files SET resolution=?,codec=?,family=?,source=?,processing=?,hdr=?,bitDepth=?,audio=?,channels=?,language=?,conflict=?,rule_conflict=?,emby_match=?,data=? WHERE rowid=?", f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, f.Conflict, f.RuleConflict, f.EmbyMatch, string(data), item.id); err != nil {
+			if _, err = update.ExecContext(ctx, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, f.Conflict, f.RuleConflict, f.EmbyMatch, string(data), item.id); err != nil {
 				return err
 			}
-			if err = replaceFileLanguages(ctx, tx, item.id, f); err != nil {
-				return err
+			// Source/codec rules commonly leave verified audio languages unchanged.
+			// Avoid rebuilding those indexed associations for every cached file.
+			if oldLanguage != f.Language || oldUnknownLanguage != slices.Contains(f.UnknownTraits, "language") {
+				if err = replaceFileLanguages(ctx, tx, item.id, f); err != nil {
+					return err
+				}
 			}
 			last = item.id
 		}

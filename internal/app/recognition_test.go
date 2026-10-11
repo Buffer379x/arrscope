@@ -496,3 +496,39 @@ func TestCompactPaginationMatchesCompleteSortOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestReprocessingUpdatesOnlyChangedLanguageAssociations(t *testing.T) {
+	store := testStore(t)
+	file := sample(1, "Movie.1080p.x264.MYLANG.mkv")
+	Enrich(&file, APIInfo{})
+	if err := store.Replace("radarr", []File{file}, SyncStatus{}); err != nil {
+		t.Fatal(err)
+	}
+	before := store.Recognition()
+	rules := append(before.Rules, customRule("custom-language", "language", "MYLANG", "Deutsch", "direct", 1))
+	saved, err := store.SaveRecognition(context.Background(), rules, before.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := store.Query(url.Values{"service": {"radarr"}, "language": {"Deutsch"}}, "matches", false)
+	if err != nil || out.Total != 1 {
+		t.Fatal("changed language association missing", out, err)
+	}
+	rules = append(rules, customRule("custom-source", "source", "MYLANG", "UHD", "override", 1))
+	saved, err = store.SaveRecognition(context.Background(), rules, saved.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = store.Query(url.Values{"service": {"radarr"}, "language": {"Deutsch"}, "source": {"UHD"}}, "matches", false)
+	if err != nil || out.Total != 1 {
+		t.Fatal("unchanged language association lost", out, err)
+	}
+	_, err = store.SaveRecognition(context.Background(), before.Rules, saved.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = store.Query(url.Values{"service": {"radarr"}, "language": {"Deutsch"}}, "matches", false)
+	if err != nil || out.Total != 0 {
+		t.Fatal("removed language association retained", out, err)
+	}
+}
