@@ -17,6 +17,7 @@ import (
 )
 
 type Store struct {
+	presetMu        sync.Mutex
 	recognitionMu   sync.Mutex
 	recognition     *RecognitionEngine
 	DB              *sql.DB

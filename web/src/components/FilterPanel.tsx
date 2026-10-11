@@ -17,6 +17,7 @@ import {
   labels,
   operatorLabels,
 } from "../ui";
+import { StateFilter } from "./StateFilter";
 import { MultiFilter } from "./MultiFilter";
 type Props = {
   q: URLSearchParams;
@@ -51,14 +52,30 @@ export function FilterPanel({
   useI18n();
   return (
     <section
-      class={"filter-panel" + (collapsed ? " collapsed" : "")}
+      class={"filter-panel filter-panel-v2" + (collapsed ? " collapsed" : "")}
       aria-label={t("Filters")}
     >
-      <div class="filter-heading">
-        <span>
-          <SlidersHorizontal size={16} />
-          {t("FILTERS")}
-        </span>
+      <div class="filter-always-visible">
+        <label class="search-field">
+          <span>{t("Title or filename")}</span>
+          <div class="input-wrap">
+            <Search size={17} />
+            <input
+              placeholder={
+                service === "radarr"
+                  ? t("Search movie or file …")
+                  : t("Series, episode or file …")
+              }
+              value={q.get("q") || ""}
+              onInput={(e) =>
+                change(
+                  "q",
+                  e.currentTarget.value ? [e.currentTarget.value] : [],
+                )
+              }
+            />
+          </div>
+        </label>
         <div class="preset-toolbar">
           <select
             aria-label={t("Filter preset")}
@@ -70,10 +87,10 @@ export function FilterPanel({
                   : "all"
             }
             onChange={(e) => {
-              const p = presets.find(
+              const preset = presets.find(
                 (p) => String(p.id) === e.currentTarget.value,
               );
-              if (p) applyPreset(p);
+              if (preset) applyPreset(preset);
               else if (e.currentTarget.value === "all") reset();
             }}
           >
@@ -85,6 +102,8 @@ export function FilterPanel({
                 <option value={String(p.id)}>{p.name}</option>
               ))}
           </select>
+        </div>
+        <div class="filter-icon-tools">
           <button
             class="icon-button"
             aria-label={t("Save preset")}
@@ -102,219 +121,145 @@ export function FilterPanel({
           >
             <Trash2 size={16} />
           </button>
-        </div>
-        <div class="filter-view-tools">
           <button
-            class="text-button"
+            class="icon-button"
+            aria-label={collapsed ? t("Expand filters") : t("Collapse filters")}
+            title={collapsed ? t("Expand filters") : t("Collapse filters")}
             aria-expanded={!collapsed}
             aria-controls="filter-controls"
             onClick={() => setCollapsed(!collapsed)}
           >
-            {collapsed ? t("Expand filters") : t("Collapse filters")}
-            <ChevronDown size={15} class={!collapsed ? "rotated" : ""} />
+            <ChevronDown size={17} class={!collapsed ? "rotated" : ""} />
           </button>
         </div>
       </div>
       {!collapsed && (
-        <div id="filter-controls">
-          <div class="filter-grid">
-            <label class="search-field">
-              <span>{t("Title or filename")}</span>
-              <div class="input-wrap">
-                <Search size={17} />
-                <input
-                  placeholder={
-                    service === "radarr"
-                      ? t("Search movie or file …")
-                      : t("Series, episode or file …")
+        <div id="filter-controls" class="filter-groups">
+          <section class="attribute-filters">
+            <h2>{t("Media attributes")}</h2>
+            <div class="attribute-grid">
+              {[
+                "resolution",
+                "codec",
+                "source",
+                "processing",
+                "family",
+                "bitDepth",
+                "hdr",
+                "audio",
+                "language",
+                "channels",
+              ].map((k) => (
+                <MultiFilter
+                  key={k}
+                  name={k}
+                  values={facets[k] || []}
+                  selected={q.getAll(k)}
+                  operator={(q.get(k + "Op") || "eq") as FilterOperator}
+                  operatorChange={(op) =>
+                    change(k + "Op", op === "eq" ? [] : [op])
                   }
-                  value={q.get("q") || ""}
-                  onInput={(e) =>
-                    change(
-                      "q",
-                      e.currentTarget.value ? [e.currentTarget.value] : [],
-                    )
-                  }
+                  change={(v) => change(k, v)}
                 />
-              </div>
-            </label>
-            {["resolution", "codec", "source"].map((k) => (
-              <MultiFilter
-                key={k}
-                name={k}
-                values={facets[k] || []}
-                selected={q.getAll(k)}
-                operator={(q.get(k + "Op") || "eq") as FilterOperator}
-                operatorChange={(operator) =>
-                  change(k + "Op", operator === "eq" ? [] : [operator])
-                }
-                change={(v) => change(k, v)}
-              />
-            ))}
-            <label class="year-field">
-              <span>{t("Year")}</span>
-              <div class="year-inputs">
-                <input
-                  type="number"
-                  min="1800"
-                  max="3000"
-                  placeholder={t("From")}
-                  aria-label={t("Year from")}
-                  value={q.get("yearMin") || ""}
-                  onInput={(e) =>
-                    change(
-                      "yearMin",
-                      e.currentTarget.value ? [e.currentTarget.value] : [],
-                    )
-                  }
-                />
-                <span>–</span>
-                <input
-                  type="number"
-                  min="1800"
-                  max="3000"
-                  placeholder={t("To")}
-                  aria-label={t("Year to")}
-                  value={q.get("yearMax") || ""}
-                  onInput={(e) =>
-                    change(
-                      "yearMax",
-                      e.currentTarget.value ? [e.currentTarget.value] : [],
-                    )
-                  }
-                />
-              </div>
-            </label>
-          </div>
-          <div class="advanced-grid">
-            {[
-              "family",
-              "processing",
-              "hdr",
-              "bitDepth",
-              "audio",
-              "channels",
-              "language",
-            ].map((k) => (
-              <MultiFilter
-                key={k}
-                name={k}
-                values={facets[k] || []}
-                selected={q.getAll(k)}
-                operator={(q.get(k + "Op") || "eq") as FilterOperator}
-                operatorChange={(operator) =>
-                  change(k + "Op", operator === "eq" ? [] : [operator])
-                }
-                change={(v) => change(k, v)}
-              />
-            ))}
-            {["sizeMin", "sizeMax"].map((k) => (
-              <label>
-                <span>
-                  {k === "sizeMin"
-                    ? t("File size from (GiB)")
-                    : t("File size to (GiB)")}
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={q.has(k) ? Number(q.get(k)) / 1024 ** 3 : ""}
-                  onInput={(e) =>
-                    change(
-                      k,
-                      e.currentTarget.value
-                        ? [
-                            String(
-                              Math.round(
-                                Number(e.currentTarget.value) * 1024 ** 3,
-                              ),
-                            ),
-                          ]
-                        : [],
-                    )
-                  }
-                />
+              ))}
+              <label class="range-field">
+                <span>{t("Year")}</span>
+                <div class="year-inputs">
+                  {["yearMin", "yearMax"].map((k, index) => (
+                    <>
+                      <input
+                        type="number"
+                        min="1800"
+                        max="3000"
+                        placeholder={index ? t("To") : t("From")}
+                        aria-label={index ? t("Year to") : t("Year from")}
+                        value={q.get(k) || ""}
+                        onInput={(e) =>
+                          change(
+                            k,
+                            e.currentTarget.value
+                              ? [e.currentTarget.value]
+                              : [],
+                          )
+                        }
+                      />
+                      {!index && <span>–</span>}
+                    </>
+                  ))}
+                </div>
               </label>
-            ))}
-            <label>
-              <span>{t("Metadata disagreement")}</span>
-              <select
-                value={q.get("conflict") || ""}
-                onChange={(e) =>
-                  change(
-                    "conflict",
-                    e.currentTarget.value ? [e.currentTarget.value] : [],
-                  )
-                }
-              >
-                <option value="">{t("All metadata")}</option>
-                <option value="true">{t("Conflicting")}</option>
-                <option value="false">{t("No conflicts")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{t("Conflicting recognition rules")}</span>
-              <select
-                aria-label={t("Conflicting recognition rules")}
-                value={q.get("ruleConflict") || ""}
-                onChange={(e) =>
-                  change(
-                    "ruleConflict",
-                    e.currentTarget.value ? [e.currentTarget.value] : [],
-                  )
-                }
-              >
-                <option value="">{t("All files")}</option>
-                <option value="true">{t("Conflicting")}</option>
-                <option value="false">{t("No conflicts")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{t("Emby matching")}</span>
-              <select
-                aria-label={t("Emby matching")}
-                value={q.get("embyMatch") || ""}
-                onChange={(e) =>
-                  change(
-                    "embyMatch",
-                    e.currentTarget.value ? [e.currentTarget.value] : [],
-                  )
-                }
-              >
-                <option value="">{t("All files")}</option>
-                {[
-                  "unmatched",
-                  "matched",
-                  "missing",
-                  "ambiguous",
-                  "missing_size",
-                  "no_tracks",
-                  "unconfigured",
-                ].map((key) => (
-                  <option value={key}>{embyMatchLabels[key]}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>{t("Metadata completeness")}</span>
-              <select
-                aria-label={t("Metadata completeness")}
-                value={q.get("metadata") || ""}
-                onChange={(e) =>
-                  change(
-                    "metadata",
-                    e.currentTarget.value ? [e.currentTarget.value] : [],
-                  )
-                }
-              >
-                <option value="">{t("All files")}</option>
-                <option value="incomplete">{t("Incomplete metadata")}</option>
-                <option value="complete">
-                  {t("Core attributes complete")}
-                </option>
-              </select>
-            </label>
+              <label class="range-field">
+                <span>{t("File size (GiB)")}</span>
+                <div class="year-inputs">
+                  {["sizeMin", "sizeMax"].map((k, index) => (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder={index ? t("To") : t("From")}
+                        aria-label={
+                          index
+                            ? t("File size to (GiB)")
+                            : t("File size from (GiB)")
+                        }
+                        value={q.has(k) ? Number(q.get(k)) / 1024 ** 3 : ""}
+                        onInput={(e) =>
+                          change(
+                            k,
+                            e.currentTarget.value
+                              ? [
+                                  String(
+                                    Math.round(
+                                      Number(e.currentTarget.value) * 1024 ** 3,
+                                    ),
+                                  ),
+                                ]
+                              : [],
+                          )
+                        }
+                      />
+                      {!index && <span>–</span>}
+                    </>
+                  ))}
+                </div>
+              </label>
+            </div>
+          </section>
+          <section class="state-filters">
+            <h2>{t("Status and metadata quality")}</h2>
+            <StateFilter
+              name="conflict"
+              label="Metadata disagreement"
+              value={q.get("conflict") || ""}
+              positive="true"
+              negative="false"
+              change={change}
+            />
+            <StateFilter
+              name="ruleConflict"
+              label="Conflicting recognition rules"
+              value={q.get("ruleConflict") || ""}
+              positive="true"
+              negative="false"
+              change={change}
+            />
+            <StateFilter
+              name="metadata"
+              label="Incomplete metadata"
+              value={q.get("metadata") || ""}
+              positive="incomplete"
+              negative="complete"
+              change={change}
+            />
+            <StateFilter
+              name="embyMatch"
+              label="All unsuccessful matches"
+              value={q.get("embyMatch") || ""}
+              positive="unmatched"
+              negative="matched"
+              change={change}
+            />
             {["unknownYear", "unknownSize"].map((k) => (
               <label class="check-field">
                 <input
@@ -329,18 +274,46 @@ export function FilterPanel({
                   : t("Unknown file size")}
               </label>
             ))}
-          </div>
+            <details class="filter-detail">
+              <summary>{t("Detailed Emby status")}</summary>
+              <label>
+                <span>{t("Emby matching")}</span>
+                <select
+                  aria-label={t("Emby matching")}
+                  value={q.get("embyMatch") || ""}
+                  onChange={(e) =>
+                    change(
+                      "embyMatch",
+                      e.currentTarget.value ? [e.currentTarget.value] : [],
+                    )
+                  }
+                >
+                  <option value="">{t("All files")}</option>
+                  {[
+                    "unmatched",
+                    "matched",
+                    "missing",
+                    "ambiguous",
+                    "missing_size",
+                    "no_tracks",
+                    "unconfigured",
+                  ].map((k) => (
+                    <option value={k}>{embyMatchLabels[k]}</option>
+                  ))}
+                </select>
+              </label>
+            </details>
+            <details class="filter-detail">
+              <summary>{t("Filter logic")}</summary>
+              <p class="filter-help">
+                {t(
+                  "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
+                )}
+              </p>
+            </details>
+          </section>
         </div>
       )}
-      <p class="filter-help">
-        {!collapsed && (
-          <>
-            {t(
-              "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
-            )}
-          </>
-        )}
-      </p>
       <div class="filter-footer">
         <div class="active-filters">
           {active.length ? (

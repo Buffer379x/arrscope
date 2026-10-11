@@ -8,6 +8,7 @@
 @import "./styles/settings-and-filters.css";
 @import "./styles/improvements.css";
 @import "./styles/recognition.css";
+@import "./styles/interface-v2.css";
 /* Language icons are self-contained SVGs; no remote images or platform emoji dependency. */
 .language-select {
   display: flex;

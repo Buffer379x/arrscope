@@ -1,16 +1,9 @@
-import { Info } from "lucide-preact";
 import { t, useI18n } from "../i18n";
 import type { MediaFile } from "../types";
 import { Tag } from "../ui";
 import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
 
-export function AudioCell({
-  file,
-  open,
-}: {
-  file: MediaFile;
-  open: () => void;
-}) {
+export function AudioCell({ file }: { file: MediaFile }) {
   useI18n();
   const tracks = file.audioTracks || [];
   const mapping = tracks.length > 0;
@@ -60,21 +53,6 @@ export function AudioCell({
           </small>
         </div>
       )}
-      <button
-        class="text-button audio-mapping"
-        onClick={open}
-        aria-label={t("Audio track information: {title}", {
-          title: file.title,
-        })}
-        title={t(
-          mapping
-            ? "Audio tracks from Emby. Open file details."
-            : "Language → codec mapping unavailable. Open file details.",
-        )}
-      >
-        <Info size={13} />
-        {!mapping && <small>{t("Track mapping unavailable")}</small>}
-      </button>
     </div>
   );
 }

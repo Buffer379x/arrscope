@@ -414,6 +414,13 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	bfile.Season = 1
 	s.Replace("sonarr", []File{a, bfile}, SyncStatus{})
 	check(request("/api/presets", "POST", `{"name":"1080 x264","service":"sonarr","query":"resolution=1080p&codec=x264"}`, true), 201)
+	duplicate := check(request("/api/presets", "POST", `{"name":"another name","service":"sonarr","query":"codec=x264&resolution=1080p&resolutionOp=eq&page=8"}`, true), 409)
+	if !strings.Contains(duplicate, "1080 x264") {
+		t.Fatal("duplicate does not identify existing preset")
+	}
+	check(request("/api/sync", "POST", `{"service":"emby"}`, false), 403)
+	check(request("/api/sync", "POST", `{"service":"emby"}`, true), 409)
+
 	raw = check(request("/api/presets", "GET", "", false), 200)
 	if !strings.Contains(raw, "1080 x264") {
 		t.Fatal("preset missing")

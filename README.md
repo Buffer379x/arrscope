@@ -37,7 +37,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/arrscope:stable`. Open port 8080, obtain the one-time setup code with `docker exec arrscope cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Connections, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
+Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/arrscope:stable`. Open port 8080, obtain the one-time setup code with `docker exec arrscope cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Services, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
 
 Connect exactly one instance per service. URL subpaths are supported, for example `http://radarr:7878/radarr`; do not append `/api/v3` or put credentials/query parameters in the URL. TLS certificates are verified and redirects are rejected. Sync intervals: manual only, 15, 30, 60 (default), 360 or 1440 minutes. Emby follows the corresponding Radarr/Sonarr sync.
 
@@ -63,7 +63,7 @@ Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `ARRSCOPE_HTTPS=t
 
 ## Filename recognition
 
-Manage rules in **Settings → System → Manage recognition rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
+Manage rules in **Settings → Filename recognition**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
 
 The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
 

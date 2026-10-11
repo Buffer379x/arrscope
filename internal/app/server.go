@@ -403,6 +403,35 @@ func (s *Server) Handler() http.Handler {
 				failure(w, r, 400, errors.New("Demo data does not need syncing"))
 				return
 			}
+			if in.Service == "emby" {
+				s.mu.Lock()
+				cfg := s.settings
+				statuses := s.Sync.Statuses()
+				if !cfg.Emby.Enabled || (!cfg.Radarr.Enabled && !cfg.Sonarr.Enabled) {
+					s.mu.Unlock()
+					failure(w, r, 409, errors.New("Enable Emby and at least one library before matching"))
+					return
+				}
+				for _, service := range []string{"radarr", "sonarr"} {
+					if statuses[service].Running {
+						s.mu.Unlock()
+						failure(w, r, 409, errors.New("Sync already running"))
+						return
+					}
+				}
+				for service, connection := range map[string]ServiceConfig{"radarr": cfg.Radarr, "sonarr": cfg.Sonarr} {
+					if connection.Enabled {
+						if e := s.Sync.Start(s.ctx, service, connection, cfg.Emby); e != nil {
+							s.mu.Unlock()
+							failure(w, r, 409, e)
+							return
+						}
+					}
+				}
+				s.mu.Unlock()
+				jsonOut(w, 202, map[string]bool{"ok": true})
+				return
+			}
 			s.mu.Lock()
 			cfg := s.settings.Radarr
 			if in.Service == "sonarr" {
@@ -491,12 +520,16 @@ func (s *Server) Handler() http.Handler {
 				}
 				q.Del("page")
 				p.Query = q.Encode()
-				res, e := s.Store.DB.Exec("INSERT INTO presets(name,service,query) VALUES(?,?,?)", strings.TrimSpace(p.Name), p.Service, p.Query)
+				created, duplicate, e := s.Store.SavePreset(r.Context(), p)
 				if e != nil {
 					failure(w, r, 500, errors.New("Could not save preset"))
 					return
 				}
-				p.ID, _ = res.LastInsertId()
+				if duplicate != nil {
+					jsonOut(w, 409, duplicatePresetResponse(*duplicate))
+					return
+				}
+				p = created
 				jsonOut(w, 201, p)
 				return
 			}
