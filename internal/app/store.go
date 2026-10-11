@@ -138,6 +138,11 @@ PRAGMA user_version=1;COMMIT;`)
 		}
 	}
 	var recognition RecognitionConfig
+	// A compact covering index avoids reading full evidence/audio JSON while
+	// counting and selecting IDs for compound filters and season membership.
+	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_traits ON files(service,resolution,codec,source,hdr,audio,language,media_id,season,processing,family,bitDepth,channels,size,conflict,rule_conflict,emby_match,title COLLATE NOCASE,id)`); err != nil {
+		return fail(err)
+	}
 	if err = s.Get("recognition", &recognition); err == nil {
 		s.recognition, err = CompileRecognition(recognition.Rules)
 		if err != nil {
@@ -295,7 +300,7 @@ func where(q url.Values) (string, []any, error) {
 				}
 				if v == "__unknown__" || v == "" {
 					if field == "language" {
-						parts = append(parts, "(f.language='' OR EXISTS(SELECT 1 FROM file_languages l WHERE l.file_rowid=f.rowid AND l.language=''))")
+						parts = append(parts, "f.rowid IN (SELECT l.file_rowid FROM file_languages l WHERE l.language='')")
 					} else if field == "audio" {
 						parts = append(parts, "(f."+field+"='' OR EXISTS(SELECT 1 FROM json_each(f.data,'$.unknownTraits') u WHERE u.value=?))")
 						a = append(a, field)
@@ -306,11 +311,12 @@ func where(q url.Values) (string, []any, error) {
 					continue
 				}
 				if field == "language" {
-					parts = append(parts, "(f.language=? OR EXISTS(SELECT 1 FROM file_languages l WHERE l.file_rowid=f.rowid AND l.language=?))")
+					parts = append(parts, "f.rowid IN (SELECT l.file_rowid FROM file_languages l WHERE l.language=?)")
+					a = append(a, v)
 				} else {
 					parts = append(parts, "(f."+field+"=? OR instr(' + '||f."+field+"||' + ', ' + '||?||' + ')>0)")
+					a = append(a, v, v)
 				}
-				a = append(a, v, v)
 			}
 			join := " OR "
 			if op == "all" || op == "notAll" {
@@ -432,37 +438,24 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 		return out, e
 	}
 	defer tx.Rollback()
+	if mode == "season" && q.Get("service") == "sonarr" && !all {
+		return querySeasonPage(ctx, tx, q, filter, args, out)
+	}
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files f WHERE "+filter, args...).Scan(&out.Total); e != nil {
 		return out, e
 	}
 	out.DisplayTotal = out.Total
-	display := filter
-	da := append([]any{}, args...)
-	if mode == "season" && q.Get("service") == "sonarr" && !all {
-		display = "f.service=? AND (f.media_id,f.season) IN (SELECT f.media_id,f.season FROM files f WHERE " + filter + ")"
-		da = append([]any{"sonarr"}, args...)
-		if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files f WHERE "+display, da...).Scan(&out.DisplayTotal); e != nil {
-			return out, e
-		}
-	}
 	order, e := displayOrder(q)
 	if e != nil {
 		return out, e
 	}
-	matchedExpression := "1"
-	matchArgs := []any{}
-	if mode == "season" && q.Get("service") == "sonarr" && !all {
-		matchedExpression = filter
-		matchArgs = args
-	}
-	query := "SELECT f.data,(" + matchedExpression + ") FROM files f WHERE " + display + " ORDER BY " + order
-	qa := append(append([]any{}, matchArgs...), da...)
+	query := "SELECT f.data,1 FROM files f WHERE " + filter + " ORDER BY " + order
+	qa := append([]any{}, args...)
 	if !all {
 		// Sort compact row IDs first, then load and evaluate only the current page.
 		// Carrying large evidence/track JSON through a 50k-row temp sort is avoidable.
-		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + display + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,(" + matchedExpression + ") FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
-		qa = append(append([]any{}, da...), out.PageSize, (out.Page-1)*out.PageSize)
-		qa = append(qa, matchArgs...)
+		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,1 FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
+		qa = append(qa, out.PageSize, (out.Page-1)*out.PageSize)
 	}
 
 	rows, e := tx.QueryContext(ctx, query, qa...)
@@ -482,6 +475,45 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 		}
 		f.Matched = matched
 		out.Files = append(out.Files, f)
+	}
+	return out, rows.Err()
+}
+
+func querySeasonPage(ctx context.Context, tx *sql.Tx, q url.Values, filter string, args []any, out Results) (Results, error) {
+	order, err := displayOrder(q)
+	if err != nil {
+		return out, err
+	}
+	// Evaluate costly compound filters once, then reuse compact IDs for season
+	// membership, counts and matched markers. The left join retains counts even
+	// when no results exist or the requested page is beyond the last page.
+	query := `WITH matched AS MATERIALIZED (SELECT f.rowid,f.media_id,f.season FROM files f WHERE ` + filter + `),
+groups AS MATERIALIZED (SELECT DISTINCT media_id,season FROM matched),
+counts AS MATERIALIZED (SELECT (SELECT count(*) FROM matched) AS total,(SELECT count(*) FROM files f INDEXED BY files_group WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups)) AS displayed),
+page AS MATERIALIZED (SELECT f.rowid FROM files f INDEXED BY files_series_sort WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups) ORDER BY ` + order + ` LIMIT ? OFFSET ?)
+SELECT f.data,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed
+FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY ` + order
+	params := append(append([]any{}, args...), out.PageSize, (out.Page-1)*out.PageSize)
+	rows, err := tx.QueryContext(ctx, query, params...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw sql.NullString
+		var matched bool
+		if err = rows.Scan(&raw, &matched, &out.Total, &out.DisplayTotal); err != nil {
+			return out, err
+		}
+		if !raw.Valid {
+			continue
+		}
+		var file File
+		if err = json.Unmarshal([]byte(raw.String), &file); err != nil {
+			return out, err
+		}
+		file.Matched = matched
+		out.Files = append(out.Files, file)
 	}
 	return out, rows.Err()
 }

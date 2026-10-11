@@ -14,29 +14,29 @@ Recorded on October 11, 2026. All service fixtures are synthetic. No production 
 
 ## Local performance
 
-Paged queries sort compact row IDs before fetching full evidence and audio-track JSON for the current page. Regression tests compare every allowed movie sort in both directions across three pages with the complete result order.
+Paged queries sort compact row IDs before fetching full evidence and audio-track JSON for the current page. A covering trait index avoids loading media JSON for compound filters. Season context reuses matched IDs and groups once, counts via the group index and pages via the series-order index. Regression tests compare every allowed movie sort in both directions across three pages with the complete result order and check empty/out-of-range season pages with multi-year/Specials context.
 
 Local prerelease candidate on macOS/arm64; Go runtime reports 15 CPUs and uses `GOMAXPROCS=2` for the native benchmark. Dataset: 50,000 files per service; query matrix includes search, numeric ranges, sorting, exclusions, compound all/not-all, both libraries and season context.
 
 | Measurement | Result |
 | --- | --- |
-| 50k-file filter p50 | 44.69 ms |
-| 50k-file filter p95 | 96.91 ms |
-| Initial statistics across 100k files | 2.79 s |
+| 50k-file filter p50 | 19.75 ms |
+| 50k-file filter p95 | 69.78 ms |
+| Initial statistics across 100k files | 2.85 s |
 
 Isolated arm64 Docker test of the final memory/pagination candidate: 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, Go memory target at most 128 MiB under the detected 256 MiB container limit, equal memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped. The runtime clamps existing higher Unraid targets too; smaller user targets remain respected.
 
 | Measurement | Result |
 | --- | --- |
-| Successful complete sync | 21.68 s |
-| Sampled application RSS peak during sync | 234.05 MiB |
-| Application RSS after queries and reprocessing | 40.06 MiB |
-| HTTP filter p95 | 89.58 ms |
-| Cold statistics request | 4.87 s |
-| Cached statistics p95 | 1.54 ms |
-| Cold facets request | 1.09 s |
-| Cached facets p95 | 0.72 ms |
-| Reprocess 100k cached filenames | 15.04 s |
+| Successful complete sync | 22.91 s |
+| Sampled application RSS peak during sync | 232.95 MiB |
+| Application RSS after queries and reprocessing | 42.88 MiB |
+| HTTP filter p95 | 20.77 ms |
+| Cold statistics request | 5.07 s |
+| Cached statistics p95 | 0.61 ms |
+| Cold facets request | 0.69 s |
+| Cached facets p95 | 0.57 ms |
+| Reprocess 100k cached filenames | 16.09 s |
 | Upstream requests caused by rule save | 0 |
 
 The cgroup peak reached its 256 MiB limit, including filesystem/database page cache; the process remained healthy and was not OOM-killed. Sampled RSS can miss transient peaks. Cold aggregate requests are slower than indexed library filters and are cached until sync or rule changes. These measurements are environment-specific, not universal latency guarantees. The final CI and release workflow rerun the synthetic container checks on the published candidate.

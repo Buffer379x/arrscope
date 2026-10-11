@@ -366,7 +366,7 @@ func TestRecognitionMigrationFromSchemaFourRetainsTracksAndPresets(t *testing.T)
 		t.Fatal(err)
 	}
 	raw, _ := json.Marshal(file)
-	if _, err := store.DB.Exec("UPDATE files SET data=?; DELETE FROM kv WHERE key='recognition'; DROP TABLE file_languages; DROP INDEX files_rule_conflicts; DROP INDEX files_emby_match; ALTER TABLE files DROP COLUMN rule_conflict; ALTER TABLE files DROP COLUMN emby_match; PRAGMA user_version=4", string(raw)); err != nil {
+	if _, err := store.DB.Exec("UPDATE files SET data=?; DELETE FROM kv WHERE key='recognition'; DROP TABLE file_languages; DROP INDEX files_rule_conflicts; DROP INDEX files_emby_match; DROP INDEX files_traits; ALTER TABLE files DROP COLUMN rule_conflict; ALTER TABLE files DROP COLUMN emby_match; PRAGMA user_version=4", string(raw)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.DB.Exec("INSERT INTO presets(name,service,query) VALUES('Languages','radarr','language=Deutsch&audio=DTS')"); err != nil {
@@ -419,6 +419,37 @@ func TestMergedAudioKeepsUnattributedFallbackAndLanguagePresetAliases(t *testing
 	out, err := store.Query(url.Values{"service": {"radarr"}, "language": {"Spanish", "Italian"}, "languageOp": {"all"}}, "matches", false)
 	if err != nil || out.Total != 1 {
 		t.Fatal("legacy language preset aliases broke", out, err)
+	}
+}
+
+func TestSeasonContextEmptyPagesAndMultiYearFilters(t *testing.T) {
+	store := testStore(t)
+	a := sample(1, "A.1080p.x264.mkv")
+	b := sample(2, "B.2160p.x265.mkv")
+	c := sample(3, "C.2160p.x265.mkv")
+	a.Series, b.Series, c.Series = "Show", "Show", "Other show"
+	a.Season, b.Season, c.Season = 0, 0, 1
+	c.MediaID = 2
+	a.Years, b.Years = []int{2019, 2021}, []int{}
+	if err := store.Replace("sonarr", []File{a, b, c}, SyncStatus{}); err != nil {
+		t.Fatal(err)
+	}
+	query := url.Values{"service": {"sonarr"}, "yearMin": {"2021"}, "yearMax": {"2021"}}
+	result, err := store.Query(query, "season", false)
+	if err != nil || result.Total != 1 || result.DisplayTotal != 2 || len(result.Files) != 2 || !result.Files[0].Matched || result.Files[1].Matched {
+		t.Fatalf("multi-year match and Specials context: %+v, %v", result, err)
+	}
+	query.Set("page", "2")
+	result, err = store.Query(query, "season", false)
+	if err != nil || result.Total != 1 || result.DisplayTotal != 2 || len(result.Files) != 0 {
+		t.Fatalf("out-of-range page must retain counts: %+v, %v", result, err)
+	}
+	query.Set("page", "1")
+	query.Set("yearMin", "2022")
+	query.Set("yearMax", "2022")
+	result, err = store.Query(query, "season", false)
+	if err != nil || result.Total != 0 || result.DisplayTotal != 0 || len(result.Files) != 0 {
+		t.Fatalf("empty matches: %+v, %v", result, err)
 	}
 }
 
