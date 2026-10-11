@@ -449,12 +449,22 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 	if e != nil {
 		return out, e
 	}
-	query := "SELECT f.data,(" + filter + ") FROM files f WHERE " + display + " ORDER BY " + order
-	qa := append(append([]any{}, args...), da...)
-	if !all {
-		query += " LIMIT ? OFFSET ?"
-		qa = append(qa, out.PageSize, (out.Page-1)*out.PageSize)
+	matchedExpression := "1"
+	matchArgs := []any{}
+	if mode == "season" && q.Get("service") == "sonarr" && !all {
+		matchedExpression = filter
+		matchArgs = args
 	}
+	query := "SELECT f.data,(" + matchedExpression + ") FROM files f WHERE " + display + " ORDER BY " + order
+	qa := append(append([]any{}, matchArgs...), da...)
+	if !all {
+		// Sort compact row IDs first, then load and evaluate only the current page.
+		// Carrying large evidence/track JSON through a 50k-row temp sort is avoidable.
+		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + display + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,(" + matchedExpression + ") FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
+		qa = append(append([]any{}, da...), out.PageSize, (out.Page-1)*out.PageSize)
+		qa = append(qa, matchArgs...)
+	}
+
 	rows, e := tx.QueryContext(ctx, query, qa...)
 	if e != nil {
 		return out, e

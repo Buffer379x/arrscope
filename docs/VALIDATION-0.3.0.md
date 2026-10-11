@@ -14,15 +14,17 @@ Recorded on October 11, 2026. All service fixtures are synthetic. No production 
 
 ## Local performance
 
+Paged queries sort compact row IDs before fetching full evidence and audio-track JSON for the current page. Regression tests compare every allowed movie sort in both directions across three pages with the complete result order.
+
 Local prerelease candidate on macOS/arm64; Go runtime reports 15 CPUs and uses `GOMAXPROCS=2` for the native benchmark. Dataset: 50,000 files per service; query matrix includes search, numeric ranges, sorting, exclusions, compound all/not-all, both libraries and season context.
 
 | Measurement | Result |
 | --- | --- |
-| 50k-file filter p50 | 46.56 ms |
-| 50k-file filter p95 | 127.20 ms |
-| Initial statistics across 100k files | 2.84 s |
+| 50k-file filter p50 | 44.69 ms |
+| 50k-file filter p95 | 96.91 ms |
+| Initial statistics across 100k files | 2.79 s |
 
-Isolated arm64 Docker test: 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, `GOMEMLIMIT=192MiB`, 256 MiB memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped.
+Isolated arm64 Docker test before the pagination optimization (the final CI reruns it): 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, `GOMEMLIMIT=192MiB`, 256 MiB memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped.
 
 | Measurement | Result |
 | --- | --- |

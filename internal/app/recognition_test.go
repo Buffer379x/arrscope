@@ -421,3 +421,47 @@ func TestMergedAudioKeepsUnattributedFallbackAndLanguagePresetAliases(t *testing
 		t.Fatal("legacy language preset aliases broke", out, err)
 	}
 }
+
+func TestCompactPaginationMatchesCompleteSortOrder(t *testing.T) {
+	store := testStore(t)
+	files := make([]File, 230)
+	for i := range files {
+		files[i] = sample(i+1, "Movie.1080p.x264.German.mkv")
+		files[i].Title = "Movie " + strings.Repeat("A", i%7) + string(rune('a'+i%26))
+		files[i].Years = []int{1980 + i%40}
+		files[i].Size = int64(i%11) * 1024
+		files[i].AudioTracks = []AudioTrack{{Index: 1, Language: "Deutsch", Codec: "DTS", Title: strings.Repeat("Large synthetic track title ", 100)}}
+	}
+	if err := store.Replace("radarr", files, SyncStatus{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "language"} {
+		for _, direction := range []string{"asc", "desc"} {
+			query := url.Values{"service": {"radarr"}, "codec": {"x264"}, "sort": {field}, "dir": {direction}}
+			complete, err := store.Query(query, "matches", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, page := range []string{"1", "2", "3"} {
+				query.Set("page", page)
+				partial, err := store.Query(query, "matches", false)
+				if err != nil {
+					t.Fatal(field, direction, err)
+				}
+				start := (partial.Page - 1) * 100
+				end := start + 100
+				if end > len(complete.Files) {
+					end = len(complete.Files)
+				}
+				if partial.Total != complete.Total || len(partial.Files) != end-start {
+					t.Fatal("pagination count", field, direction, page)
+				}
+				for i, file := range partial.Files {
+					if file.ID != complete.Files[start+i].ID || !file.Matched {
+						t.Fatal("pagination order", field, direction, page, file.ID)
+					}
+				}
+			}
+		}
+	}
+}
