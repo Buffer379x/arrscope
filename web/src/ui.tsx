@@ -84,6 +84,7 @@ export const date = (s: string | null | undefined) =>
       })
     : t("Not synced yet");
 export const TagColors = createContext<Record<string, string>>({});
+export const TagTextColors = createContext<Record<string, string>>({});
 export const colorFields = [
   "resolution",
   "codec",
@@ -113,20 +114,22 @@ export function Tag({
   kind = "source",
   title,
   colors,
+  textColors,
 }: {
   colors?: Record<string, string>;
+  textColors?: Record<string, string>;
   value: string;
   kind?: string;
   title?: string;
 }) {
   useI18n();
   const inherited = useContext(TagColors);
-  const color = (colors || inherited)[
-    kind.split(" ")[0] + ":" + (value || "__unknown__")
-  ];
+  const inheritedText = useContext(TagTextColors);
+  const key = kind.split(" ")[0] + ":" + (value || "__unknown__");
+  const color = (colors || inherited)[key];
   return (
     <span
-      style={colorStyle(color)}
+      style={colorStyle(color, (textColors || inheritedText)[key])}
       class={"tag " + kind + (!value ? " unknown" : "")}
       title={title}
     >

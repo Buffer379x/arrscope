@@ -1,4 +1,5 @@
 :root {
+  scrollbar-gutter: stable;
   font-family:
     Inter,
     ui-sans-serif,

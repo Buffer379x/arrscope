@@ -59,9 +59,9 @@ Only internal audio streams count: index, explicitly reported language, codec/pr
 
 ## Presentation, translations and versioning
 
-Settings store visible columns and the complete eleven-column order independently per service. Title/episode remains visible. Unknown/duplicate/missing columns and invalid services are rejected. Header/cells share one ordered list; temporary “All columns” does not change defaults. Tag colors are validated hex values with readable text contrast. Filter presets remain canonical SQLite data independent of display language.
+Settings store visible columns and the complete eleven-column order independently per service. Title/episode remains visible. Unknown/duplicate/missing columns and invalid services are rejected. Header/cells share one ordered list; temporary “All columns” does not change defaults. Tag backgrounds are validated hex values with automatic text contrast. Optional text overrides accept only black or white; both maps persist in the existing settings JSON without a schema migration. Filter presets remain canonical SQLite data independent of display language.
 
-The dashboard opens after login. Distribution-tag buttons open a separate temporary filter query, preserving saved/current library queries. Combined statistics offer a movie/TV choice in the drilldown banner. Returning or normal menu navigation restores previous filters. Presets change only when explicitly saved or selected.
+The dashboard opens after login. Distribution-tag buttons replace the target library’s current in-memory query and select the corresponding value in the existing controls. The panel expands, with no separate drilldown banner. The other library’s filters remain independent. The combined statistics scope uses the currently selected library; movie/TV scopes choose explicitly. Reload clears unsaved filters. Presets change only when explicitly saved or selected.
 
 JSON catalogs are discovered at build time, including future contributed languages. English keys are stable message identifiers with named placeholders and plain-text values. Go embeds the same catalogs for API errors/CSV. `Accept-Language` negotiation supports regional fallback and quality weights. UI preferences use browser storage; canonical media/filter values are never translated in storage. See [translation guide](TRANSLATING.md).
 

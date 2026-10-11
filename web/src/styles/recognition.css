@@ -1,12 +1,20 @@
+.statistics-heading,
+.library-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+  margin: 0 0 14px;
+}
 .statistics-heading h1,
+.library-intro h1,
 .recognition-heading h1 {
   font-size: 18px;
+  line-height: 24px;
   letter-spacing: -0.3px;
   margin: 0;
-  font-weight: 700;
-}
-.statistics-heading {
-  margin: 8px 0 20px;
+  font-weight: 600;
 }
 .recognition-heading {
   display: flex;
@@ -193,6 +201,7 @@
 }
 @media (max-width: 600px) {
   .statistics-heading h1,
+  .library-intro h1,
   .recognition-heading h1 {
     font-size: 16px;
   }

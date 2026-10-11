@@ -474,6 +474,11 @@
     "Cancel": "Annulla",
     "Enter a filename up to 2048 characters": "Inserisci un nome di file fino a 2048 caratteri",
     "Discard unsaved settings changes?": "Scartare le impostazioni non salvate?",
-    "Additional reported values without track attribution": "Valori aggiuntivi senza associazione alle tracce"
+    "Additional reported values without track attribution": "Valori aggiuntivi senza associazione alle tracce",
+    "Text color for {value}": "Colore del testo per {value}",
+    "Automatic": "Automatico",
+    "Black": "Nero",
+    "White": "Bianco",
+    "Tag text color must be black or white": "Il colore del testo del tag deve essere nero o bianco"
   }
 }

@@ -42,14 +42,9 @@ import type {
 } from "../types";
 
 import { api } from "../api";
-import {
-  dashboardService,
-  makeDashboardFilter,
-  type DashboardFilter,
-} from "../dashboard-filter";
+import { dashboardService, makeDashboardFilter } from "../dashboard-filter";
 import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
 import { getLocale } from "../i18n";
-import { labels } from "../ui";
 import { useFacets, useLibraryQuery } from "../hooks/useLibraryQuery";
 import {
   bytes,
@@ -62,6 +57,7 @@ import {
   FilterUpdate,
   Tag,
   TagColors,
+  TagTextColors,
 } from "../ui";
 import { RecognitionPage } from "./RecognitionPage";
 import { AudioCell } from "./AudioCell";
@@ -145,12 +141,7 @@ export function Library({
     ),
     [savePreset, setSavePreset] = useState(false),
     [presetName, setPresetName] = useState("");
-  const [dashboardFilter, setDashboardFilter] =
-    useState<DashboardFilter | null>(null);
-  const effectiveFilters = dashboardFilter
-    ? { radarr: dashboardFilter.query, sonarr: dashboardFilter.query }
-    : filters;
-  const q = new URLSearchParams(effectiveFilters[service]);
+  const q = new URLSearchParams(filters[service]);
   const sync = status.sync?.[service];
   const configured = settings?.[service].enabled;
   const visibleColumns = settings?.visibleColumns[service] || defaultColumns;
@@ -184,7 +175,7 @@ export function Library({
   useLibraryQuery({
     view,
     service,
-    filters: effectiveFilters,
+    filters,
     page,
     movieSort,
     lastSuccess: `${sync?.lastSuccess}:${status.recognitionRevision}`,
@@ -210,35 +201,23 @@ export function Library({
       next.forEach((v) => n.append(key, v));
       return { ...current, [service]: n.toString() };
     };
-    if (dashboardFilter)
-      setDashboardFilter((current) =>
-        current
-          ? {
-              ...current,
-              query: updateFilters({
-                radarr: current.query,
-                sonarr: current.query,
-              })[service],
-            }
-          : current,
-      );
-    else setFilters(updateFilters);
+    setFilters(updateFilters);
     setPage(1);
   };
   const openDashboardFilter = (field: string, value: string, scope: string) => {
-    setDashboardFilter(makeDashboardFilter(field, value, scope));
-    setService(dashboardService(scope, service));
+    const target = dashboardService(scope, service);
+    setFilters((current) => ({
+      ...current,
+      [target]: makeDashboardFilter(field, value, scope).query,
+    }));
+    setPresetIds((current) => ({ ...current, [target]: undefined }));
+    setService(target);
+    setCollapsed(false);
     setPage(1);
     setResults(emptyResults);
     setView("library");
   };
-  const closeDashboardFilter = () => {
-    if (!dashboardFilter) return;
-    setDashboardFilter(null);
-    setPage(1);
-  };
   const applyPreset = (p: Preset) => {
-    setDashboardFilter(null);
     setPresetIds({ ...presetIds, [p.service]: p.id });
     setService(p.service);
     const n = new URLSearchParams(p.query);
@@ -250,10 +229,6 @@ export function Library({
     setPage(1);
   };
   const reset = () => {
-    if (dashboardFilter) {
-      closeDashboardFilter();
-      return;
-    }
     setFilters({ ...filters, [service]: "" });
     setPage(1);
   };
@@ -274,7 +249,7 @@ export function Library({
       const created = await api<Preset>("presets", "POST", {
         name: presetName,
         service,
-        query: effectiveFilters[service],
+        query: filters[service],
       });
       await loadPresets();
       setPresetIds({ ...presetIds, [service]: created.id });
@@ -285,7 +260,7 @@ export function Library({
       setError((e as Error).message);
     }
   };
-  const exportQuery = new URLSearchParams(effectiveFilters[service]);
+  const exportQuery = new URLSearchParams(filters[service]);
   exportQuery.set("service", service);
   exportQuery.set("lang", getLocale());
   if (service === "radarr") {
@@ -310,7 +285,7 @@ export function Library({
   const matchingPresets = presets.filter(
     (p) =>
       p.service === service &&
-      canonicalQuery(p.query) === canonicalQuery(effectiveFilters[service]),
+      canonicalQuery(p.query) === canonicalQuery(filters[service]),
   );
   const selectedPreset =
     matchingPresets.find((p) => p.id === presetIds[service]) ||
@@ -387,613 +362,619 @@ export function Library({
   }, [busy, results.page, page, pages]);
   return (
     <TagColors.Provider value={settings?.tagColors || {}}>
-      <div class="shell">
-        <header class="header">
-          <a href="/" class="brand" aria-label={t("ArrScope home")}>
-            <img
-              src="/icon-64.png"
-              srcSet="/icon-64.png 1x, /icon-256.png 2x"
-              width="34"
-              height="34"
-              alt=""
-            />
-            <b>
-              ArrScope<span> / </span>
-            </b>
-            <span class="brand-caption">{t("LIBRARY EXPLORER")}</span>
-          </a>
-          <nav class="tabs" aria-label={t("Main navigation")}>
-            <button
-              class={view === "statistics" ? "active" : ""}
-              onClick={() => {
-                if (!canLeaveRules()) return;
-                closeDashboardFilter();
-                setView("statistics");
-              }}
-            >
-              <BarChart3 size={17} />
-              {t("Dashboard")}
-            </button>
+      <TagTextColors.Provider value={settings?.tagTextColors || {}}>
+        <div class="shell">
+          <header class="header">
+            <a href="/" class="brand" aria-label={t("ArrScope home")}>
+              <img
+                src="/icon-64.png"
+                srcSet="/icon-64.png 1x, /icon-256.png 2x"
+                width="34"
+                height="34"
+                alt=""
+              />
+              <b>
+                ArrScope<span> / </span>
+              </b>
+              <span class="brand-caption">{t("LIBRARY EXPLORER")}</span>
+            </a>
+            <nav class="tabs" aria-label={t("Main navigation")}>
+              <button
+                class={view === "statistics" ? "active" : ""}
+                onClick={() => {
+                  if (!canLeaveRules()) return;
+                  setView("statistics");
+                }}
+              >
+                <BarChart3 size={17} />
+                {t("Dashboard")}
+              </button>
 
-            <button
-              class={view === "library" && service === "radarr" ? "active" : ""}
-              onClick={() => {
-                if (!canLeaveRules()) return;
-                closeDashboardFilter();
-                setView("library");
-                if (service === "radarr") return;
-                setService("radarr");
-                setPage(1);
-                setResults(emptyResults);
-              }}
-            >
-              <Film size={17} /> {t("Movies")}
-            </button>
-            <button
-              class={view === "library" && service === "sonarr" ? "active" : ""}
-              onClick={() => {
-                if (!canLeaveRules()) return;
-                closeDashboardFilter();
-                setView("library");
-                if (service === "sonarr") return;
-                setService("sonarr");
-                setPage(1);
-                setResults(emptyResults);
-              }}
-            >
-              <Tv size={17} /> {t("TV series")}
-            </button>
-          </nav>
-          <div class="header-actions">
-            <button
-              class="icon-button"
-              aria-label={theme === "dark" ? t("Light theme") : t("Dark theme")}
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            >
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button
-              class="icon-button"
-              aria-label={t("Settings")}
-              onClick={() => {
-                if (canLeaveRules()) openSettings();
-              }}
-            >
-              <SettingsIcon size={18} />
-            </button>
-            <button
-              class="icon-button"
-              aria-label={t("Sign out")}
-              onClick={async () => {
-                await api("logout", "POST");
-                await refresh();
-              }}
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </header>
-        {status.demo && (
-          <div class="demo-bar">
-            <span>
-              <Info size={14} />
-              {t("Demo · sample data, no connection to your services")}
-            </span>
-          </div>
-        )}
-        <main class="main">
-          {view === "recognition" ? (
-            <RecognitionPage
-              onDirty={setRulesDirty}
-              saved={refresh}
-              back={() => {
-                setView("statistics");
-                openSettings("system");
-              }}
-            />
-          ) : view === "statistics" ? (
-            <StatisticsPage status={status} onFilter={openDashboardFilter} />
-          ) : (
-            <>
-              <section class="library-intro">
-                <h1>
-                  {service === "radarr" ? t("Movie library") : t("TV library")}
-                </h1>
-                <span>
-                  {count(sync?.count || 0)} {t("files in cache")}
-                </span>
-              </section>
-              {error && (
-                <div class="notice error" role="alert">
-                  <AlertTriangle size={16} />
-                  {error}
-                  <button
-                    class="icon-button"
-                    aria-label={t("Dismiss error")}
-                    onClick={() => setError("")}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-              {notice && (
-                <div class="notice success" role="status">
-                  <Check size={16} />
-                  {notice}
-                  <button
-                    class="icon-button"
-                    aria-label={t("Dismiss notification")}
-                    onClick={() => setNotice("")}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-              {!status.demo && settings && !configured && (
-                <div class="connect-card">
-                  <Database size={24} />
-                  <div>
-                    <b>
-                      {t(
-                        service === "radarr"
-                          ? "Connect your movie library."
-                          : "Connect your TV library.",
-                      )}
-                    </b>
-                    <p>
-                      {t(
-                        "An address and API key are enough. ArrScope only reads existing data.",
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    class="primary"
-                    onClick={() => {
-                      if (canLeaveRules()) openSettings();
-                    }}
-                  >
-                    {t("Set up service")}
-                    <ArrowUpRight size={16} />
-                  </button>
-                </div>
-              )}
-              {dashboardFilter && (
-                <div class="dashboard-filter-notice" role="status">
+              <button
+                class={
+                  view === "library" && service === "radarr" ? "active" : ""
+                }
+                onClick={() => {
+                  if (!canLeaveRules()) return;
+                  setView("library");
+                  if (service === "radarr") return;
+                  setService("radarr");
+                  setPage(1);
+                  setResults(emptyResults);
+                }}
+              >
+                <Film size={17} /> {t("Movies")}
+              </button>
+              <button
+                class={
+                  view === "library" && service === "sonarr" ? "active" : ""
+                }
+                onClick={() => {
+                  if (!canLeaveRules()) return;
+                  setView("library");
+                  if (service === "sonarr") return;
+                  setService("sonarr");
+                  setPage(1);
+                  setResults(emptyResults);
+                }}
+              >
+                <Tv size={17} /> {t("TV series")}
+              </button>
+            </nav>
+            <div class="header-actions">
+              <button
+                class="icon-button"
+                aria-label={
+                  theme === "dark" ? t("Light theme") : t("Dark theme")
+                }
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                class="icon-button"
+                aria-label={t("Settings")}
+                onClick={() => {
+                  if (canLeaveRules()) openSettings();
+                }}
+              >
+                <SettingsIcon size={18} />
+              </button>
+              <button
+                class="icon-button"
+                aria-label={t("Sign out")}
+                onClick={async () => {
+                  await api("logout", "POST");
+                  await refresh();
+                }}
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
+          </header>
+          {status.demo && (
+            <div class="demo-bar">
+              <span>
+                <Info size={14} />
+                {t("Demo · sample data, no connection to your services")}
+              </span>
+            </div>
+          )}
+          <main class="main">
+            {view === "recognition" ? (
+              <RecognitionPage
+                onDirty={setRulesDirty}
+                saved={refresh}
+                back={() => {
+                  setView("statistics");
+                  openSettings("system");
+                }}
+              />
+            ) : view === "statistics" ? (
+              <StatisticsPage status={status} onFilter={openDashboardFilter} />
+            ) : (
+              <>
+                <section class="library-intro">
+                  <h1>
+                    {service === "radarr"
+                      ? t("Movie library")
+                      : t("TV library")}
+                  </h1>
                   <span>
-                    {t("Temporary dashboard filter")}:{" "}
-                    {labels[dashboardFilter.field]} ·{" "}
-                    {dashboardFilter.value || t("Unknown")}
+                    {count(sync?.count || 0)} {t("files in cache")}
                   </span>
-                  {dashboardFilter.scope === "all" && (
-                    <select
-                      aria-label={t("Library for dashboard filter")}
-                      value={service}
-                      onChange={(event) => {
-                        setService(event.currentTarget.value as Service);
-                        setPage(1);
-                        setResults(emptyResults);
+                </section>
+                {error && (
+                  <div class="notice error" role="alert">
+                    <AlertTriangle size={16} />
+                    {error}
+                    <button
+                      class="icon-button"
+                      aria-label={t("Dismiss error")}
+                      onClick={() => setError("")}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                {notice && (
+                  <div class="notice success" role="status">
+                    <Check size={16} />
+                    {notice}
+                    <button
+                      class="icon-button"
+                      aria-label={t("Dismiss notification")}
+                      onClick={() => setNotice("")}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                {!status.demo && settings && !configured && (
+                  <div class="connect-card">
+                    <Database size={24} />
+                    <div>
+                      <b>
+                        {t(
+                          service === "radarr"
+                            ? "Connect your movie library."
+                            : "Connect your TV library.",
+                        )}
+                      </b>
+                      <p>
+                        {t(
+                          "An address and API key are enough. ArrScope only reads existing data.",
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      class="primary"
+                      onClick={() => {
+                        if (canLeaveRules()) openSettings();
                       }}
                     >
-                      <option value="radarr">{t("Movies")}</option>
-                      <option value="sonarr">{t("TV series")}</option>
-                    </select>
-                  )}
-                  <button class="text-button" onClick={closeDashboardFilter}>
-                    {t("Return to previous filters")}
-                  </button>
-                </div>
-              )}
-              <FilterPanel
-                q={q}
-                collapsed={collapsed}
-                setCollapsed={setCollapsed}
-                active={active}
-                service={service}
-                facets={facets}
-                presets={presets}
-                selectedPreset={selectedPreset}
-                applyPreset={applyPreset}
-                reset={reset}
-                setSavePreset={setSavePreset}
-                deletePreset={deletePreset}
-                change={change}
-              />
-              <section class="library-section">
-                <div class="results-heading">
-                  <div>
-                    <h2>
-                      {t(
-                        service === "radarr" ? "Your movies" : "Your TV series",
-                      )}{" "}
-                      <span>{count(results.total)}</span>
-                      {busy && <LoaderCircle size={16} class="spin" />}
-                    </h2>
-                    <p>
-                      {active.length
-                        ? t("Files matching your filters")
-                        : t("Your complete library")}
-                      {results.displayTotal > results.total &&
-                        t(" · {count} additional files as season context", {
-                          count: count(results.displayTotal - results.total),
-                        })}
-                    </p>
-                  </div>
-                  <div class="results-tools">
-                    <button
-                      class="button"
-                      aria-pressed={showAllColumns[service]}
-                      disabled={
-                        visibleColumns.length === columnOrder.length &&
-                        !showAllColumns[service]
-                      }
-                      title={
-                        showAllColumns[service]
-                          ? t("Return to saved columns")
-                          : t("Show hidden columns in the saved order")
-                      }
-                      onClick={() =>
-                        setShowAllColumns({
-                          ...showAllColumns,
-                          [service]: !showAllColumns[service],
-                        })
-                      }
-                    >
-                      <Columns3 size={15} />{" "}
-                      {showAllColumns[service]
-                        ? t("Default view")
-                        : t("All columns")}
+                      {t("Set up service")}
+                      <ArrowUpRight size={16} />
                     </button>
-                    <a class="button" href={"/api/export?" + exportQuery}>
-                      <Download size={15} />
-                      {t("Export CSV")}
-                    </a>
                   </div>
-                </div>
-                <div
-                  class={"table-wrap" + (busy ? " busy" : "")}
-                  aria-busy={busy}
-                >
-                  <table>
-                    <thead>
-                      <tr>
-                        {displayColumns.map((field) =>
-                          columnHeader(
-                            field,
-                            field === "title"
-                              ? service === "radarr"
-                                ? t("Title")
-                                : t("Episode")
-                              : columnLabels[field],
-                            field === "title",
-                          ),
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.files.map((f, i) => {
-                        const prev = results.files[i - 1];
-                        const group =
-                          service === "sonarr" &&
-                          (!prev ||
-                            prev.mediaId !== f.mediaId ||
-                            prev.season !== f.season);
-                        const cells: Record<string, JSX.Element> = {
-                          title: (
-                            <td key="title" class="title-cell">
-                              <div class="title-line">
-                                <button
-                                  class="row-icon file-button"
-                                  aria-label={t(
-                                    "Filename and metadata: {title}",
-                                    { title: f.title },
-                                  )}
-                                  aria-describedby={"filename-" + f.id}
-                                  onClick={() => setFilename(f)}
-                                >
-                                  {service === "radarr" ? (
-                                    <Film size={15} />
-                                  ) : (
-                                    <FileVideo2 size={15} />
-                                  )}
-                                  <span
-                                    class="filename-tooltip"
-                                    role="tooltip"
-                                    id={"filename-" + f.id}
-                                  >
-                                    {f.filename}
-                                  </span>
-                                </button>
-                                <b>{f.title}</b>
-                                {f.conflict && (
-                                  <button
-                                    class="conflict-button"
-                                    title={t("Metadata disagreement")}
-                                    style={{
-                                      color:
-                                        settings?.warningColors.metadata ||
-                                        defaultWarningColors.metadata,
-                                    }}
-                                    aria-label={t("Show conflicting metadata")}
-                                    onClick={() => setFilename(f)}
-                                  >
-                                    <AlertTriangle size={14} />
-                                  </button>
-                                )}
-                                {f.ruleConflict && (
-                                  <button
-                                    class="conflict-button"
-                                    style={{
-                                      color:
-                                        settings?.warningColors.recognition ||
-                                        defaultWarningColors.recognition,
-                                    }}
-                                    title={t("Conflicting recognition rules")}
-                                    aria-label={t("Show recognition conflicts")}
-                                    onClick={() => setFilename(f)}
-                                  >
-                                    <OctagonAlert size={14} />
-                                  </button>
-                                )}
-                              </div>
-                              {service === "sonarr" && (
-                                <small class="episode-filename">
-                                  {f.filename}
-                                </small>
-                              )}
-                              {!f.matched && (
-                                <small class="context-label">
-                                  {t("Season context · not a filter match")}
-                                </small>
-                              )}
-                            </td>
-                          ),
-                          year: (
-                            <td key="year" class="year-cell">
-                              {f.years.length ? f.years.join(" / ") : "—"}
-                            </td>
-                          ),
-                          resolution: (
-                            <td key="resolution">
-                              <Tag
-                                value={f.resolution}
-                                kind={"resolution r" + f.resolution}
-                              />
-                            </td>
-                          ),
-                          codec: (
-                            <td key="codec">
-                              <Tag
-                                value={f.codec}
-                                kind="codec"
-                                title={f.family}
-                              />
-                            </td>
-                          ),
-                          source: (
-                            <td key="source">
-                              <div class="source-tags">
-                                <Tag value={f.source} />
-                                {f.processing && (
-                                  <Tag value={f.processing} kind="processing" />
-                                )}
-                              </div>
-                            </td>
-                          ),
-                          size: (
-                            <td key="size" class="nowrap">
-                              {bytes(f.size)}
-                            </td>
-                          ),
-                          hdr: (
-                            <td key="hdr">
-                              <div class="source-tags">
-                                {(f.hdr ? f.hdr.split(" + ") : [""]).map(
-                                  (value) => (
-                                    <Tag value={value} kind="hdr" />
-                                  ),
-                                )}
-                              </div>
-                            </td>
-                          ),
-                          bitDepth: <td key="bitDepth">{f.bitDepth || "—"}</td>,
-                          audio: (
-                            <td key="audio">
-                              <AudioCell file={f} open={() => setFilename(f)} />
-                            </td>
-                          ),
-                          channels: <td key="channels">{f.channels || "—"}</td>,
-                        };
-                        return (
-                          <>
-                            {group && (
-                              <tr class="season-row">
-                                <td colSpan={displayColumns.length}>
-                                  <Layers size={15} />
-                                  <strong>
-                                    {f.series} <span>—</span>{" "}
-                                    {f.season === 0
-                                      ? t("Specials")
-                                      : t("Season {number}", {
-                                          number: String(f.season).padStart(
-                                            2,
-                                            "0",
-                                          ),
-                                        })}
-                                  </strong>
-                                  <span class="season-note">
-                                    {settings?.seasonMode === "season"
-                                      ? t("Season context enabled")
-                                      : t("Matching files")}
-                                  </span>
-                                </td>
-                              </tr>
-                            )}
-                            <tr
-                              key={f.service + f.id}
-                              class={!f.matched ? "context-row" : ""}
-                            >
-                              {displayColumns.map((field) => cells[field])}
-                            </tr>
-                          </>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {!results.files.length && !busy && (
-                    <div class="empty-state">
-                      <Search size={32} />
-                      <h3>
-                        {active.length
-                          ? t("No matching files.")
-                          : t("Your overview starts here.")}
-                      </h3>
+                )}
+                <FilterPanel
+                  q={q}
+                  collapsed={collapsed}
+                  setCollapsed={setCollapsed}
+                  active={active}
+                  service={service}
+                  facets={facets}
+                  presets={presets}
+                  selectedPreset={selectedPreset}
+                  applyPreset={applyPreset}
+                  reset={reset}
+                  setSavePreset={setSavePreset}
+                  deletePreset={deletePreset}
+                  change={change}
+                />
+                <section class="library-section">
+                  <div class="results-heading">
+                    <div>
+                      <h2>
+                        {t(
+                          service === "radarr"
+                            ? "Your movies"
+                            : "Your TV series",
+                        )}{" "}
+                        <span>{count(results.total)}</span>
+                        {busy && <LoaderCircle size={16} class="spin" />}
+                      </h2>
                       <p>
                         {active.length
-                          ? t("Adjust or reset your filters.")
-                          : t("Connect a service and start the first sync.")}
+                          ? t("Files matching your filters")
+                          : t("Your complete library")}
+                        {results.displayTotal > results.total &&
+                          t(" · {count} additional files as season context", {
+                            count: count(results.displayTotal - results.total),
+                          })}
                       </p>
+                    </div>
+                    <div class="results-tools">
                       <button
                         class="button"
-                        onClick={active.length ? reset : () => openSettings()}
+                        aria-pressed={showAllColumns[service]}
+                        disabled={
+                          visibleColumns.length === columnOrder.length &&
+                          !showAllColumns[service]
+                        }
+                        title={
+                          showAllColumns[service]
+                            ? t("Return to saved columns")
+                            : t("Show hidden columns in the saved order")
+                        }
+                        onClick={() =>
+                          setShowAllColumns({
+                            ...showAllColumns,
+                            [service]: !showAllColumns[service],
+                          })
+                        }
                       >
-                        {active.length
-                          ? t("Reset filters")
-                          : t("Open settings")}
+                        <Columns3 size={15} />{" "}
+                        {showAllColumns[service]
+                          ? t("Default view")
+                          : t("All columns")}
+                      </button>
+                      <a class="button" href={"/api/export?" + exportQuery}>
+                        <Download size={15} />
+                        {t("Export CSV")}
+                      </a>
+                    </div>
+                  </div>
+                  <div
+                    class={"table-wrap" + (busy ? " busy" : "")}
+                    aria-busy={busy}
+                  >
+                    <table>
+                      <thead>
+                        <tr>
+                          {displayColumns.map((field) =>
+                            columnHeader(
+                              field,
+                              field === "title"
+                                ? service === "radarr"
+                                  ? t("Title")
+                                  : t("Episode")
+                                : columnLabels[field],
+                              field === "title",
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.files.map((f, i) => {
+                          const prev = results.files[i - 1];
+                          const group =
+                            service === "sonarr" &&
+                            (!prev ||
+                              prev.mediaId !== f.mediaId ||
+                              prev.season !== f.season);
+                          const cells: Record<string, JSX.Element> = {
+                            title: (
+                              <td key="title" class="title-cell">
+                                <div class="title-line">
+                                  <button
+                                    class="row-icon file-button"
+                                    aria-label={t(
+                                      "Filename and metadata: {title}",
+                                      { title: f.title },
+                                    )}
+                                    aria-describedby={"filename-" + f.id}
+                                    onClick={() => setFilename(f)}
+                                  >
+                                    {service === "radarr" ? (
+                                      <Film size={15} />
+                                    ) : (
+                                      <FileVideo2 size={15} />
+                                    )}
+                                    <span
+                                      class="filename-tooltip"
+                                      role="tooltip"
+                                      id={"filename-" + f.id}
+                                    >
+                                      {f.filename}
+                                    </span>
+                                  </button>
+                                  <b>{f.title}</b>
+                                  {f.conflict && (
+                                    <button
+                                      class="conflict-button"
+                                      title={t("Metadata disagreement")}
+                                      style={{
+                                        color:
+                                          settings?.warningColors.metadata ||
+                                          defaultWarningColors.metadata,
+                                      }}
+                                      aria-label={t(
+                                        "Show conflicting metadata",
+                                      )}
+                                      onClick={() => setFilename(f)}
+                                    >
+                                      <AlertTriangle size={14} />
+                                    </button>
+                                  )}
+                                  {f.ruleConflict && (
+                                    <button
+                                      class="conflict-button"
+                                      style={{
+                                        color:
+                                          settings?.warningColors.recognition ||
+                                          defaultWarningColors.recognition,
+                                      }}
+                                      title={t("Conflicting recognition rules")}
+                                      aria-label={t(
+                                        "Show recognition conflicts",
+                                      )}
+                                      onClick={() => setFilename(f)}
+                                    >
+                                      <OctagonAlert size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                                {service === "sonarr" && (
+                                  <small class="episode-filename">
+                                    {f.filename}
+                                  </small>
+                                )}
+                                {!f.matched && (
+                                  <small class="context-label">
+                                    {t("Season context · not a filter match")}
+                                  </small>
+                                )}
+                              </td>
+                            ),
+                            year: (
+                              <td key="year" class="year-cell">
+                                {f.years.length ? f.years.join(" / ") : "—"}
+                              </td>
+                            ),
+                            resolution: (
+                              <td key="resolution">
+                                <Tag
+                                  value={f.resolution}
+                                  kind={"resolution r" + f.resolution}
+                                />
+                              </td>
+                            ),
+                            codec: (
+                              <td key="codec">
+                                <Tag
+                                  value={f.codec}
+                                  kind="codec"
+                                  title={f.family}
+                                />
+                              </td>
+                            ),
+                            source: (
+                              <td key="source">
+                                <div class="source-tags">
+                                  <Tag value={f.source} />
+                                  {f.processing && (
+                                    <Tag
+                                      value={f.processing}
+                                      kind="processing"
+                                    />
+                                  )}
+                                </div>
+                              </td>
+                            ),
+                            size: (
+                              <td key="size" class="nowrap">
+                                {bytes(f.size)}
+                              </td>
+                            ),
+                            hdr: (
+                              <td key="hdr">
+                                <div class="source-tags">
+                                  {(f.hdr ? f.hdr.split(" + ") : [""]).map(
+                                    (value) => (
+                                      <Tag value={value} kind="hdr" />
+                                    ),
+                                  )}
+                                </div>
+                              </td>
+                            ),
+                            bitDepth: (
+                              <td key="bitDepth">{f.bitDepth || "—"}</td>
+                            ),
+                            audio: (
+                              <td key="audio">
+                                <AudioCell
+                                  file={f}
+                                  open={() => setFilename(f)}
+                                />
+                              </td>
+                            ),
+                            channels: (
+                              <td key="channels">{f.channels || "—"}</td>
+                            ),
+                          };
+                          return (
+                            <>
+                              {group && (
+                                <tr class="season-row">
+                                  <td colSpan={displayColumns.length}>
+                                    <Layers size={15} />
+                                    <strong>
+                                      {f.series} <span>—</span>{" "}
+                                      {f.season === 0
+                                        ? t("Specials")
+                                        : t("Season {number}", {
+                                            number: String(f.season).padStart(
+                                              2,
+                                              "0",
+                                            ),
+                                          })}
+                                    </strong>
+                                    <span class="season-note">
+                                      {settings?.seasonMode === "season"
+                                        ? t("Season context enabled")
+                                        : t("Matching files")}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )}
+                              <tr
+                                key={f.service + f.id}
+                                class={!f.matched ? "context-row" : ""}
+                              >
+                                {displayColumns.map((field) => cells[field])}
+                              </tr>
+                            </>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {!results.files.length && !busy && (
+                      <div class="empty-state">
+                        <Search size={32} />
+                        <h3>
+                          {active.length
+                            ? t("No matching files.")
+                            : t("Your overview starts here.")}
+                        </h3>
+                        <p>
+                          {active.length
+                            ? t("Adjust or reset your filters.")
+                            : t("Connect a service and start the first sync.")}
+                        </p>
+                        <button
+                          class="button"
+                          onClick={active.length ? reset : () => openSettings()}
+                        >
+                          {active.length
+                            ? t("Reset filters")
+                            : t("Open settings")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div class="pagination">
+                    <span>
+                      {results.displayTotal
+                        ? t("{from}–{to} of {total} files", {
+                            from: count((page - 1) * 100 + 1),
+                            to: count(
+                              Math.min(page * 100, results.displayTotal),
+                            ),
+                            total: count(results.displayTotal),
+                          })
+                        : t("0 files")}
+                      {service === "sonarr" && t(" · by series and season")}
+                    </span>
+                    <div>
+                      <button
+                        class="icon-button"
+                        aria-label={t("Previous page")}
+                        disabled={page <= 1}
+                        onClick={() => setPage(page - 1)}
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <span>{t("Page {page} / {pages}", { page, pages })}</span>
+                      <button
+                        class="icon-button"
+                        aria-label={t("Next page")}
+                        disabled={page >= pages}
+                        onClick={() => setPage(page + 1)}
+                      >
+                        <ArrowRight size={16} />
                       </button>
                     </div>
-                  )}
-                </div>
-                <div class="pagination">
-                  <span>
-                    {results.displayTotal
-                      ? t("{from}–{to} of {total} files", {
-                          from: count((page - 1) * 100 + 1),
-                          to: count(Math.min(page * 100, results.displayTotal)),
-                          total: count(results.displayTotal),
-                        })
-                      : t("0 files")}
-                    {service === "sonarr" && t(" · by series and season")}
-                  </span>
+                  </div>
+                </section>
+                <footer class="footer">
                   <div>
+                    <span
+                      class={
+                        "sync-dot " +
+                        (sync?.error
+                          ? "failed"
+                          : sync?.running
+                            ? "running"
+                            : "")
+                      }
+                    />
+                    <span>
+                      {sync?.running
+                        ? sync.queued
+                          ? t("Sync waiting for a slot …")
+                          : t("Sync in progress …")
+                        : sync?.error
+                          ? t("Sync failed · {error}", { error: t(sync.error) })
+                          : t("Last sync: {date}", {
+                              date: date(sync?.lastSuccess),
+                            })}
+                    </span>
+                    {sync?.error && sync.lastSuccess && (
+                      <span>
+                        {t("Cache: {date}", { date: date(sync.lastSuccess) })}
+                      </span>
+                    )}
                     <button
-                      class="icon-button"
-                      aria-label={t("Previous page")}
-                      disabled={page <= 1}
-                      onClick={() => setPage(page - 1)}
+                      class="text-button"
+                      disabled={!!sync?.running || status.demo || !configured}
+                      onClick={runSync}
                     >
-                      <ArrowLeft size={16} />
-                    </button>
-                    <span>{t("Page {page} / {pages}", { page, pages })}</span>
-                    <button
-                      class="icon-button"
-                      aria-label={t("Next page")}
-                      disabled={page >= pages}
-                      onClick={() => setPage(page + 1)}
-                    >
-                      <ArrowRight size={16} />
+                      <RefreshCw
+                        size={13}
+                        class={sync?.running ? "spin" : ""}
+                      />{" "}
+                      {t("Sync now")}
                     </button>
                   </div>
-                </div>
-              </section>
-              <footer class="footer">
-                <div>
-                  <span
-                    class={
-                      "sync-dot " +
-                      (sync?.error ? "failed" : sync?.running ? "running" : "")
-                    }
-                  />
                   <span>
-                    {sync?.running
-                      ? sync.queued
-                        ? t("Sync waiting for a slot …")
-                        : t("Sync in progress …")
-                      : sync?.error
-                        ? t("Sync failed · {error}", { error: t(sync.error) })
-                        : t("Last sync: {date}", {
-                            date: date(sync?.lastSuccess),
-                          })}
+                    <ShieldCheck size={13} />
+                    {t("Existing data only")}
                   </span>
-                  {sync?.error && sync.lastSuccess && (
-                    <span>
-                      {t("Cache: {date}", { date: date(sync.lastSuccess) })}
-                    </span>
-                  )}
-                  <button
-                    class="text-button"
-                    disabled={!!sync?.running || status.demo || !configured}
-                    onClick={runSync}
-                  >
-                    <RefreshCw size={13} class={sync?.running ? "spin" : ""} />{" "}
-                    {t("Sync now")}
-                  </button>
-                </div>
-                <span>
-                  <ShieldCheck size={13} />
-                  {t("Existing data only")}
-                </span>
-              </footer>
-            </>
+                </footer>
+              </>
+            )}
+          </main>
+          {filename && (
+            <FileDialog
+              warningColors={settings?.warningColors || defaultWarningColors}
+              file={filename}
+              close={() => setFilename(null)}
+            />
+          )}{" "}
+          {settingsOpen && settings && (
+            <SettingsDialog
+              settings={settings}
+              initialSection={settingsSection}
+              onRecognition={() => {
+                setSettingsOpen(false);
+                setView("recognition");
+              }}
+              status={status}
+              connectionError={connectionError}
+              demo={status.demo}
+              close={() => setSettingsOpen(false)}
+              saved={async () => {
+                await loadSettings();
+                await refresh();
+                setNotice(t("Settings saved."));
+              }}
+            />
           )}
-        </main>
-        {filename && (
-          <FileDialog
-            warningColors={settings?.warningColors || defaultWarningColors}
-            file={filename}
-            close={() => setFilename(null)}
-          />
-        )}{" "}
-        {settingsOpen && settings && (
-          <SettingsDialog
-            settings={settings}
-            initialSection={settingsSection}
-            onRecognition={() => {
-              setSettingsOpen(false);
-              setView("recognition");
-            }}
-            status={status}
-            connectionError={connectionError}
-            demo={status.demo}
-            close={() => setSettingsOpen(false)}
-            saved={async () => {
-              await loadSettings();
-              await refresh();
-              setNotice(t("Settings saved."));
-            }}
-          />
-        )}
-        {savePreset && (
-          <Modal
-            title={t("Save filter view")}
-            close={() => setSavePreset(false)}
-          >
-            <form onSubmit={doSavePreset}>
-              <p class="quiet">
-                {t(
-                  service === "radarr"
-                    ? "Save the current filter combination for movies."
-                    : "Save the current filter combination for TV series.",
-                )}
-              </p>
-              <label>
-                {t("Name")}
-                <input
-                  autoFocus
-                  maxLength={80}
-                  required
-                  value={presetName}
-                  placeholder={t("For example: 1080p · x264")}
-                  onInput={(e) => setPresetName(e.currentTarget.value)}
-                />
-              </label>
-              <button class="primary">
-                <Bookmark size={16} />
-                {t("Save view")}
-              </button>
-            </form>
-          </Modal>
-        )}
-      </div>
+          {savePreset && (
+            <Modal
+              title={t("Save filter view")}
+              close={() => setSavePreset(false)}
+            >
+              <form onSubmit={doSavePreset}>
+                <p class="quiet">
+                  {t(
+                    service === "radarr"
+                      ? "Save the current filter combination for movies."
+                      : "Save the current filter combination for TV series.",
+                  )}
+                </p>
+                <label>
+                  {t("Name")}
+                  <input
+                    autoFocus
+                    maxLength={80}
+                    required
+                    value={presetName}
+                    placeholder={t("For example: 1080p · x264")}
+                    onInput={(e) => setPresetName(e.currentTarget.value)}
+                  />
+                </label>
+                <button class="primary">
+                  <Bookmark size={16} />
+                  {t("Save view")}
+                </button>
+              </form>
+            </Modal>
+          )}
+        </div>
+      </TagTextColors.Provider>
     </TagColors.Provider>
   );
 }

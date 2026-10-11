@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.3.1
+
+Consistent Dashboard/library heading and card positions; Dashboard clicks select existing unsaved filters; removal of the Dashboard footer; persistent black/white/automatic tag text colors. No database schema migration. See [release notes](docs/releases/0.3.1.md).
+
 ## 0.3.0
 
 Configurable filename recognition with previews and atomic cache reprocessing; separate, customizable recognition warnings; conflict and Emby matching filters; unified Audio column; clickable language distribution; consistent Dashboard heading and title-icon details. SQLite migration to schema 5 retains settings, presets and cached Emby tracks. See [release notes](docs/releases/0.3.0.md).

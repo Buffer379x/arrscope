@@ -13,6 +13,7 @@ export type Settings = {
   visibleColumns: Record<Service, string[]>;
   warningColors: Record<string, string>;
   tagColors: Record<string, string>;
+  tagTextColors: Record<string, string>;
   radarr: Connection;
   sonarr: Connection;
   emby: Connection;
