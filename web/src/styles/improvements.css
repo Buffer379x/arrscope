@@ -17,16 +17,17 @@
   max-width: min(330px, calc(100vw - 40px));
 }
 .settings-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  position: sticky;
-  top: -24px;
+  flex-shrink: 0;
   background: var(--panel);
   padding: 12px 0;
   z-index: 2;
 }
 .settings-tabs button {
-  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -38,8 +39,7 @@
   background: var(--accent-bg);
 }
 .settings-save-bar {
-  position: sticky;
-  bottom: -24px;
+  flex-shrink: 0;
   background: var(--panel);
   padding: 14px 0;
   border-top: 1px solid var(--line);
@@ -125,11 +125,39 @@ textarea {
   .quality-widgets {
     grid-template-columns: 1fr;
   }
-  .settings-tabs {
-    top: -16px;
-  }
   .settings-save-bar {
-    bottom: -16px;
     flex-wrap: wrap;
+  }
+}
+
+/* Only settings keep a stable frame; the active section scrolls inside it. */
+.modal.settings-modal {
+  height: min(820px, calc(100dvh - 30px));
+  max-height: calc(100dvh - 30px);
+  overflow: hidden;
+}
+.modal.settings-modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+.settings-modal .modal-heading {
+  flex-shrink: 0;
+}
+.settings-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding-right: 5px;
+  overscroll-behavior: contain;
+}
+@media (max-width: 740px) {
+  .settings-modal .settings-tabs {
+    gap: 5px;
+  }
+  .settings-modal .settings-tabs button {
+    padding: 10px 5px;
+    font-size: 12px;
   }
 }

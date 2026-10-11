@@ -13,11 +13,11 @@ export function SystemInfo({
 }) {
   useI18n();
   return (
-    <section class="system-info" aria-label={t("System info")}>
+    <section class="system-info" aria-label={t("System")}>
       <dl class="system-details">
         <div>
           <dt>{t("Version")}</dt>
-          <dd>ArrScope {status.version}</dd>
+          <dd>{status.version}</dd>
         </div>
         <div>
           <dt>{t("App connection")}</dt>
