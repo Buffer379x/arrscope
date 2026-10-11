@@ -1,6 +1,6 @@
 # Translation guide
 
-ArrScope keeps all interface text in `web/src/locales/<locale>.json`. English (`en.json`) is the source and fallback catalog. German, Spanish and Italian ship with the application. Catalogs are discovered automatically at build time by the frontend and embedded into Go for API messages and CSV headers.
+Scopearr keeps all interface text in `web/src/locales/<locale>.json`. English (`en.json`) is the source and fallback catalog. German, Spanish and Italian ship with the application. Catalogs are discovered automatically at build time by the frontend and embedded into Go for API messages and CSV headers.
 
 ## Add a language
 
@@ -28,7 +28,7 @@ This excerpt is not a complete catalog; use the entire English file. No new comp
 
 ## Language selection
 
-ArrScope initially selects a supported browser language (including regional fallbacks such as `es-MX` → `es`), then English. The explicit choice is stored as `arrscope-language` in this browser. Login and Settings → Appearance both expose the selector. It does not change the account or other browsers. Numbers, dates and document language follow the selection; media titles and filenames remain original.
+Scopearr initially selects a supported browser language (including regional fallbacks such as `es-MX` → `es`), then English. The explicit choice is stored as `scopearr-language` in this browser. Login and Settings → Appearance both expose the selector. It does not change the account or other browsers. Numbers, dates and document language follow the selection; media titles and filenames remain original.
 
 ## Audio languages and flags
 

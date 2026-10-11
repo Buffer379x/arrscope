@@ -1,4 +1,4 @@
-# ArrScope 0.3.3 validation
+# Scopearr 0.3.3 validation
 
 - Full Go test suite, race suite and `go vet ./...`: passed locally. Backend filtering, preset storage and synchronization behavior are unchanged.
 - Frontend: all 11 tests passed; TypeScript and production Vite build passed. English, German, Spanish and Italian catalogs retain identical keys and compatible placeholders.

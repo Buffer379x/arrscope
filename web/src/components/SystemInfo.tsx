@@ -24,7 +24,7 @@ export function SystemInfo({
           <dd role="status" class={connectionError ? "error" : ""}>
             {connectionError
               ? t("Connection unavailable")
-              : t("Connected to ArrScope")}
+              : t("Connected to Scopearr")}
           </dd>
         </div>
       </dl>

@@ -27,7 +27,14 @@ export type Evidence = {
   conflict: boolean;
   rules?: string[];
 };
+export type CustomTag = { id: number; name: string };
+export type CustomSelection = {
+  total: number;
+  counts: Record<string, number>;
+  tags: CustomTag[];
+};
 export type MediaFile = {
+  custom: CustomTag[];
   id: number;
   service: Service;
   mediaId: number;

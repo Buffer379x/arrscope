@@ -18,6 +18,7 @@ export const labels: Record<string, string> = translatedLabels({
   audio: "Audio codec",
   channels: "Channels",
   language: "Language",
+  custom: "Custom",
 });
 export const tableColumns = [
   ["title", "Title / episode"],
@@ -30,6 +31,7 @@ export const tableColumns = [
   ["bitDepth", "Bit depth"],
   ["audio", "Audio"],
   ["channels", "Channels"],
+  ["custom", "Custom"],
 ];
 export type ConnectionService = Service | "emby";
 export const embyMatchLabels: Record<string, string> = translatedLabels({
@@ -48,7 +50,7 @@ export const operatorLabels: Record<FilterOperator, string> = translatedLabels({
   all: "contains all",
   notAll: "does not contain all",
 });
-export const compoundFields = ["hdr", "audio", "language"];
+export const compoundFields = ["hdr", "audio", "language", "custom"];
 export type FilterUpdate = string[] | ((current: string[]) => string[]);
 export const defaultColumnOrder = tableColumns.map(([field]) => field);
 export const columnLabels = translatedLabels(Object.fromEntries(tableColumns));
@@ -58,6 +60,7 @@ export const defaultColumns = [
   "resolution",
   "codec",
   "source",
+  "custom",
 ];
 export const emptyResults: Results = {
   files: [],
@@ -85,6 +88,7 @@ export const date = (s: string | null | undefined) =>
     : t("Not synced yet");
 export const TagColors = createContext<Record<string, string>>({});
 export const TagTextColors = createContext<Record<string, string>>({});
+export const CustomTagNames = createContext<Record<string, string>>({});
 export const colorFields = [
   "resolution",
   "codec",
@@ -92,6 +96,7 @@ export const colorFields = [
   "processing",
   "hdr",
   "audio",
+  "custom",
 ];
 export const defaultColor = (field: string, value: string) =>
   field === "resolution"
@@ -115,7 +120,9 @@ export function Tag({
   title,
   colors,
   textColors,
+  label,
 }: {
+  label?: string;
   colors?: Record<string, string>;
   textColors?: Record<string, string>;
   value: string;
@@ -123,6 +130,7 @@ export function Tag({
   title?: string;
 }) {
   useI18n();
+  const names = useContext(CustomTagNames);
   const inherited = useContext(TagColors);
   const inheritedText = useContext(TagTextColors);
   const key = kind.split(" ")[0] + ":" + (value || "__unknown__");
@@ -133,7 +141,9 @@ export function Tag({
       class={"tag " + kind + (!value ? " unknown" : "")}
       title={title}
     >
-      {value || t("Unknown")}
+      {kind === "custom"
+        ? names[value] || label || value || t("Unknown")
+        : value || t("Unknown")}
     </span>
   );
 }

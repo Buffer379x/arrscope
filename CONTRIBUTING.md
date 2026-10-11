@@ -1,4 +1,4 @@
-# Contributing to ArrScope
+# Contributing to Scopearr
 
 Use English for public descriptions, documentation, changelogs and release notes. Interface translations are welcome: see [the translation guide](docs/TRANSLATING.md).
 

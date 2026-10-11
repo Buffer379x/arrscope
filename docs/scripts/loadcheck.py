@@ -1,8 +1,8 @@
 import argparse, json, os, time, subprocess, signal, tempfile, threading, urllib.request, urllib.parse, http.cookiejar, resource, sys, socket
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-parser=argparse.ArgumentParser(description="Local synthetic ArrScope sync and HTTP load check; never uses real services.")
-parser.add_argument("binary",type=Path,help="Path to a built ArrScope binary")
+parser=argparse.ArgumentParser(description="Local synthetic Scopearr sync and HTTP load check; never uses real services.")
+parser.add_argument("binary",type=Path,help="Path to a built Scopearr binary")
 parser.add_argument("--files",type=int,default=50000)
 parser.add_argument("--emby",action="store_true",help="Supplement per-track metadata through a synthetic Emby API")
 args=parser.parse_args(); binary=args.binary.resolve(); N=args.files
@@ -35,9 +35,9 @@ def req(path,data=None,method=None):
  headers={'Content-Type':'application/json','X-CSRF-Token':csrf}
  r=urllib.request.Request(base+path,data=None if data is None else json.dumps(data).encode(),headers=headers,method=method)
  with opener.open(r,timeout=30) as response:return json.load(response)
-with tempfile.TemporaryDirectory(prefix='arrscope-load-') as appdata:
- env={**os.environ,'ARRSCOPE_DATA_DIR':appdata,'ARRSCOPE_LISTEN':f'127.0.0.1:{app_port}','GOMAXPROCS':'2','GOMEMLIMIT':'96MiB'}
- env.pop('ARRSCOPE_DEMO',None)
+with tempfile.TemporaryDirectory(prefix='scopearr-load-') as appdata:
+ env={**os.environ,'SCOPEARR_DATA_DIR':appdata,'SCOPEARR_LISTEN':f'127.0.0.1:{app_port}','GOMAXPROCS':'2','GOMEMLIMIT':'96MiB'}
+ env.pop('SCOPEARR_DEMO',None)
  proc=subprocess.Popen([str(binary)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
  try:
   for _ in range(100):

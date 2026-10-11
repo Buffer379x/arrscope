@@ -31,7 +31,10 @@ func OpenStore(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "arrscope.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	if err := migrateLegacyDatabase(dir); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +49,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 5 {
+	if version > 6 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -138,6 +141,37 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(e)
 		}
 	}
+	if version < 6 {
+		if originalVersion >= 5 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		var cfg Settings
+		saved := s.Get("settings", &cfg) == nil
+		if saved {
+			for service, columns := range cfg.VisibleColumns {
+				if !containsColumn(columns, "custom") {
+					cfg.VisibleColumns[service] = append(columns, "custom")
+				}
+			}
+		}
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if _, e = tx.Exec(customSchema); e == nil && saved {
+			raw, _ := json.Marshal(cfg)
+			_, e = tx.Exec("UPDATE kv SET value=? WHERE key='settings'", string(raw))
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
 	var recognition RecognitionConfig
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.
@@ -156,7 +190,7 @@ PRAGMA user_version=1;COMMIT;`)
 	} else {
 		return fail(err)
 	}
-	os.Chmod(filepath.Join(dir, "arrscope.db"), 0600)
+	os.Chmod(filepath.Join(dir, "scopearr.db"), 0600)
 	return s, nil
 }
 func (s *Store) Backup() error {
@@ -216,6 +250,18 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 		return e
 	}
 	defer tx.Rollback()
+	customActive := false
+	for _, rule := range s.recognition.config.Rules {
+		if rule.Enabled && rule.Field == "custom" {
+			customActive = true
+			break
+		}
+	}
+	if !customActive {
+		if e = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM custom_overrides WHERE service=?)", service).Scan(&customActive); e != nil {
+			return e
+		}
+	}
 	if _, e = tx.Exec("DELETE FROM files WHERE service=?", service); e != nil {
 		return e
 	}
@@ -247,6 +293,11 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 			return e
 		}
 		id, _ := r.LastInsertId()
+		if customActive {
+			if e = replaceFileCustom(context.Background(), tx, id, f, true); e != nil {
+				return e
+			}
+		}
 		if e = replaceFileLanguages(context.Background(), tx, id, f); e != nil {
 			return e
 		}
@@ -258,6 +309,9 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 				return e
 			}
 		}
+	}
+	if _, e = tx.Exec("DELETE FROM custom_overrides WHERE service=? AND NOT EXISTS(SELECT 1 FROM files f WHERE f.service=custom_overrides.service AND f.id=custom_overrides.file_id)", service); e != nil {
+		return e
 	}
 	b, _ := json.Marshal(status)
 	if _, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", "sync:"+service, string(b)); e != nil {
@@ -277,7 +331,7 @@ func (s *Store) invalidateAggregates() {
 	s.statisticsCache = nil
 }
 
-var fields = []string{"resolution", "codec", "family", "source", "processing", "hdr", "bitDepth", "audio", "channels", "language"}
+var fields = []string{"resolution", "codec", "family", "source", "processing", "hdr", "bitDepth", "audio", "channels", "language", "custom"}
 
 func serviceOK(s string) bool { return s == "radarr" || s == "sonarr" }
 func where(q url.Values) (string, []any, error) {
@@ -301,18 +355,34 @@ func where(q url.Values) (string, []any, error) {
 	for _, field := range fields {
 		opValues := q[field+"Op"]
 		op := q.Get(field + "Op")
-		compound := field == "language" || field == "hdr" || field == "audio"
+		compound := field == "language" || field == "hdr" || field == "audio" || field == "custom"
 		if len(opValues) > 1 || (op != "" && op != "eq" && op != "not" && !(compound && (op == "all" || op == "notAll"))) {
 			return "", nil, fmt.Errorf("Invalid filter operator for %s", field)
 		}
 		negative := op == "not" || op == "notAll"
 		values := q[field]
+		if field == "custom" && len(values) > 128 {
+			return "", nil, fmt.Errorf("At most 128 custom tags are allowed")
+		}
 		if len(values) == 0 {
 			continue
 		}
 		if compound {
 			var parts []string
 			for _, v := range values {
+				if field == "custom" {
+					if v == "__unknown__" {
+						parts = append(parts, "NOT EXISTS(SELECT 1 FROM file_custom c WHERE c.file_rowid=f.rowid)")
+					} else {
+						id, err := strconv.ParseInt(v, 10, 64)
+						if err != nil || id <= 0 {
+							return "", nil, fmt.Errorf("Invalid custom tag")
+						}
+						parts = append(parts, "EXISTS(SELECT 1 FROM file_custom c WHERE c.file_rowid=f.rowid AND c.tag_id=?)")
+						a = append(a, id)
+					}
+					continue
+				}
 				if field == "language" && v != "__unknown__" {
 					v = normLanguage(v)
 				}
@@ -467,12 +537,12 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 	if e != nil {
 		return out, e
 	}
-	query := "SELECT f.data,1 FROM files f WHERE " + filter + " ORDER BY " + order
+	query := "SELECT f.data,1," + customJSON + " FROM files f WHERE " + filter + " ORDER BY " + order
 	qa := append([]any{}, args...)
 	if !all {
 		// Sort compact row IDs first, then load and evaluate only the current page.
 		// Carrying large evidence/track JSON through a 50k-row temp sort is avoidable.
-		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,1 FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
+		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,1," + customJSON + " FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
 		qa = append(qa, out.PageSize, (out.Page-1)*out.PageSize)
 	}
 
@@ -484,11 +554,15 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 	for rows.Next() {
 		var raw string
 		var matched bool
-		if e = rows.Scan(&raw, &matched); e != nil {
+		var custom string
+		if e = rows.Scan(&raw, &matched, &custom); e != nil {
 			return out, e
 		}
 		var f File
 		if e = json.Unmarshal([]byte(raw), &f); e != nil {
+			return out, e
+		}
+		if e = json.Unmarshal([]byte(custom), &f.Custom); e != nil {
 			return out, e
 		}
 		f.Matched = matched
@@ -509,7 +583,7 @@ func querySeasonPage(ctx context.Context, tx *sql.Tx, q url.Values, filter strin
 groups AS MATERIALIZED (SELECT DISTINCT media_id,season FROM matched),
 counts AS MATERIALIZED (SELECT (SELECT count(*) FROM matched) AS total,(SELECT count(*) FROM files f INDEXED BY files_group WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups)) AS displayed),
 page AS MATERIALIZED (SELECT f.rowid FROM files f INDEXED BY files_series_sort WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups) ORDER BY ` + order + ` LIMIT ? OFFSET ?)
-SELECT f.data,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed
+SELECT f.data,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed,` + customJSON + `
 FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY ` + order
 	params := append(append([]any{}, args...), out.PageSize, (out.Page-1)*out.PageSize)
 	rows, err := tx.QueryContext(ctx, query, params...)
@@ -520,7 +594,8 @@ FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY 
 	for rows.Next() {
 		var raw sql.NullString
 		var matched bool
-		if err = rows.Scan(&raw, &matched, &out.Total, &out.DisplayTotal); err != nil {
+		var custom string
+		if err = rows.Scan(&raw, &matched, &out.Total, &out.DisplayTotal, &custom); err != nil {
 			return out, err
 		}
 		if !raw.Valid {
@@ -528,6 +603,9 @@ FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY 
 		}
 		var file File
 		if err = json.Unmarshal([]byte(raw.String), &file); err != nil {
+			return out, err
+		}
+		if err = json.Unmarshal([]byte(custom), &file.Custom); err != nil {
 			return out, err
 		}
 		file.Matched = matched
@@ -546,6 +624,9 @@ func (s *Store) facets(ctx context.Context, service string) (map[string][]string
 	defer tx.Rollback()
 	out := map[string][]string{}
 	for _, field := range fields {
+		if field == "custom" {
+			continue
+		}
 		rows, e := tx.QueryContext(ctx, "SELECT DISTINCT "+field+" FROM files WHERE service=? ORDER BY "+field, service)
 		if e != nil {
 			return nil, e
@@ -591,6 +672,31 @@ func (s *Store) facets(ctx context.Context, service string) (map[string][]string
 		}
 		sort.Strings(out[field])
 	}
+	rows, err := tx.QueryContext(ctx, "SELECT DISTINCT cast(c.tag_id AS TEXT) FROM file_custom c JOIN files f ON f.rowid=c.file_rowid JOIN custom_tags t ON t.id=c.tag_id WHERE f.service=? ORDER BY t.name_key", service)
+	if err != nil {
+		return nil, err
+	}
+	out["custom"] = []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out["custom"] = append(out["custom"], id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	var untagged bool
+	if err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM files f WHERE service=? AND NOT EXISTS(SELECT 1 FROM file_custom c WHERE c.file_rowid=f.rowid))", service).Scan(&untagged); err != nil {
+		return nil, err
+	}
+	if untagged {
+		out["custom"] = append(out["custom"], "__unknown__")
+	}
 	return out, tx.Commit()
 }
 func (s *Store) Presets() ([]Preset, error) {
@@ -624,7 +730,8 @@ func movieOrder(q url.Values) (string, error) {
 		field = "title"
 	}
 	expression, ok := map[string]string{
-		"title": "f.title COLLATE NOCASE", "year": "(SELECT min(year) FROM years y WHERE y.file_rowid=f.rowid)",
+		"custom": "(SELECT group_concat(name_key) FROM (SELECT t.name_key FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key))",
+		"title":  "f.title COLLATE NOCASE", "year": "(SELECT min(year) FROM years y WHERE y.file_rowid=f.rowid)",
 		"resolution": "CASE f.resolution WHEN '4320p' THEN 4320 WHEN '2160p' THEN 2160 WHEN '1440p' THEN 1440 WHEN '1080p' THEN 1080 WHEN '720p' THEN 720 WHEN '576p' THEN 576 WHEN '480p' THEN 480 ELSE CAST(f.resolution AS INTEGER) END",
 		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "(f.language||' '||f.audio) COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
 	}[field]
@@ -639,6 +746,9 @@ func movieOrder(q url.Values) (string, error) {
 		return "", fmt.Errorf("Invalid sort direction")
 	}
 	unknown := "f." + field + "=''"
+	if field == "custom" {
+		unknown = "NOT EXISTS(SELECT 1 FROM file_custom c WHERE c.file_rowid=f.rowid)"
+	}
 	if field == "audio" {
 		unknown = "f.language='' AND f.audio=''"
 	}

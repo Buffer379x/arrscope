@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.4.0
+
+Scopearr branding; persistent custom tags with administration, atomic bulk assignment, filters, colors and filename recognition; custom CSV output; compatible upgrade to SQLite schema 6. See [release notes](docs/releases/0.4.0.md).
+
 ## 0.3.3
 
 Consistent tables for tag and warning colors; bordered icon controls; uniform dropdown sizing; simplified settings footer; permanently visible filename-preview results with a wider input above. No database schema migration. See [release notes](docs/releases/0.3.3.md).
@@ -34,7 +38,7 @@ See [0.2.0 release notes](docs/releases/0.2.0.md): four interface languages, tra
 
 See [initial release notes](docs/releases/0.1.0.md).
 
-[0.2.0]: https://github.com/Buffer379x/arrscope/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Buffer379x/arrscope/releases/tag/v0.1.0
-[0.2.1]: https://github.com/Buffer379x/arrscope/compare/v0.2.0...v0.2.1
-[0.2.3]: https://github.com/Buffer379x/arrscope/compare/v0.2.1...v0.2.3
+[0.2.0]: https://github.com/Buffer379x/scopearr/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Buffer379x/scopearr/releases/tag/v0.1.0
+[0.2.1]: https://github.com/Buffer379x/scopearr/compare/v0.2.0...v0.2.1
+[0.2.3]: https://github.com/Buffer379x/scopearr/compare/v0.2.1...v0.2.3

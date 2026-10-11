@@ -2,7 +2,7 @@
 appdata/
 web/node_modules/
 web/dist/
-arrscope
+scopearr
 *.db
 *.db-wal
 *.db-shm

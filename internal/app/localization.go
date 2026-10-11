@@ -1,11 +1,11 @@
 package app
 
 import (
-	"arrscope"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
+	"scopearr"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,12 +20,12 @@ var translations = loadTranslations()
 
 func loadTranslations() map[string]map[string]string {
 	catalogs := map[string]map[string]string{}
-	entries, err := fs.ReadDir(arrscope.Locales(), ".")
+	entries, err := fs.ReadDir(scopearr.Locales(), ".")
 	if err != nil {
 		panic(err)
 	}
 	for _, entry := range entries {
-		raw, err := fs.ReadFile(arrscope.Locales(), entry.Name())
+		raw, err := fs.ReadFile(scopearr.Locales(), entry.Name())
 		if err != nil {
 			panic(err)
 		}

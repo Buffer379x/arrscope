@@ -1,4 +1,4 @@
-# ArrScope 0.3.0 validation
+# Scopearr 0.3.0 validation
 
 Recorded on October 11, 2026. All service fixtures are synthetic. No production services, media mounts or Unraid installation were changed during validation.
 

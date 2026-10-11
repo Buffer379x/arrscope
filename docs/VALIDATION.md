@@ -28,11 +28,11 @@ Checks and release jobs passed, including both image architectures and runtime h
 
 The separate 100,000-file container workload (50,000 per service, two Emby tracks each) completed without OOM or swap. HTTP filter p95 was 303 ms in Checks and 525 ms in the release run; cold dashboard aggregation took approximately 5.5 and 7 seconds. Release sync: 33.437 seconds; sampled RSS peak 210.07 MiB. RSS remained 202.1 MiB after release-run queries, which is not a measured permanent idle state. Runner load, disk and architecture affect results; the 100,000-file HTTP test is not claimed to meet 200 ms.
 
-Reproduce native queries with `GOMAXPROCS=2 ARRSCOPE_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app`, host mock workloads using `docs/scripts/loadcheck.py`, and isolated containers using `docs/scripts/containercheck.py`. The scripts create their own synthetic state; they must not be pointed at production Appdata.
+Reproduce native queries with `GOMAXPROCS=2 SCOPEARR_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app`, host mock workloads using `docs/scripts/loadcheck.py`, and isolated containers using `docs/scripts/containercheck.py`. The scripts create their own synthetic state; they must not be pointed at production Appdata.
 
 ## Production smoke checks
 
-The actual Unraid installation connected successfully to Radarr 6.4.4.10685, Sonarr 4.0.20.3014 and Emby 4.10.1.0. Initial sync, real combined-filter samples, season grouping, dual HDR tags and per-track language/codec display were checked. A targeted ArrScope restart preserved authentication, cache and saved connections; all three connection tests still passed. Container health and autostart were confirmed.
+The actual Unraid installation connected successfully to Radarr 6.4.4.10685, Sonarr 4.0.20.3014 and Emby 4.10.1.0. Initial sync, real combined-filter samples, season grouping, dual HDR tags and per-track language/codec display were checked. A targeted Scopearr restart preserved authentication, cache and saved connections; all three connection tests still passed. Container health and autostart were confirmed.
 
 This smoke test is not a production performance benchmark. Some real files retain incomplete upstream metadata or unmatched Emby identity; no scans were triggered to repair these. Real update/rollback, long-term memory, arbitrary library growth and different HTTPS/proxy configurations remain separate operational checks. A host swap-limit capability warning was observed; RAM limiting remained active, but swap enforcement was not confirmed on that host.
 

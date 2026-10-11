@@ -67,6 +67,9 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	}
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
+	if err = s.validateCustomRules(ctx, rules); err != nil {
+		return RecognitionConfig{}, err
+	}
 	if revision != s.recognition.config.Revision {
 		return RecognitionConfig{}, ErrRecognitionRevision
 	}
@@ -139,6 +142,7 @@ func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) e
 			return nil
 		}
 		for _, item := range batch {
+			oldCustom := item.file.RecognizedCustom
 			oldLanguage := item.file.Language
 			oldUnknownLanguage := slices.Contains(item.file.UnknownTraits, "language")
 			reparseFile(&item.file, engine)
@@ -154,6 +158,11 @@ func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) e
 			// Avoid rebuilding those indexed associations for every cached file.
 			if oldLanguage != f.Language || oldUnknownLanguage != slices.Contains(f.UnknownTraits, "language") {
 				if err = replaceFileLanguages(ctx, tx, item.id, f); err != nil {
+					return err
+				}
+			}
+			if !slices.Equal(oldCustom, f.RecognizedCustom) {
+				if err = replaceFileCustom(ctx, tx, item.id, f, false); err != nil {
 					return err
 				}
 			}

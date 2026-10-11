@@ -2,9 +2,15 @@ import { t, useI18n } from "../i18n";
 import { audioLanguageKey, sameAudioLanguage } from "../languages";
 import { OperatorButton } from "./OperatorButton";
 import { ChevronDown } from "lucide-preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState, useContext } from "preact/hooks";
 
-import { compoundFields, FilterOperator, FilterUpdate, labels } from "../ui";
+import {
+  CustomTagNames,
+  compoundFields,
+  FilterOperator,
+  FilterUpdate,
+  labels,
+} from "../ui";
 export function MultiFilter({
   name,
   values,
@@ -21,6 +27,7 @@ export function MultiFilter({
   change: (v: FilterUpdate) => void;
 }) {
   useI18n();
+  const names = useContext(CustomTagNames);
   const equivalent = (left: string, right: string) =>
     name === "language" ? sameAudioLanguage(left, right) : left === right;
   const negative = operator === "not" || operator === "notAll";
@@ -94,10 +101,12 @@ export function MultiFilter({
                 selected
                   .map((v) =>
                     v === "__unknown__"
-                      ? t("Unknown")
+                      ? t(name === "custom" ? "No custom tags" : "Unknown")
                       : name === "language"
                         ? t(audioLanguageKey(v))
-                        : v,
+                        : name === "custom"
+                          ? names[v] || v
+                          : v,
                   )
                   .join(", ")
               : negative
@@ -137,10 +146,12 @@ export function MultiFilter({
                   }}
                 />
                 {v === "__unknown__"
-                  ? t("Unknown")
+                  ? t(name === "custom" ? "No custom tags" : "Unknown")
                   : name === "language"
                     ? t(audioLanguageKey(v))
-                    : v}
+                    : name === "custom"
+                      ? names[v] || v
+                      : v}
               </label>
             ))
           ) : (

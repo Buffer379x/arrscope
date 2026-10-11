@@ -295,6 +295,11 @@ func TestVersion3MigrationRetainsEmbyMetadata(t *testing.T) {
 	if err != nil || results.Total != 1 || len(results.Files[0].AudioTracks) != 2 || results.Files[0].EmbyMatch != "matched" {
 		t.Fatal(results, err)
 	}
+	for service, columns := range cfg.VisibleColumns {
+		if !containsColumn(columns, "custom") {
+			cfg.VisibleColumns[service] = append(columns, "custom")
+		}
+	}
 	var after Settings
 	if err = s.Get("settings", &after); err != nil || !reflect.DeepEqual(after, cfg) {
 		t.Fatal(after, err)

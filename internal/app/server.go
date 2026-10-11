@@ -211,9 +211,88 @@ func (s *Server) Handler() http.Handler {
 				break
 			}
 			s.Store.DB.Exec("DELETE FROM sessions WHERE token=?", hash)
+			http.SetCookie(w, &http.Cookie{Name: "scopearr_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 			http.SetCookie(w, &http.Cookie{Name: "arrscope_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
+		case "/api/custom-tags":
+			if r.Method == "GET" {
+				tags, err := s.Store.CustomTags(r.Context())
+				if err != nil {
+					failure(w, r, 500, err)
+				} else {
+					jsonOut(w, 200, tags)
+				}
+				return
+			}
+			var tag CustomTag
+			if err := decodeLimit(w, r, &tag, 2048); err != nil {
+				failure(w, r, 400, err)
+				return
+			}
+			switch r.Method {
+			case "POST", "PUT":
+				out, err := s.Store.SaveCustomTag(r.Context(), tag)
+				if err != nil {
+					failure(w, r, 400, err)
+				} else {
+					jsonOut(w, 200, out)
+				}
+				return
+			case "DELETE":
+				if tag.ID <= 0 {
+					failure(w, r, 400, errors.New("Invalid custom tag"))
+					return
+				}
+				if err := s.Store.DeleteCustomTag(r.Context(), tag.ID); err != nil {
+					failure(w, r, 400, err)
+				} else {
+					var stored Settings
+					if err := s.Store.Get("settings", &stored); err == nil {
+						s.mu.Lock()
+						s.settings.TagColors = stored.TagColors
+						s.settings.TagTextColors = stored.TagTextColors
+						s.mu.Unlock()
+					}
+					jsonOut(w, 200, map[string]bool{"ok": true})
+				}
+				return
+			}
+		case "/api/custom-selection":
+			if r.Method == "GET" {
+				out, err := s.Store.CustomSelection(r.Context(), r.URL.Query())
+				if err != nil {
+					failure(w, r, 400, err)
+				} else {
+					jsonOut(w, 200, out)
+				}
+				return
+			}
+			if r.Method == "PUT" {
+				var in struct {
+					Query   string          `json:"query"`
+					Changes map[string]bool `json:"changes"`
+				}
+				if err := decodeLimit(w, r, &in, 16384); err != nil {
+					failure(w, r, 400, err)
+					return
+				}
+				q, err := url.ParseQuery(in.Query)
+				if err != nil {
+					failure(w, r, 400, err)
+					return
+				}
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(190 * time.Second))
+				ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
+				defer cancel()
+				total, err := s.Store.ApplyCustom(ctx, q, in.Changes)
+				if err != nil {
+					failure(w, r, 400, err)
+				} else {
+					jsonOut(w, 200, map[string]int{"total": total})
+				}
+				return
+			}
 		case "/api/recognition", "/api/recognition/defaults", "/api/recognition/preview":
 			if r.Method == "GET" && r.URL.Path == "/api/recognition" {
 				jsonOut(w, 200, s.Store.Recognition())
@@ -610,7 +689,7 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		failure(w, r, 400, e)
 		return
 	}
-	rows, e := s.Store.DB.QueryContext(r.Context(), "SELECT f.data FROM files f WHERE "+filter+" ORDER BY "+order, args...)
+	rows, e := s.Store.DB.QueryContext(r.Context(), "SELECT f.data,"+customJSON+" FROM files f WHERE "+filter+" ORDER BY "+order, args...)
 	if e != nil {
 		failure(w, r, 400, e)
 		return
@@ -631,7 +710,7 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="arrscope-`+r.URL.Query().Get("service")+`-`+time.Now().Format("2006-01-02")+`.csv"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="scopearr-`+r.URL.Query().Get("service")+`-`+time.Now().Format("2006-01-02")+`.csv"`)
 	if _, e = io.Copy(w, temporary); e != nil {
 		return
 	}
@@ -643,7 +722,7 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 	}
 	cw := csv.NewWriter(destination)
 	cw.Comma = ';'
-	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Bytes", "Metadata disagreement", "Recognition conflicts", "Emby matching"}
+	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Bytes", "Metadata disagreement", "Recognition conflicts", "Emby matching", "Custom"}
 	if len(locale) > 0 {
 		for i, header := range headers {
 			headers[i] = localizedMessage(locale[0], header)
@@ -651,22 +730,29 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 	}
 	cw.Write(headers)
 	for rows.Next() {
-		var raw string
+		var raw, custom string
 		if e := ctx.Err(); e != nil {
 			return e
 		}
-		if e := rows.Scan(&raw); e != nil {
+		if e := rows.Scan(&raw, &custom); e != nil {
 			return e
 		}
 		var f File
 		if e := json.Unmarshal([]byte(raw), &f); e != nil {
 			return e
 		}
+		if e := json.Unmarshal([]byte(custom), &f.Custom); e != nil {
+			return e
+		}
+		var names []string
+		for _, tag := range f.Custom {
+			names = append(names, tag.Name)
+		}
 		var years []string
 		for _, y := range f.Years {
 			years = append(years, strconv.Itoa(y))
 		}
-		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, combinedAudioSummary(f, locale...), f.Channels, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), strconv.FormatBool(f.RuleConflict), f.EmbyMatch}
+		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, combinedAudioSummary(f, locale...), f.Channels, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), strconv.FormatBool(f.RuleConflict), f.EmbyMatch, strings.Join(names, " · ")}
 		for i, v := range record {
 			record[i] = safeCell(v)
 		}

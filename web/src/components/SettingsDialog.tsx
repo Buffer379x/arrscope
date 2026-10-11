@@ -1,3 +1,5 @@
+import { CustomTagsSettings } from "./CustomTagsSettings";
+import type { CustomTag } from "../types";
 import { LanguageSelect, t, useI18n } from "../i18n";
 import { SystemInfo } from "./SystemInfo";
 import { RecognitionPage } from "./RecognitionPage";
@@ -36,6 +38,8 @@ import {
   Tag,
 } from "../ui";
 export function SettingsDialog({
+  customTags,
+  customChanged,
   settings,
   status,
   connectionError,
@@ -45,6 +49,8 @@ export function SettingsDialog({
   refresh,
   initialSection = "connections",
 }: {
+  customTags: CustomTag[];
+  customChanged: () => Promise<void>;
   settings: Settings;
   status: Status;
   connectionError?: string;
@@ -56,6 +62,7 @@ export function SettingsDialog({
 }) {
   useI18n();
   const settingsFormId = useId();
+  const [customDirty, setCustomDirty] = useState(false);
   const [rulesDirty, setRulesDirty] = useState(false);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const contentRef = useRef<HTMLDivElement>(null);
@@ -78,29 +85,49 @@ export function SettingsDialog({
         const values: Record<string, string[]> = {};
         colorFields.forEach((field) => {
           values[field] = [
-            ...new Set(all.flatMap((f) => f[field] || [])),
-          ].sort();
+            ...new Set(
+              all
+                .flatMap((f) => f[field] || [])
+                .filter(
+                  (value) => field !== "custom" || value !== "__unknown__",
+                ),
+            ),
+          ].sort((a, b) =>
+            field === "custom"
+              ? (
+                  customTags.find((tag) => String(tag.id) === a)?.name || a
+                ).localeCompare(
+                  customTags.find((tag) => String(tag.id) === b)?.name || b,
+                )
+              : a.localeCompare(b),
+          );
         });
         setRecognized(values);
       })
       .catch((e) => setError(e.message));
-  }, []);
+  }, [customTags]);
   const dirty = JSON.stringify(cfg) !== JSON.stringify(settings);
   useEffect(() => {
-    onDirty(dirty || rulesDirty);
-  }, [dirty, rulesDirty]);
+    onDirty(dirty || rulesDirty || customDirty);
+  }, [dirty, rulesDirty, customDirty]);
   useEffect(() => () => onDirty(false), []);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (dirty || rulesDirty) {
+      if (dirty || rulesDirty || customDirty) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, rulesDirty]);
+  }, [dirty, rulesDirty, customDirty]);
   const changeSection = (next: string) => {
+    if (
+      section === "custom" &&
+      customDirty &&
+      !confirm(t("Discard unsaved settings changes?"))
+    )
+      return;
     if (
       section === "recognition" &&
       rulesDirty &&
@@ -183,6 +210,7 @@ export function SettingsDialog({
             ["connections", t("Services")],
             ["appearance", t("Display and columns")],
             ["colors", t("Colors and tags")],
+            ["custom", t("Custom tags")],
             ["recognition", t("Filename recognition")],
             ["system", t("System")],
           ].map(([value, label]) => (
@@ -207,18 +235,44 @@ export function SettingsDialog({
               back={() => changeSection("connections")}
             />
           )}
+          {section === "custom" && (
+            <CustomTagsSettings
+              tags={customTags}
+              changed={async () => {
+                await customChanged();
+                const tags = await api<CustomTag[]>("custom-tags");
+                const ids = new Set(tags.map((tag) => String(tag.id)));
+                setCfg((current) => ({
+                  ...current,
+                  tagColors: Object.fromEntries(
+                    Object.entries(current.tagColors || {}).filter(
+                      ([key]) =>
+                        !key.startsWith("custom:") || ids.has(key.slice(7)),
+                    ),
+                  ),
+                  tagTextColors: Object.fromEntries(
+                    Object.entries(current.tagTextColors || {}).filter(
+                      ([key]) =>
+                        !key.startsWith("custom:") || ids.has(key.slice(7)),
+                    ),
+                  ),
+                }));
+              }}
+              onDirty={setCustomDirty}
+            />
+          )}
           <form
             id={settingsFormId}
             onSubmit={submit}
-            hidden={section === "recognition"}
+            hidden={["recognition", "custom"].includes(section)}
           >
             <p
               class="quiet"
-              hidden={["system", "recognition"].includes(section)}
+              hidden={["system", "recognition", "custom"].includes(section)}
             >
               {t("Your services, your cache. No media directories required.")}
             </p>
-            {demo && !["system", "recognition"].includes(section) && (
+            {demo && !["system", "recognition", "custom"].includes(section) && (
               <div class="notice">
                 {t(
                   "Demo connections are locked. Try the TV view, default columns and tag colors.",
@@ -303,7 +357,7 @@ export function SettingsDialog({
                         <small>
                           {service === "emby"
                             ? t(
-                                "Emby dashboard → API keys. Use a dedicated key for ArrScope.",
+                                "Emby dashboard → API keys. Use a dedicated key for Scopearr.",
                               )
                             : t("In each service under Settings → General.")}
                         </small>
@@ -781,7 +835,13 @@ export function SettingsDialog({
                       {colorValues.map((value) => {
                         const key = colorField + ":" + value;
                         const label =
-                          value === "__unknown__" ? t("Unknown") : value;
+                          value === "__unknown__"
+                            ? t("Unknown")
+                            : colorField === "custom"
+                              ? customTags.find(
+                                  (tag) => String(tag.id) === value,
+                                )?.name || value
+                              : value;
                         return (
                           <tr>
                             <td>
@@ -886,7 +946,11 @@ export function SettingsDialog({
                 </div>
                 {!colorValues.length && (
                   <p class="quiet">
-                    {t("No tags detected yet. Sync a library first.")}
+                    {t(
+                      colorField === "custom"
+                        ? "No custom tags assigned yet. Assign tags in your library or add a filename rule."
+                        : "No tags detected yet. Sync a library first.",
+                    )}
                   </p>
                 )}
               </fieldset>
@@ -988,7 +1052,7 @@ export function SettingsDialog({
           form={settingsFormId}
           class="primary"
           disabled={busy}
-          hidden={["system", "recognition"].includes(section)}
+          hidden={["system", "recognition", "custom"].includes(section)}
         >
           {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}{" "}
           {t("Save settings")}

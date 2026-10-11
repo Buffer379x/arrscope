@@ -1,4 +1,4 @@
-package arrscope
+package scopearr
 
 import (
 	"embed"

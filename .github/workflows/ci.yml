@@ -33,25 +33,25 @@ jobs:
       - run: go test -race ./...
       - run: go vet ./...
       - name: 50k file performance check
-        run: GOMAXPROCS=2 ARRSCOPE_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
+        run: GOMAXPROCS=2 SCOPEARR_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
       - name: Docker build and smoke test
         run: |
-          docker build -t arrscope:test .
-          docker run -d --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --memory-swap 256m --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m --name arrscope-ci -e ARRSCOPE_DEMO=true arrscope:test
+          docker build -t scopearr:test .
+          docker run -d --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --memory-swap 256m --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m --name scopearr-ci -e SCOPEARR_DEMO=true scopearr:test
           for n in $(seq 1 30); do
-            if docker exec arrscope-ci arrscope healthcheck; then break; fi
+            if docker exec scopearr-ci scopearr healthcheck; then break; fi
             sleep 1
           done
-          docker exec arrscope-ci arrscope healthcheck
-          test "$(docker inspect --format '{{.Config.User}}' arrscope-ci)" = '99:100'
-          docker stop arrscope-ci
-          docker start arrscope-ci
+          docker exec scopearr-ci scopearr healthcheck
+          test "$(docker inspect --format '{{.Config.User}}' scopearr-ci)" = '99:100'
+          docker stop scopearr-ci
+          docker start scopearr-ci
           sleep 2
-          docker exec arrscope-ci arrscope healthcheck
-          docker rm -f arrscope-ci
+          docker exec scopearr-ci scopearr healthcheck
+          docker rm -f scopearr-ci
       - name: Scan runtime image for high and critical vulnerabilities
         run: |
-          docker save arrscope:test -o "$RUNNER_TEMP/arrscope-image.tar"
-          docker run --rm -v "$RUNNER_TEMP/arrscope-image.tar:/scan/image.tar:ro" aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1
+          docker save scopearr:test -o "$RUNNER_TEMP/scopearr-image.tar"
+          docker run --rm -v "$RUNNER_TEMP/scopearr-image.tar:/scan/image.tar:ro" aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1
       - name: 100k synthetic files with Emby, no swap, cached dashboard
-        run: python3 docs/scripts/containercheck.py --image arrscope:test
+        run: python3 docs/scripts/containercheck.py --image scopearr:test

@@ -1,4 +1,4 @@
-module arrscope
+module scopearr
 
 go 1.27.2
 

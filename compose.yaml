@@ -1,18 +1,18 @@
 services:
-  arrscope:
-    image: ghcr.io/buffer379x/arrscope:${ARRSCOPE_TAG:-stable}
-    container_name: arrscope
+  scopearr:
+    image: ghcr.io/buffer379x/scopearr:${SCOPEARR_TAG:-${ARRSCOPE_TAG:-stable}}
+    container_name: scopearr
     restart: unless-stopped
-    user: "${ARRSCOPE_UID:-99}:${ARRSCOPE_GID:-100}"
+    user: "${SCOPEARR_UID:-${ARRSCOPE_UID:-99}}:${SCOPEARR_GID:-${ARRSCOPE_GID:-100}}"
     ports:
-      - "${ARRSCOPE_BIND:-0.0.0.0}:${ARRSCOPE_PORT:-8080}:8080"
+      - "${SCOPEARR_BIND:-${ARRSCOPE_BIND:-0.0.0.0}}:${SCOPEARR_PORT:-${ARRSCOPE_PORT:-8080}}:8080"
     environment:
-      ARRSCOPE_DATA_DIR: /data
-      ARRSCOPE_HTTPS: "${ARRSCOPE_HTTPS:-false}"
+      SCOPEARR_DATA_DIR: /data
+      SCOPEARR_HTTPS: "${SCOPEARR_HTTPS:-${ARRSCOPE_HTTPS:-false}}"
       GOMEMLIMIT: 64MiB
       GOMAXPROCS: "2"
     volumes:
-      - "${ARRSCOPE_APPDATA:-./appdata}:/data"
+      - "${SCOPEARR_APPDATA:-${ARRSCOPE_APPDATA:-./appdata}}:/data"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
@@ -22,4 +22,4 @@ services:
     memswap_limit: 256m
     labels:
       net.unraid.docker.webui: "http://[IP]:[PORT:8080]/"
-      net.unraid.docker.icon: "https://raw.githubusercontent.com/Buffer379x/arrscope/main/web/public/icon-256.png"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/Buffer379x/scopearr/main/web/public/icon-256.png"

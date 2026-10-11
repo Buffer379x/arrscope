@@ -34,7 +34,7 @@ Local Docker/OrbStack Linux/ARM64 on SSD, Go 1.27.2, `GOMAXPROCS=2`, `GOMEMLIMIT
 | Sampled app RSS peak during sync | 207.9 MiB |
 | App RSS after queries | 34.8 MiB |
 
-The cgroup peak reached 256 MiB and includes more than process RSS. The test passed with limited headroom; this does not guarantee arbitrary library sizes. In-memory snapshots remain a potential memory constraint for much larger or richer datasets. Batched SQLite staging is a future option. Reproduce with `python3 docs/scripts/containercheck.py --image arrscope:local` using a separately built image; it creates and cleans up its own synthetic container.
+The cgroup peak reached 256 MiB and includes more than process RSS. The test passed with limited headroom; this does not guarantee arbitrary library sizes. In-memory snapshots remain a potential memory constraint for much larger or richer datasets. Batched SQLite staging is a future option. Reproduce with `python3 docs/scripts/containercheck.py --image scopearr:local` using a separately built image; it creates and cleans up its own synthetic container.
 
 Race tests, vet, TypeScript, frontend tests and both architecture healthchecks passed. Local AMD64 was emulated. Synthetic regression tests cover malformed response cache preservation, queue cancellation, language sets, unknown tracks, cache invalidation, contexts, CSV sorting/corruption, key removal, path matching, migrations/backups, reset races and existing read-only/security/filter behavior. Preview data, four presets and custom colors survived the local container replacement.
 

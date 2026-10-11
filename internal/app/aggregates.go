@@ -65,3 +65,10 @@ func cloneStatistics(in Statistics) Statistics {
 	}
 	return out
 }
+
+// Custom tags do not change Dashboard's media/audio aggregates.
+func (s *Store) invalidateCustomFacets() {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.facetCache = map[string]map[string][]string{}
+}
