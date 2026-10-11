@@ -36,7 +36,7 @@ def req(path,data=None,method=None):
  r=urllib.request.Request(base+path,data=None if data is None else json.dumps(data).encode(),headers=headers,method=method)
  with opener.open(r,timeout=30) as response:return json.load(response)
 with tempfile.TemporaryDirectory(prefix='arrscope-load-') as appdata:
- env={**os.environ,'ARRSCOPE_DATA_DIR':appdata,'ARRSCOPE_LISTEN':f'127.0.0.1:{app_port}','GOMAXPROCS':'2','GOMEMLIMIT':'128MiB'}
+ env={**os.environ,'ARRSCOPE_DATA_DIR':appdata,'ARRSCOPE_LISTEN':f'127.0.0.1:{app_port}','GOMAXPROCS':'2','GOMEMLIMIT':'96MiB'}
  env.pop('ARRSCOPE_DEMO',None)
  proc=subprocess.Popen([str(binary)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
  try:
