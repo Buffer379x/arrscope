@@ -16,6 +16,6 @@
   <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="WebUI port on the dedicated container IP." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
   <Config Name="Appdata" Target="/data" Default="/mnt/cache/appdata/arrscope" Mode="rw" Description="Local SSD/pool path. No SMB/NFS. Owner must match UID/GID in Extra Parameters." Type="Path" Display="always" Required="true" Mask="false">/mnt/cache/appdata/arrscope</Config>
   <Config Name="HTTPS proxy" Target="ARRSCOPE_HTTPS" Default="false" Mode="" Description="Set true only when the browser accesses this app through HTTPS." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
-  <Config Name="Go memory target" Target="GOMEMLIMIT" Default="128MiB" Mode="" Description="Soft Go memory target, clamped to half the container memory limit to retain headroom." Type="Variable" Display="advanced" Required="false" Mask="false">128MiB</Config>
+  <Config Name="Go memory target" Target="GOMEMLIMIT" Default="96MiB" Mode="" Description="Soft Go memory target, clamped to three eighths of the container memory limit to retain headroom." Type="Variable" Display="advanced" Required="false" Mask="false">96MiB</Config>
   <Config Name="Go CPU parallelism" Target="GOMAXPROCS" Default="2" Mode="" Description="Limit Go execution threads to two by default." Type="Variable" Display="advanced" Required="false" Mask="false">2</Config>
 </Container>

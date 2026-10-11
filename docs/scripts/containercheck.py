@@ -76,7 +76,7 @@ def req(path, data=None, method=None, timeout=10):
     r = urllib.request.Request(base + path, data=None if data is None else json.dumps(data).encode(), method=method, headers={'Content-Type': 'application/json', 'X-CSRF-Token': csrf})
     with opener.open(r, timeout=timeout) as response:
         return json.load(response)
-result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 128MiB under the 256MiB container limit'}
+result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 96MiB under the 256MiB container limit'}
 # Match the host's unprivileged UID/GID so it can clean up private 0700 backup
 # directories on Linux bind mounts. Root callers still run the app as 99:100.
 test_uid = os.getuid() if os.getuid() else 99

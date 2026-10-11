@@ -2,7 +2,7 @@
 
 ## Scope
 
-Heading/card alignment, existing-control Dashboard filtering, footer removal and persistent tag text colors. Schema 5 and all upstream clients remain unchanged. Tests use local synthetic fixtures; no production services or Unraid installation are modified.
+Heading/card alignment, existing-control Dashboard filtering, footer removal and persistent tag text colors. Schema 5 and all upstream clients remain unchanged. A stress-test memory finding also lowers the Go soft target to 96 MiB and caps legacy settings at three eighths of the detected container limit. Tests use local synthetic fixtures; no production services or Unraid installation are modified.
 
 ## Local checks
 
@@ -19,6 +19,10 @@ At a 1280 × 900 desktop viewport, both Dashboard and Movies have heading top 13
 A click on Dashboard 1080p expands the existing Resolution filter, selects 1080p, returns matching movie rows and exports the same query to CSV. A TV-scoped x265 click selects the existing Codec filter, whose x265 checkbox is checked. The separate temporary-filter banner is absent. Saved presets are unchanged; selections reset on page reload.
 
 Black and white text choices appear immediately in settings previews and survive save/reload. Setting only a foreground keeps the default background and border. Reset removes both overrides. Existing darker border and hover styling remain independent of text color. The Dashboard footer paragraph is absent.
+
+## Stress-test follow-up
+
+Two PR runs were triggered close together after an initially delayed workflow start. One completed successfully, while the other was OOM-killed under the 256 MiB/no-swap limit during the 100,000-file/Emby test. Publication was canceled before releasing an image. The runtime memory target was reduced from 128 to 96 MiB to retain more headroom, including existing configurations. The full required checks and release stress test must pass on this corrected source before publication. Sampling does not prove the absence of every transient memory peak.
 
 ## Release gates
 
