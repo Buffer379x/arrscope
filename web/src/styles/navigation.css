@@ -51,20 +51,6 @@
   gap: 6px;
   align-items: center;
 }
-.local-status {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  color: var(--muted);
-  margin-right: 14px;
-}
-.local-status i {
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  border-radius: 50%;
-}
 .demo-bar {
   display: flex;
   align-items: center;

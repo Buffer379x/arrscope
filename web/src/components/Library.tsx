@@ -97,8 +97,10 @@ function initialMovieSort(): FilmSort {
 export function Library({
   status,
   refresh,
+  connectionError,
 }: {
   status: Status;
+  connectionError?: string;
   refresh: () => Promise<void>;
 }) {
   useI18n();
@@ -407,7 +409,7 @@ export function Library({
                 setResults(emptyResults);
               }}
             >
-              <Film size={17} /> Radarr <span>{t("Movies")}</span>
+              <Film size={17} /> {t("Movies")}
             </button>
             <button
               class={view === "library" && service === "sonarr" ? "active" : ""}
@@ -420,15 +422,10 @@ export function Library({
                 setResults(emptyResults);
               }}
             >
-              <Tv size={17} /> Sonarr <span>{t("TV series")}</span>
+              <Tv size={17} /> {t("TV series")}
             </button>
           </nav>
           <div class="header-actions">
-            <span class="app-version">v{status.version}</span>
-            <span class="local-status">
-              <i />
-              {t("Connected locally")}
-            </span>
             <button
               class="icon-button"
               aria-label={theme === "dark" ? t("Light theme") : t("Dark theme")}
@@ -461,7 +458,6 @@ export function Library({
               <Info size={14} />
               {t("Demo · sample data, no connection to your services")}
             </span>
-            <span>ArrScope {status.version}</span>
           </div>
         )}
         <main class="main">
@@ -934,7 +930,6 @@ export function Library({
                 <span>
                   <ShieldCheck size={13} />
                   {t("Existing data only")}
-                  <i /> ArrScope {status.version}
                 </span>
               </footer>
             </>
@@ -946,6 +941,8 @@ export function Library({
         {settingsOpen && settings && (
           <SettingsDialog
             settings={settings}
+            status={status}
+            connectionError={connectionError}
             demo={status.demo}
             close={() => setSettingsOpen(false)}
             saved={async () => {
