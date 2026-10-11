@@ -474,6 +474,11 @@
     "Cancel": "Cancelar",
     "Enter a filename up to 2048 characters": "Introduce un nombre de archivo de hasta 2048 caracteres",
     "Discard unsaved settings changes?": "¿Descartar los ajustes sin guardar?",
-    "Additional reported values without track attribution": "Valores adicionales sin asignación a pistas"
+    "Additional reported values without track attribution": "Valores adicionales sin asignación a pistas",
+    "Text color for {value}": "Color del texto para {value}",
+    "Automatic": "Automático",
+    "Black": "Negro",
+    "White": "Blanco",
+    "Tag text color must be black or white": "El color del texto de la etiqueta debe ser negro o blanco"
   }
 }

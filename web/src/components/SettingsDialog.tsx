@@ -84,7 +84,7 @@ export function SettingsDialog({
   const colorValues = [
     ...new Set([
       ...(recognized[colorField] || []),
-      ...Object.keys(cfg.tagColors || {})
+      ...Object.keys({ ...cfg.tagColors, ...cfg.tagTextColors })
         .filter((k) => k.startsWith(colorField + ":"))
         .map((k) => k.slice(colorField.length + 1)),
     ]),
@@ -94,7 +94,17 @@ export function SettingsDialog({
       const colors = { ...current.tagColors };
       if (color) colors[key] = color;
       else delete colors[key];
-      return { ...current, tagColors: colors };
+      const textColors = { ...current.tagTextColors };
+      if (!color) delete textColors[key];
+      return { ...current, tagColors: colors, tagTextColors: textColors };
+    });
+  };
+  const setTextColor = (key: string, color: string) => {
+    setCfg((current) => {
+      const colors = { ...current.tagTextColors };
+      if (color) colors[key] = color;
+      else delete colors[key];
+      return { ...current, tagTextColors: colors };
     });
   };
   const update = (service: ConnectionService, patch: Partial<Connection>) =>
@@ -622,6 +632,7 @@ export function SettingsDialog({
                         kind={colorField}
                         value={value === "__unknown__" ? "" : value}
                         colors={cfg.tagColors || {}}
+                        textColors={cfg.tagTextColors || {}}
                       />
                       <input
                         type="color"
@@ -632,10 +643,26 @@ export function SettingsDialog({
                         }
                         onInput={(e) => setColor(key, e.currentTarget.value)}
                       />
+                      <select
+                        class="tag-text-color"
+                        aria-label={t("Text color for {value}", {
+                          value: label,
+                        })}
+                        value={cfg.tagTextColors?.[key] || ""}
+                        onChange={(e) =>
+                          setTextColor(key, e.currentTarget.value)
+                        }
+                      >
+                        <option value="">{t("Automatic")}</option>
+                        <option value="#000000">{t("Black")}</option>
+                        <option value="#ffffff">{t("White")}</option>
+                      </select>
                       <button
                         type="button"
                         class="text-button"
-                        disabled={!cfg.tagColors?.[key]}
+                        disabled={
+                          !cfg.tagColors?.[key] && !cfg.tagTextColors?.[key]
+                        }
                         onClick={() => setColor(key)}
                         aria-label={t("Default color for {value}", {
                           value: label,

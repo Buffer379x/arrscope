@@ -470,3 +470,11 @@
 .column-sort:hover svg {
   opacity: 1;
 }
+
+.tag-color-row {
+  flex-wrap: wrap;
+}
+.tag-color-row .tag-text-color {
+  width: auto;
+  min-width: 100px;
+}

@@ -1,5 +1,8 @@
-export function colorStyle(color: string | undefined) {
-  if (!color || !/^#[0-9a-f]{6}$/i.test(color)) return undefined;
+export function colorStyle(color: string | undefined, textColor?: string) {
+  const foreground =
+    textColor === "#000000" || textColor === "#ffffff" ? textColor : undefined;
+  if (!color || !/^#[0-9a-f]{6}$/i.test(color))
+    return foreground ? { color: foreground } : undefined;
   const rgb = [1, 3, 5]
     .map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
     .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -18,8 +21,9 @@ export function colorStyle(color: string | undefined) {
     backgroundColor: color,
     borderColor: border,
     color:
-      (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05)
+      foreground ||
+      ((luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05)
         ? "#000000"
-        : "#ffffff",
+        : "#ffffff"),
   };
 }

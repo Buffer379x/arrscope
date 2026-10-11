@@ -176,13 +176,6 @@
   display: block;
   border-radius: 3px;
 }
-.statistics-footnote {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.7;
-  margin-top: 24px;
-  max-width: 760px;
-}
 .statistics-empty {
   display: flex;
   flex-direction: column;

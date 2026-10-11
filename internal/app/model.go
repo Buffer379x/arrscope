@@ -21,6 +21,7 @@ type Settings struct {
 	ColumnOrder    map[string][]string `json:"columnOrder"`
 	VisibleColumns map[string][]string `json:"visibleColumns"`
 	TagColors      map[string]string   `json:"tagColors"`
+	TagTextColors  map[string]string   `json:"tagTextColors"`
 	Radarr         ServiceConfig       `json:"radarr"`
 	Sonarr         ServiceConfig       `json:"sonarr"`
 	Emby           ServiceConfig       `json:"emby"`
@@ -100,7 +101,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
@@ -197,6 +198,21 @@ func validateTagColors(colors map[string]string) error {
 		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio"
 		if !ok || !valid || value == "" || len(key) > 200 || !tagColorPattern.MatchString(color) {
 			return fmt.Errorf("Invalid tag color")
+		}
+	}
+	return nil
+}
+
+func normalizeTagTextColors(cfg *Settings) error {
+	if cfg.TagTextColors == nil {
+		cfg.TagTextColors = map[string]string{}
+	}
+	if err := validateTagColors(cfg.TagTextColors); err != nil {
+		return err
+	}
+	for _, color := range cfg.TagTextColors {
+		if color != "#000000" && color != "#ffffff" {
+			return fmt.Errorf("Tag text color must be black or white")
 		}
 	}
 	return nil

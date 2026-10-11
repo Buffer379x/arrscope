@@ -188,11 +188,6 @@ export function StatisticsPage({
             total={data.languageTotals[scope] || 0}
             onFilter={(value) => onFilter("language", value, scope)}
           />
-          <p class="statistics-footnote">
-            {t(
-              "Counts include movies and series with cached files. Each unique episode counts once; one file may contain multiple episodes. Unknown values remain visible in charts.",
-            )}
-          </p>
         </>
       )}
     </section>

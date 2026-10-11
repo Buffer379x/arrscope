@@ -80,24 +80,7 @@
   outline: 2px solid var(--tag-border);
   outline-offset: 2px;
 }
-.dashboard-filter-notice {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-.dashboard-filter-notice .text-button {
-  margin-left: auto;
-}
 @media (max-width: 600px) {
-  .dashboard-filter-notice select {
-    width: auto;
-  }
   .language-select select {
     min-width: 8rem;
   }

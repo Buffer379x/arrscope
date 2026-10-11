@@ -474,6 +474,11 @@
     "Cancel": "Abbrechen",
     "Enter a filename up to 2048 characters": "Gib einen Dateinamen mit höchstens 2048 Zeichen ein",
     "Discard unsaved settings changes?": "Ungespeicherte Einstellungen verwerfen?",
-    "Additional reported values without track attribution": "Zusätzliche Angaben ohne Tonspur-Zuordnung"
+    "Additional reported values without track attribution": "Zusätzliche Angaben ohne Tonspur-Zuordnung",
+    "Text color for {value}": "Schriftfarbe für {value}",
+    "Automatic": "Automatisch",
+    "Black": "Schwarz",
+    "White": "Weiß",
+    "Tag text color must be black or white": "Die Tag-Schriftfarbe muss schwarz oder weiß sein"
   }
 }

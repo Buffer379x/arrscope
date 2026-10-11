@@ -474,6 +474,11 @@
     "Cancel": "Cancel",
     "Enter a filename up to 2048 characters": "Enter a filename up to 2048 characters",
     "Discard unsaved settings changes?": "Discard unsaved settings changes?",
-    "Additional reported values without track attribution": "Additional reported values without track attribution"
+    "Additional reported values without track attribution": "Additional reported values without track attribution",
+    "Text color for {value}": "Text color for {value}",
+    "Automatic": "Automatic",
+    "Black": "Black",
+    "White": "White",
+    "Tag text color must be black or white": "Tag text color must be black or white"
   }
 }

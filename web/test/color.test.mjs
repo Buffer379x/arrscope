@@ -34,3 +34,11 @@ test("custom tag borders and hover outlines retain the selected hue", () => {
   assert.notEqual(style.borderColor, style.backgroundColor);
   assert.notEqual(style.borderColor, style.color);
 });
+test("explicit black or white text overrides automatic contrast independently of background", () => {
+  assert.equal(colorStyle("#ffffff", "#ffffff").color, "#ffffff");
+  assert.equal(colorStyle("#000000", "#000000").color, "#000000");
+  assert.deepEqual(colorStyle(undefined, "#ffffff"), { color: "#ffffff" });
+  assert.equal(colorStyle(undefined, "red"), undefined);
+  assert.equal(colorStyle("#85bce5", "red").color, "#000000");
+  assert.equal(colorStyle("#85bce5", "#ffffff").borderColor, "#5d84a0");
+});

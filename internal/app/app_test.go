@@ -356,6 +356,7 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	cfg.Emby.URL = "http://emby.example"
 	cfg.VisibleColumns["radarr"] = []string{"title", "size"}
 	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][5] = cfg.ColumnOrder["radarr"][5], cfg.ColumnOrder["radarr"][0]
+	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff"}
 	b, _ = json.Marshal(cfg)
 	check(request("/api/settings", "PUT", string(b), true), 200)
 	raw := check(request("/api/settings", "GET", "", false), 200)
@@ -364,6 +365,16 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	}
 	var stored Settings
 	s.Get("settings", &stored)
+	if stored.TagTextColors["codec:x264"] != "#ffffff" || !strings.Contains(raw, `"tagTextColors":{"codec:x264":"#ffffff"}`) {
+		t.Fatal("tag text color not saved or returned")
+	}
+	invalidText := cfg
+	invalidText.TagTextColors = map[string]string{"codec:x264": "#123456"}
+	b, _ = json.Marshal(invalidText)
+	check(request("/api/settings", "PUT", string(b), true), 400)
+	if server.Config().TagTextColors["codec:x264"] != "#ffffff" {
+		t.Fatal("invalid text color changed settings")
+	}
 	if strings.Join(stored.VisibleColumns["radarr"], ",") != "title,size" || !strings.Contains(raw, `"visibleColumns"`) {
 		t.Fatal("column selection not saved or returned")
 	}
@@ -737,6 +748,7 @@ func TestPermanentPresetsAndTagColors(t *testing.T) {
 	}
 	cfg := DefaultSettings()
 	cfg.TagColors = map[string]string{"codec:x264": "#e5725e", "resolution:1080p": "#3388aa"}
+	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff", "resolution:1080p": "#000000"}
 	cfg.VisibleColumns["radarr"] = []string{"title", "size", "audio"}
 	cfg.VisibleColumns["sonarr"] = []string{"title", "codec"}
 	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][5] = cfg.ColumnOrder["radarr"][5], cfg.ColumnOrder["radarr"][0]
@@ -770,6 +782,9 @@ func TestPermanentPresetsAndTagColors(t *testing.T) {
 	defer server.Sync.Shutdown()
 	if server.Config().TagColors["codec:x264"] != "#e5725e" {
 		t.Fatal("tag color lost after restart")
+	}
+	if server.Config().TagTextColors["codec:x264"] != "#ffffff" || server.Config().TagTextColors["resolution:1080p"] != "#000000" {
+		t.Fatal("tag text colors lost after restart")
 	}
 	if strings.Join(server.Config().VisibleColumns["radarr"], ",") != "title,size,audio" || strings.Join(server.Config().VisibleColumns["sonarr"], ",") != "title,codec" {
 		t.Fatal("column choices lost after restart")
