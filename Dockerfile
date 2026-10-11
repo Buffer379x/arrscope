@@ -15,13 +15,13 @@ COPY . .
 COPY --from=frontend /src/web/dist ./web/dist
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=0.3.2
+ARG VERSION=0.3.3
 RUN test "$VERSION" = "$(cat VERSION)" && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o /arrscope ./cmd/arrscope
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates && mkdir /data && chown 99:100 /data
 COPY --from=backend /arrscope /usr/local/bin/arrscope
-ARG VERSION=0.3.2
+ARG VERSION=0.3.3
 ARG SOURCE=https://github.com/Buffer379x/arrscope
 LABEL org.opencontainers.image.title="ArrScope" org.opencontainers.image.description="Filter your Radarr and Sonarr library without scanning media" org.opencontainers.image.source=$SOURCE org.opencontainers.image.version=$VERSION org.opencontainers.image.licenses="MIT"
 ENV ARRSCOPE_DATA_DIR=/data ARRSCOPE_LISTEN=:8080 GOMEMLIMIT=64MiB GOMAXPROCS=2 SQLITE_TMPDIR=/data

@@ -424,51 +424,53 @@ export function RecognitionPage({
                 {t("Preview")}
               </button>
             </form>
-            {preview && (
-              <>
-                <div class="table-wrap">
-                  <table>
-                    <thead>
+            <>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("Attribute")}</th>
+                      <th>{t("Result")}</th>
+                      <th>{t("Matching rules")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fields.map((field) => (
                       <tr>
-                        <th>{t("Attribute")}</th>
-                        <th>{t("Result")}</th>
-                        <th>{t("Matching rules")}</th>
+                        <td>{labels[field]}</td>
+                        <td>
+                          {preview
+                            ? preview.values[field] || t("Unknown")
+                            : "—"}
+                        </td>
+                        <td>
+                          {(preview?.matches[field] || [])
+                            .map(
+                              (id) =>
+                                rules.find((r) => r.id === id)?.name || id,
+                            )
+                            .join(" · ") || "—"}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {fields.map((field) => (
-                        <tr>
-                          <td>{labels[field]}</td>
-                          <td>{preview.values[field] || t("Unknown")}</td>
-                          <td>
-                            {(preview.matches[field] || [])
-                              .map(
-                                (id) =>
-                                  rules.find((r) => r.id === id)?.name || id,
-                              )
-                              .join(" · ") || "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!!preview.conflicts.length && (
-                  <div class="notice recognition-conflict-details">
-                    <OctagonAlert size={18} />
-                    <div>
-                      <b>{t("Conflicting recognition rules")}</b>
-                      {preview.conflicts.map((c) => (
-                        <p>
-                          {labels[c.field]}: {c.values.join(" / ")} ·{" "}
-                          {c.ruleNames.join(" · ")}
-                        </p>
-                      ))}
-                    </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!!preview?.conflicts.length && (
+                <div class="notice recognition-conflict-details">
+                  <OctagonAlert size={18} />
+                  <div>
+                    <b>{t("Conflicting recognition rules")}</b>
+                    {preview.conflicts.map((c) => (
+                      <p>
+                        {labels[c.field]}: {c.values.join(" / ")} ·{" "}
+                        {c.ruleNames.join(" · ")}
+                      </p>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              )}
+            </>
           </section>
         </>
       )}

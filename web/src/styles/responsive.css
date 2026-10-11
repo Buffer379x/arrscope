@@ -312,8 +312,6 @@
 }
 .preset-toolbar select {
   width: 210px;
-  height: 34px;
-  padding: 5px 10px;
 }
 .filter-panel.collapsed .filter-heading {
   padding-bottom: 10px;

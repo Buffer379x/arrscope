@@ -217,66 +217,14 @@
 .settings-page .settings-save-bar {
   margin-top: 24px;
   padding: 16px 0;
-  border-top: 1px solid var(--line);
+  border: 0;
+  justify-content: flex-end;
+  background: transparent;
 }
 .settings-save-bar > span {
   margin-right: auto;
   font-size: 12px;
   color: var(--muted);
-}
-.settings-page .tag-color-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
-}
-.settings-page .tag-color-row,
-.settings-page .tag-color-head {
-  display: grid;
-  grid-template-columns: minmax(60px, 1fr) repeat(3, 40px);
-  gap: 6px;
-  align-items: center;
-}
-.settings-page .tag-color-head {
-  font-size: 11px;
-  color: var(--muted);
-}
-.tag-color-head > span:not(:first-child) {
-  text-align: right;
-}
-.settings-page .tag-color-row {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-.settings-page .tag-color-row > .tag {
-  justify-self: start;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-.settings-page .tag-color-row > .icon-button,
-.settings-page .tag-color-row > input[type="color"] {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
-  max-width: 40px;
-  padding: 4px;
-  justify-self: end;
-  margin: 0;
-}
-.settings-page .tag-color-row > .tag-text-color {
-  display: flex;
-  flex-direction: row;
-  gap: 2px;
-  font-size: 15px;
-}
-.tag-text-color > span:last-child {
-  font-size: 11px;
-}
-.settings-page .warning-color-settings .tag-color-row {
-  grid-template-columns: minmax(0, 1fr) 40px 40px;
-}
-.color-reset {
-  width: 40px;
-  height: 40px;
 }
 .service-sync {
   display: flex;
@@ -343,22 +291,135 @@
     width: 44px;
     height: 44px;
   }
-  .settings-page .tag-color-row,
-  .settings-page .tag-color-head {
-    grid-template-columns: minmax(60px, 1fr) repeat(3, 44px);
-  }
-  .settings-page .tag-color-row > .icon-button,
-  .settings-page .tag-color-row > input[type="color"] {
-    width: 44px;
-    max-width: 44px;
-    height: 44px;
-    min-height: 44px;
-  }
   .operator-menu button {
     min-height: 44px;
   }
 }
 
-.settings-page .tag-color-row > .tag-text-color {
+/* Native selects keep their single-selection behavior and share filter sizing. */
+select {
+  height: 42px;
+  padding: 11px 12px;
+  line-height: 18px;
+}
+.color-table-wrap {
+  margin-top: 16px;
+  min-height: 0;
+}
+.color-settings-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+.color-settings-table th:first-child {
+  width: auto;
+  text-align: left;
+}
+.color-settings-table th:not(:first-child),
+.color-settings-table td:not(:first-child) {
+  width: 46px;
+  padding: 10px 3px;
+  text-align: right;
+}
+.color-settings-table th:last-child,
+.color-settings-table td:last-child {
+  width: 59px;
+  padding-right: 16px;
+}
+.color-settings-table td:first-child,
+.color-settings-table th:first-child {
+  padding-left: 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.color-settings-table .tag {
+  max-width: 100%;
+  white-space: normal;
+}
+.color-settings-table td > label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  margin: 0;
+}
+.color-settings-table td > label svg {
+  flex: none;
+}
+.color-settings-table .icon-button,
+.color-settings-table input[type="color"] {
+  width: 40px;
   min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 4px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  vertical-align: middle;
+}
+.color-settings-table .tag-text-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.tag-text-color > span:last-child {
+  font-size: 11px;
+}
+.settings-page .recognition-preview form {
+  flex-direction: row;
+  align-items: end;
+  gap: 10px;
+}
+.recognition-preview form label {
+  flex: 1;
+  min-width: 0;
+  max-width: 900px;
+}
+.recognition-preview form button {
+  flex: none;
+}
+@media (max-width: 650px) {
+  .settings-page .recognition-preview form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .recognition-preview form label {
+    width: 100%;
+  }
+  .color-settings-table th:first-child,
+  .color-settings-table td:first-child {
+    padding-left: 10px;
+  }
+  .color-settings-table th:last-child,
+  .color-settings-table td:last-child {
+    padding-right: 10px;
+    width: 53px;
+  }
+}
+
+.color-settings-table th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+
+/* Reserve identical inner spacing around text and the native-select chevron. */
+select {
+  appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23829399' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+}
+@media (forced-colors: active) {
+  select {
+    appearance: auto;
+    background-image: none;
+    padding-right: 12px;
+  }
 }
