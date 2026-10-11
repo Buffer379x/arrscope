@@ -220,3 +220,38 @@ func TestEmbyFailuresPreserveSyncAndDoNotLeakKey(t *testing.T) {
 		t.Fatal("cancel ignored")
 	}
 }
+
+func TestCompactEmbyCandidatesPreserveRawDuplicateChecks(t *testing.T) {
+	for _, mode := range []string{"identical", "different raw codec", "different title", "different stream order"} {
+		t.Run(mode, func(t *testing.T) {
+			streams := []embyStream{{Type: "Audio", Index: 1, Codec: "dts", Language: "ger"}, {Type: "Audio", Index: 2, Codec: "ac3", Language: "eng"}, {Type: "Video", ExtendedVideoType: "DolbyVision", ExtendedVideoSubType: "Hdr10"}}
+			other := append([]embyStream(nil), streams...)
+			switch mode {
+			case "different raw codec":
+				other[0].Codec = "DTS"
+			case "different title":
+				other[0].Title = "Commentary"
+			case "different stream order":
+				other[0], other[1] = other[1], other[0]
+			}
+			mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				json.NewEncoder(w).Encode(map[string]any{"TotalRecordCount": 2, "Items": []embyItem{{Id: "one", Type: "Movie", Path: "/library/A.mkv", Size: 100, MediaStreams: streams}, {Id: "two", Type: "Movie", Path: "/library/A.mkv", Size: 100, MediaStreams: other}}})
+			}))
+			defer mock.Close()
+			f := sample(1, "A.mkv")
+			f.Size = 100
+			f.HDR = "HDR10"
+			files := []File{f}
+			if err := NewEmby(ServiceConfig{URL: mock.URL}).Enrich(context.Background(), "radarr", files); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "identical" {
+				if files[0].EmbyMatch != "matched" || len(files[0].AudioTracks) != 2 || files[0].HDR != "Dolby Vision + HDR10" {
+					t.Fatal("normalized tracks/HDR changed", files)
+				}
+			} else if files[0].EmbyMatch != "ambiguous" || len(files[0].AudioTracks) != 0 {
+				t.Fatal("raw duplicate differences collapsed", files)
+			}
+		})
+	}
+}

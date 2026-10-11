@@ -236,7 +236,7 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 			year  int
 		}{m.Title, m.Year}
 	}
-	out := []File{}
+	out := make([]File, 0, len(movies))
 	seenFiles := map[int]bool{}
 	for start := 0; start < len(movies); start += 100 {
 		end := start + 100
