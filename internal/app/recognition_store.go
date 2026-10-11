@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"runtime/debug"
 	"strconv"
 	"strings"
 )
@@ -71,9 +72,13 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	if engine.config.Revision == revision {
 		return engine.Config(), nil
 	}
+	// Large syncs may leave reclaimable heap pages behind. Release them before
+	// SQLite's backup and reprocessing allocations, outside the request hot path.
+	debug.FreeOSMemory()
 	if err = s.Backup(); err != nil {
 		return RecognitionConfig{}, err
 	}
+	debug.FreeOSMemory()
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return RecognitionConfig{}, err
