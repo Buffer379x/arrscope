@@ -1,5 +1,6 @@
 import { t, useI18n } from "../i18n";
 import { audioLanguageKey, sameAudioLanguage } from "../languages";
+import { OperatorButton } from "./OperatorButton";
 import { ChevronDown } from "lucide-preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
@@ -57,67 +58,55 @@ export function MultiFilter({
         <span class="field-label" id={"label-" + name}>
           {labels[name]}
         </span>
-        <select
-          class="filter-operator"
-          aria-label={t("{field}: operator", { field: labels[name] })}
-          value={operator}
-          onChange={(e) =>
-            operatorChange(e.currentTarget.value as FilterOperator)
-          }
-        >
-          <option value="eq">
-            {compound ? t("contains at least one") : t("is")}
-          </option>
-          <option value="not">
-            {compound ? t("contains none") : t("is not")}
-          </option>
-          {compound && (
-            <>
-              <option value="all">{t("contains all")}</option>
-              <option value="notAll">{t("does not contain all")}</option>
-            </>
-          )}
-        </select>
       </div>
-      <button
-        ref={trigger}
-        class={
-          "select-button" +
-          (selected.length
-            ? negative
-              ? " selected excluded"
-              : " selected"
-            : "")
-        }
-        aria-labelledby={"label-" + name}
-        aria-expanded={open}
-        aria-controls={"options-" + name}
-        onClick={() => setOpen(!open)}
-      >
-        <span class="select-values">
-          {selected.length
-            ? (operator === "notAll"
-                ? t("Not all: ")
-                : operator === "all"
-                  ? t("All: ")
-                  : negative
-                    ? t("Not: ")
-                    : "") +
-              selected
-                .map((v) =>
-                  v === "__unknown__"
-                    ? t("Unknown")
-                    : name === "language"
-                      ? t(audioLanguageKey(v))
-                      : v,
-                )
-                .join(", ")
-            : negative
-              ? t("No exclusions")
-              : t("All")}
-        </span>
-        <ChevronDown size={15} />
-      </button>
+      <div class="multi-filter-control">
+        <OperatorButton
+          field={labels[name]}
+          value={operator}
+          compound={compound}
+          change={operatorChange}
+        />
+        <button
+          type="button"
+          ref={trigger}
+          class={
+            "select-button" +
+            (selected.length
+              ? negative
+                ? " selected excluded"
+                : " selected"
+              : "")
+          }
+          aria-labelledby={"label-" + name}
+          aria-expanded={open}
+          aria-controls={"options-" + name}
+          onClick={() => setOpen(!open)}
+        >
+          <span class="select-values">
+            {selected.length
+              ? (operator === "notAll"
+                  ? t("Not all: ")
+                  : operator === "all"
+                    ? t("All: ")
+                    : negative
+                      ? t("Not: ")
+                      : "") +
+                selected
+                  .map((v) =>
+                    v === "__unknown__"
+                      ? t("Unknown")
+                      : name === "language"
+                        ? t(audioLanguageKey(v))
+                        : v,
+                  )
+                  .join(", ")
+              : negative
+                ? t("No exclusions")
+                : t("All")}
+          </span>
+          <ChevronDown size={15} />
+        </button>
+      </div>
       {open && (
         <div
           class="select-popover"

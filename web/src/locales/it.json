@@ -479,6 +479,26 @@
     "Automatic": "Automatico",
     "Black": "Nero",
     "White": "Bianco",
-    "Tag text color must be black or white": "Il colore del testo del tag deve essere nero o bianco"
+    "Tag text color must be black or white": "Il colore del testo del tag deve essere nero o bianco",
+    "File size (GiB)": "Dimensione file (GiB)",
+    "Status and metadata quality": "Stato e qualità dei metadati",
+    "Detailed Emby status": "Stato dettagliato di Emby",
+    "Filter logic": "Logica dei filtri",
+    "Services": "Servizi",
+    "Display and columns": "Visualizzazione e colonne",
+    "Colors and tags": "Colori e tag",
+    "Reset this warning color to its default?": "Ripristinare il colore predefinito di questo avviso?",
+    "Reset background and text colors for {value}?": "Ripristinare sfondo e testo per {value}?",
+    "Tag preview": "Anteprima tag",
+    "Color": "Colore",
+    "Text": "Testo",
+    "Match now": "Confronta ora",
+    "Matches both enabled libraries against Emby.": "Confronta entrambe le librerie attive con Emby.",
+    "Save connection changes before syncing.": "Salva le modifiche della connessione prima di sincronizzare.",
+    "These filters are already saved as {name}.": "Questi filtri sono già salvati come «{name}».",
+    "These filters are already saved.": "Questi filtri sono già salvati.",
+    "Enable Emby and at least one library before matching": "Attiva Emby e almeno una libreria prima del confronto",
+    "Syncing …": "Sincronizzazione …",
+    "Last sync": "Ultima sincronizzazione"
   }
 }

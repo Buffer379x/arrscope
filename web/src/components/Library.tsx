@@ -30,7 +30,7 @@ import {
   X,
 } from "lucide-preact";
 import type { JSX } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type {
   FilmSort,
   MediaFile,
@@ -41,7 +41,8 @@ import type {
   Status,
 } from "../types";
 
-import { api } from "../api";
+import { canonicalPresetQuery } from "../preset-query";
+import { api, ApiError } from "../api";
 import { dashboardService, makeDashboardFilter } from "../dashboard-filter";
 import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
 import { getLocale } from "../i18n";
@@ -127,6 +128,7 @@ export function Library({
       sonarr: false,
     }),
     [rulesDirty, setRulesDirty] = useState(false),
+    [settingsDirty, setSettingsDirty] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [settingsSection, setSettingsSection] = useState("connections"),
     [collapsed, setCollapsed] = useState(
@@ -140,7 +142,9 @@ export function Library({
       localStorage.getItem("arrscope-theme") || "dark",
     ),
     [savePreset, setSavePreset] = useState(false),
-    [presetName, setPresetName] = useState("");
+    [presetName, setPresetName] = useState(""),
+    [presetError, setPresetError] = useState("");
+  const libraryScroll = useRef(0);
   const q = new URLSearchParams(filters[service]);
   const sync = status.sync?.[service];
   const configured = settings?.[service].enabled;
@@ -166,14 +170,14 @@ export function Library({
     loadPresets().catch(() => {});
   }, []);
   useFacets(
-    view === "library",
+    view === "library" && !settingsOpen,
     service,
     `${sync?.lastSuccess}:${status.recognitionRevision}`,
     setFacets,
     setError,
   );
   useLibraryQuery({
-    view,
+    view: settingsOpen ? "settings" : view,
     service,
     filters,
     page,
@@ -185,13 +189,26 @@ export function Library({
     setError,
   });
   const openSettings = (section = "connections") => {
+    if (!settingsOpen) libraryScroll.current = window.scrollY;
     setSettingsSection(section);
     setSettingsOpen(true);
   };
-  const canLeaveRules = () =>
-    view !== "recognition" ||
-    !rulesDirty ||
-    confirm(t("Discard unsaved rule changes?"));
+  const canLeaveRules = () => {
+    if (
+      settingsOpen &&
+      settingsDirty &&
+      !confirm(t("Discard unsaved settings changes?"))
+    )
+      return false;
+    if (
+      view === "recognition" &&
+      rulesDirty &&
+      !confirm(t("Discard unsaved rule changes?"))
+    )
+      return false;
+    setSettingsOpen(false);
+    return true;
+  };
   const change = (key: string, values: FilterUpdate) => {
     const updateFilters = (current: Record<Service, string>) => {
       const n = new URLSearchParams(current[service]);
@@ -246,6 +263,20 @@ export function Library({
   const doSavePreset = async (e: Event) => {
     e.preventDefault();
     try {
+      const duplicate = presets.find(
+        (p) =>
+          p.service === service &&
+          canonicalPresetQuery(p.query) ===
+            canonicalPresetQuery(filters[service]),
+      );
+      if (duplicate) {
+        setPresetError(
+          t("These filters are already saved as {name}.", {
+            name: duplicate.name,
+          }),
+        );
+        return;
+      }
       const created = await api<Preset>("presets", "POST", {
         name: presetName,
         service,
@@ -257,7 +288,13 @@ export function Library({
       setPresetName("");
       setNotice(t("Filter view saved."));
     } catch (e) {
-      setError((e as Error).message);
+      setPresetError(
+        e instanceof ApiError && e.data.preset
+          ? t("These filters are already saved as {name}.", {
+              name: e.data.preset.name,
+            })
+          : (e as Error).message,
+      );
     }
   };
   const exportQuery = new URLSearchParams(filters[service]);
@@ -270,22 +307,10 @@ export function Library({
   const active = [...q.entries()].filter(
     ([k]) => k !== "sort" && k !== "dir" && !k.endsWith("Op"),
   );
-  const canonicalQuery = (query: string) => {
-    const params = new URLSearchParams(query);
-    params.delete("service");
-    params.delete("page");
-    params.delete("sort");
-    params.delete("dir");
-    return JSON.stringify(
-      [...params.entries()].sort(
-        ([a, b], [c, d]) => a.localeCompare(c) || b.localeCompare(d),
-      ),
-    );
-  };
   const matchingPresets = presets.filter(
     (p) =>
       p.service === service &&
-      canonicalQuery(p.query) === canonicalQuery(filters[service]),
+      canonicalPresetQuery(p.query) === canonicalPresetQuery(filters[service]),
   );
   const selectedPreset =
     matchingPresets.find((p) => p.id === presetIds[service]) ||
@@ -461,7 +486,28 @@ export function Library({
             </div>
           )}
           <main class="main">
-            {view === "recognition" ? (
+            {settingsOpen && settings ? (
+              <SettingsDialog
+                settings={settings}
+                initialSection={settingsSection}
+                onDirty={setSettingsDirty}
+                refresh={refresh}
+                status={status}
+                connectionError={connectionError}
+                demo={status.demo}
+                close={() => {
+                  setSettingsOpen(false);
+                  requestAnimationFrame(() =>
+                    window.scrollTo({ top: libraryScroll.current }),
+                  );
+                }}
+                saved={async () => {
+                  await loadSettings();
+                  await refresh();
+                  setNotice(t("Settings saved."));
+                }}
+              />
+            ) : view === "recognition" ? (
               <RecognitionPage
                 onDirty={setRulesDirty}
                 saved={refresh}
@@ -549,7 +595,10 @@ export function Library({
                   selectedPreset={selectedPreset}
                   applyPreset={applyPreset}
                   reset={reset}
-                  setSavePreset={setSavePreset}
+                  setSavePreset={(value) => {
+                    setPresetError("");
+                    setSavePreset(value);
+                  }}
                   deletePreset={deletePreset}
                   change={change}
                 />
@@ -764,10 +813,7 @@ export function Library({
                             ),
                             audio: (
                               <td key="audio">
-                                <AudioCell
-                                  file={f}
-                                  open={() => setFilename(f)}
-                                />
+                                <AudioCell file={f} />
                               </td>
                             ),
                             channels: (
@@ -923,31 +969,17 @@ export function Library({
               close={() => setFilename(null)}
             />
           )}{" "}
-          {settingsOpen && settings && (
-            <SettingsDialog
-              settings={settings}
-              initialSection={settingsSection}
-              onRecognition={() => {
-                setSettingsOpen(false);
-                setView("recognition");
-              }}
-              status={status}
-              connectionError={connectionError}
-              demo={status.demo}
-              close={() => setSettingsOpen(false)}
-              saved={async () => {
-                await loadSettings();
-                await refresh();
-                setNotice(t("Settings saved."));
-              }}
-            />
-          )}
           {savePreset && (
             <Modal
               title={t("Save filter view")}
               close={() => setSavePreset(false)}
             >
               <form onSubmit={doSavePreset}>
+                {presetError && (
+                  <p class="error" role="alert">
+                    {presetError}
+                  </p>
+                )}
                 <p class="quiet">
                   {t(
                     service === "radarr"

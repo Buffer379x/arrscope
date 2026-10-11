@@ -1,4 +1,9 @@
 import { getLocale, t } from "./i18n";
+export class ApiError extends Error {
+  constructor(public data: { error?: string; preset?: { name: string } }) {
+    super(t(data.error || "Request failed"));
+  }
+}
 let csrf = "";
 export async function api<T>(
   path: string,
@@ -17,7 +22,7 @@ export async function api<T>(
     signal,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(t(data.error || "Request failed"));
+  if (!res.ok) throw new ApiError(data);
   return data;
 }
 

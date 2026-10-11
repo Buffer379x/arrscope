@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.3.2
+
+Grouped filters with persistent search and checkbox multi-selects; compact operator icons; full-page settings; compact color controls with confirmed resets; equivalent-preset rejection; manual service synchronization; removal of the audio info icon. No database schema migration. See [release notes](docs/releases/0.3.2.md).
+
 ## 0.3.1
 
 Consistent Dashboard/library heading and card positions; Dashboard clicks select existing unsaved filters; removal of the Dashboard footer; persistent black/white/automatic tag text colors; reduced memory overlap during large syncs. No database schema migration. See [release notes](docs/releases/0.3.1.md).
