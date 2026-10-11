@@ -20,23 +20,23 @@ Local prerelease candidate on macOS/arm64; Go runtime reports 15 CPUs and uses `
 
 | Measurement | Result |
 | --- | --- |
-| 50k-file filter p50 | 19.75 ms |
+| 50k-file filter p50 | 18.99 ms |
 | 50k-file filter p95 | 69.78 ms |
-| Initial statistics across 100k files | 2.85 s |
+| Initial statistics across 100k files | 1.52 s |
 
 Isolated arm64 Docker test of the final memory/pagination candidate: 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, Go memory target at most 128 MiB under the detected 256 MiB container limit, equal memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped. The runtime clamps existing higher Unraid targets too; smaller user targets remain respected.
 
 | Measurement | Result |
 | --- | --- |
-| Successful complete sync | 22.91 s |
-| Sampled application RSS peak during sync | 232.95 MiB |
-| Application RSS after queries and reprocessing | 42.88 MiB |
-| HTTP filter p95 | 20.77 ms |
-| Cold statistics request | 5.07 s |
-| Cached statistics p95 | 0.61 ms |
+| Successful complete sync | 23.33 s |
+| Sampled application RSS peak during sync | 231.44 MiB |
+| Application RSS after queries and reprocessing | 45.92 MiB |
+| HTTP filter p95 | 20.49 ms |
+| Cold statistics request | 2.40 s |
+| Cached statistics p95 | 0.80 ms |
 | Cold facets request | 0.69 s |
-| Cached facets p95 | 0.57 ms |
-| Reprocess 100k cached filenames | 16.09 s |
+| Cached facets p95 | 0.62 ms |
+| Reprocess 100k cached filenames | 16.46 s |
 | Upstream requests caused by rule save | 0 |
 
 The cgroup peak reached its 256 MiB limit, including filesystem/database page cache; the process remained healthy and was not OOM-killed. Sampled RSS can miss transient peaks. Cold aggregate requests are slower than indexed library filters and are cached until sync or rule changes. These measurements are environment-specific, not universal latency guarantees. The final CI and release workflow rerun the synthetic container checks on the published candidate.

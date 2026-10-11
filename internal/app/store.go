@@ -665,7 +665,7 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files WHERE json_extract(data,'$.metadataIncomplete')=1").Scan(&out.Incomplete); e != nil {
 		return out, e
 	}
-	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(json_extract(data,'$.embyMatch'),''),'unconfigured'),count(*) FROM files GROUP BY 1")
+	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(emby_match,''),'unconfigured'),count(*) FROM files GROUP BY 1")
 	if e != nil {
 		return out, e
 	}
@@ -714,39 +714,40 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 			out.Distributions[service][field] = buckets
 		}
 	}
+	// Decode episode associations once, rather than once per language and scope.
+	// DISTINCT entity identities retain multi-episode and duplicate-file semantics.
+	entity := `f.service||':'||f.media_id||CASE WHEN f.service='sonarr' THEN ':'||f.season||':'||CASE WHEN json_extract(ep.value,'$.number') IS NULL THEN 'file:'||f.id ELSE 'episode:'||json_extract(ep.value,'$.number') END ELSE '' END`
+	query := `WITH entities AS MATERIALIZED (SELECT f.rowid AS file_rowid,f.service,` + entity + ` AS identity FROM files f LEFT JOIN json_each(CASE WHEN f.service='sonarr' THEN json_extract(f.data,'$.episodes') ELSE '[]' END) ep),
+scopes(service) AS (VALUES('all'),('radarr'),('sonarr'))
+SELECT s.service,'' AS language,1 AS is_total,count(DISTINCT e.identity) AS n FROM scopes s LEFT JOIN entities e ON s.service='all' OR e.service=s.service GROUP BY s.service
+UNION ALL
+SELECT s.service,l.language,0,count(DISTINCT e.identity) FROM scopes s JOIN entities e ON s.service='all' OR e.service=s.service JOIN file_languages l ON l.file_rowid=e.file_rowid GROUP BY s.service,l.language
+ORDER BY 1,3 DESC,4 DESC,2`
 	for _, service := range []string{"all", "radarr", "sonarr"} {
-		filter := ""
-		args := []any{}
-		if service != "all" {
-			filter = " WHERE f.service=?"
-			args = append(args, service)
-		}
-		entity := `f.service||':'||f.media_id||CASE WHEN f.service='sonarr' THEN ':'||f.season||':'||CASE WHEN json_extract(ep.value,'$.number') IS NULL THEN 'file:'||f.id ELSE 'episode:'||json_extract(ep.value,'$.number') END ELSE '' END`
-		from := ` FROM files f LEFT JOIN json_each(CASE WHEN f.service='sonarr' THEN json_extract(f.data,'$.episodes') ELSE '[]' END) ep`
-		var titles int
-		if e = tx.QueryRowContext(ctx, "SELECT count(DISTINCT "+entity+")"+from+filter, args...).Scan(&titles); e != nil {
+		out.Distributions[service]["language"] = []StatisticBucket{}
+	}
+	rows, e = tx.QueryContext(ctx, query)
+	if e != nil {
+		return out, e
+	}
+	for rows.Next() {
+		var service string
+		var bucket StatisticBucket
+		var total bool
+		if e = rows.Scan(&service, &bucket.Value, &total, &bucket.Count); e != nil {
+			rows.Close()
 			return out, e
 		}
-		out.LanguageTotals[service] = titles
-		buckets := []StatisticBucket{}
-		rows, e := tx.QueryContext(ctx, "SELECT l.language,count(DISTINCT "+entity+")"+from+" JOIN file_languages l ON l.file_rowid=f.rowid"+filter+" GROUP BY l.language ORDER BY 2 DESC,l.language", args...)
-		if e != nil {
-			return out, e
+		if total {
+			out.LanguageTotals[service] = bucket.Count
+		} else {
+			out.Distributions[service]["language"] = append(out.Distributions[service]["language"], bucket)
 		}
-		for rows.Next() {
-			var b StatisticBucket
-			if e = rows.Scan(&b.Value, &b.Count); e != nil {
-				rows.Close()
-				return out, e
-			}
-			buckets = append(buckets, b)
-		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return out, e
-		}
-		out.Distributions[service]["language"] = buckets
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return out, e
 	}
 	return out, tx.Commit()
 }
