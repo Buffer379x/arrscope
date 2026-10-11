@@ -1,0 +1,324 @@
+package app
+
+import (
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+var resolutionRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(480[pi]|576[pi]|720p|1080[pi]|1440p|2160p|4320p|4k|8k)(?:$|[ ._\[\]()-])`)
+var codecRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(x[ ._-]?264|x[ ._-]?265|h[ ._-]?264|h[ ._-]?265|avc|hevc|av1|xvid|divx|mpeg[ ._-]?2|vc[ ._-]?1)(?:$|[ ._\[\]()-])`)
+var depthRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(8|10|12)[ ._-]?bit(?:$|[ ._\[\]()-])`)
+var channelRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])([257]\.1|2\.0)(?:$|[ ._\[\]()-])`)
+var dolbyRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:dv|dovi|dolby[ ._-]?vision)(?:$|[ ._\[\]()-])`)
+var hdrRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])hdr(?:$|[ ._\[\]()-])`)
+var eacRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:ddp|dd\+|eac3|e-ac-3)(?:[ ._\[\]()-]|\d|$)`)
+var languageMatchers = []struct {
+	re    *regexp.Regexp
+	label string
+}{
+	{regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:german|deutsch)(?:$|[ ._\[\]()-])`), "Deutsch"},
+	{regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])english(?:$|[ ._\[\]()-])`), "Englisch"},
+	{regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])french(?:$|[ ._\[\]()-])`), "Französisch"},
+	{regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])japanese(?:$|[ ._\[\]()-])`), "Japanisch"},
+}
+
+func match(re *regexp.Regexp, s string) string {
+	m := re.FindStringSubmatch(s)
+	if len(m) > 1 {
+		return strings.ToLower(m[1])
+	}
+	return ""
+}
+func normResolution(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "4k" {
+		return "2160p"
+	}
+	if s == "8k" {
+		return "4320p"
+	}
+	return s
+}
+func normCodec(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	r := strings.NewReplacer(".", "", " ", "", "-", "", "_", "")
+	s = r.Replace(s)
+	switch s {
+	case "avc", "h264", "avc1", "h264/avc", "avc/h264":
+		return "AVC"
+	case "hevc", "h265", "hev1", "hvc1", "h265/hevc", "hevc/h265":
+		return "HEVC"
+	case "x264":
+		return "x264"
+	case "x265":
+		return "x265"
+	case "av1":
+		return "AV1"
+	case "xvid":
+		return "XviD"
+	case "divx":
+		return "DivX"
+	case "vc1":
+		return "VC-1"
+	case "mpeg2", "mpeg2video":
+		return "MPEG-2"
+	}
+	return s
+}
+func family(s string) string {
+	switch s {
+	case "AVC", "x264":
+		return "H.264/AVC"
+	case "HEVC", "x265":
+		return "H.265/HEVC"
+	}
+	return s
+}
+
+type tokenMatcher struct {
+	re    *regexp.Regexp
+	label string
+}
+
+func token(pattern string) *regexp.Regexp {
+	return regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:` + pattern + `)(?:$|[ ._\[\]()-])`)
+}
+
+var sourceMatchers = []tokenMatcher{
+	{token(`web[ ._-]?rip`), "WEBRip"}, {token(`web[ ._-]?dl`), "WEB-DL"},
+	{token(`blu[ ._-]?ray`), "BluRay"}, {token(`bdrip`), "BDRip"}, {token(`brrip`), "BRRip"},
+	{token(`hdtv`), "HDTV"}, {token(`dvdrip`), "DVDRip"}, {token(`dvd`), "DVD"},
+}
+var remuxRE = token(`remux`)
+
+func qualityParts(s string) (string, string, string) {
+	source, processing := "", ""
+	for _, m := range sourceMatchers {
+		if m.re.MatchString(s) {
+			source = m.label
+			break
+		}
+	}
+	if remuxRE.MatchString(s) {
+		processing = "Remux"
+	}
+	return normResolution(match(resolutionRE, s)), source, processing
+}
+
+var hdr10PlusRE = token(`hdr10(?:\+|plus)`)
+var hdr10RE = token(`hdr10`)
+var hlgRE = token(`hlg`)
+
+func hdrToken(s string) string {
+	var values []string
+	if dolbyRE.MatchString(s) {
+		values = append(values, "Dolby Vision")
+	}
+	if hdr10PlusRE.MatchString(s) {
+		values = append(values, "HDR10+")
+	}
+	if hdr10RE.MatchString(s) {
+		values = append(values, "HDR10")
+	}
+	if hlgRE.MatchString(s) {
+		values = append(values, "HLG")
+	}
+	if hdrRE.MatchString(s) && !hdr10PlusRE.MatchString(s) && !hdr10RE.MatchString(s) {
+		values = append(values, "HDR")
+	}
+	return strings.Join(values, " + ")
+}
+
+var audioMatchers = []tokenMatcher{
+	{token(`true[ ._-]?hd`), "TrueHD"}, {token(`dts[ ._-]?hd[ ._-]?ma`), "DTS-HD MA"},
+	{token(`dts[ ._-]?hd`), "DTS-HD"}, {eacRE, "E-AC-3"},
+	{token(`ac[ ._-]?3`), "AC-3"}, {token(`flac`), "FLAC"}, {token(`aac`), "AAC"},
+	{token(`dts`), "DTS"}, {token(`opus`), "Opus"},
+	{token(`lpcm`), "LPCM"}, {token(`pcm`), "PCM"}, {token(`mp3`), "MP3"}, {token(`alac`), "ALAC"},
+}
+
+func audioToken(s string) string {
+	// Specific codecs consume their token before broader patterns run:
+	// DTS-HD MA must not also become DTS-HD and DTS; E-AC-3 must not become AC-3.
+	s = strings.NewReplacer("/", " ", ",", " ", ";", " ", "|", " ").Replace(s)
+	var out []string
+	for _, m := range audioMatchers {
+		if m.re.MatchString(s) {
+			out = append(out, m.label)
+			for m.re.MatchString(s) {
+				s = m.re.ReplaceAllString(s, " ")
+			}
+		}
+	}
+	return strings.Join(out, " + ")
+}
+func languageToken(s string) string {
+	var out []string
+	for _, x := range languageMatchers {
+		if x.re.MatchString(s) {
+			out = append(out, x.label)
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, ", ")
+}
+func normAudio(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "unknown", "n/a", "none":
+		return ""
+	}
+	if v := audioToken(" " + s + " "); v != "" {
+		return v
+	}
+	return strings.TrimSpace(s)
+}
+func normLanguage(s string) string {
+	values := strings.FieldsFunc(s, func(r rune) bool { return r == '/' || r == ',' || r == ';' || r == '|' })
+	out := []string{}
+	seen := map[string]bool{}
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		switch strings.ToLower(v) {
+		case "und", "unknown", "undefined", "n/a":
+			v = ""
+		case "german", "deutsch", "de", "deu", "ger":
+			v = "Deutsch"
+		case "english", "englisch", "en", "eng":
+			v = "Englisch"
+		case "french", "französisch", "fr", "fra", "fre":
+			v = "Französisch"
+		case "japanese", "japanisch", "ja", "jpn":
+			v = "Japanisch"
+		}
+		if v != "" && !seen[v] {
+			out = append(out, v)
+			seen[v] = true
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+type APIInfo struct {
+	Quality               string
+	VideoCodec            string
+	Resolution            string
+	VideoBitDepth         int
+	VideoDynamicRange     string
+	VideoDynamicRangeType string
+	AudioCodec            string
+	AudioChannels         float64
+	AudioLanguages        string
+	AudioStreamCount      int
+}
+
+func Enrich(f *File, api APIInfo) {
+	f.Evidence = map[string]Evidence{}
+	f.Conflict = false
+	r, s, p := qualityParts(f.Filename)
+	ar, as, ap := qualityParts(api.Quality)
+	if api.Resolution != "" {
+		if v := normResolution(match(resolutionRE, " "+api.Resolution+" ")); v != "" {
+			ar = v
+		}
+	}
+	set := func(k, n, a string) string {
+		e := Evidence{Filename: n, API: a}
+		v := n
+		if v != "" {
+			e.Origin = "filename"
+		} else if a != "" {
+			v = a
+			e.Origin = "api"
+		} else {
+			e.Origin = "unknown"
+		}
+		e.Conflict = n != "" && a != "" && n != a
+		if k == "codec" {
+			e.Conflict = n != "" && a != "" && family(n) != family(a)
+		}
+		if k == "hdr" && n != "" && a != "" {
+			// Profiles are additive. A filename naming DV must not hide an
+			// explicitly reported HDR10 fallback from existing API metadata.
+			v = hdrToken(n + " " + a)
+			e.Conflict = false
+			if v != n {
+				e.Origin = "combined"
+			}
+		}
+		f.Evidence[k] = e
+		f.Conflict = f.Conflict || e.Conflict
+		return v
+	}
+	f.Resolution = set("resolution", r, ar)
+	f.Source = set("source", s, as)
+	f.Processing = set("processing", p, ap)
+	f.Codec = set("codec", normCodec(match(codecRE, f.Filename)), normCodec(api.VideoCodec))
+	f.Family = family(f.Codec)
+	ad := ""
+	if api.VideoBitDepth > 0 {
+		ad = strconv.Itoa(api.VideoBitDepth)
+	}
+	f.BitDepth = set("bitDepth", match(depthRE, f.Filename), ad)
+	f.HDR = set("hdr", hdrToken(f.Filename), hdrToken(api.VideoDynamicRange+" "+api.VideoDynamicRangeType))
+	f.Audio = set("audio", audioToken(f.Filename), normAudio(api.AudioCodec))
+	ac := ""
+	if api.AudioChannels > 0 {
+		ac = strconv.FormatFloat(api.AudioChannels, 'f', 1, 64)
+	}
+	f.Channels = set("channels", match(channelRE, f.Filename), ac)
+	f.Language = set("language", languageToken(f.Filename), normLanguage(api.AudioLanguages))
+	if e := f.Evidence["language"]; e.Filename != "" && e.API != "" {
+		f.Language = normLanguage(e.Filename + " / " + e.API)
+		e.Conflict = !containsAllTraits(e.API, e.Filename, ", ")
+		if f.Language != e.Filename {
+			e.Origin = "combined"
+		}
+		f.Evidence["language"] = e
+	}
+	f.AudioStreamCount = api.AudioStreamCount
+	// The API reports a primary codec, not a complete per-track codec list.
+	// A primary codec already present among filename codecs is compatible.
+	if e := f.Evidence["audio"]; e.Conflict && containsAllTraits(e.Filename, e.API, " + ") {
+		e.Conflict = false
+		f.Evidence["audio"] = e
+		f.Conflict = false
+		for _, evidence := range f.Evidence {
+			f.Conflict = f.Conflict || evidence.Conflict
+		}
+	}
+	f.Conflict = false
+	for _, e := range f.Evidence {
+		f.Conflict = f.Conflict || e.Conflict
+	}
+	updateCompleteness(f)
+}
+
+func updateCompleteness(f *File) {
+	f.UnknownTraits = nil
+	for _, field := range []struct{ name, value string }{{"audio", f.Audio}, {"language", f.Language}} {
+		unknown := field.value == ""
+		for _, track := range f.AudioTracks {
+			unknown = unknown || (field.name == "audio" && track.Codec == "") || (field.name == "language" && track.Language == "")
+		}
+		if unknown {
+			f.UnknownTraits = append(f.UnknownTraits, field.name)
+		}
+	}
+	f.MetadataIncomplete = f.Resolution == "" || f.Codec == "" || f.Source == "" || len(f.UnknownTraits) > 0 || (f.EmbyMatch != "" && f.EmbyMatch != "matched")
+}
+
+func containsAllTraits(value, selected, separator string) bool {
+	values := strings.Split(value, separator)
+	for _, part := range strings.Split(selected, separator) {
+		found := false
+		for _, v := range values {
+			found = found || v == part
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}

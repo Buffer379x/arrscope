@@ -1,0 +1,13 @@
+.env
+appdata/
+web/node_modules/
+web/dist/
+arrscope
+*.db
+*.db-wal
+*.db-shm
+secret.key
+setup-token
+*.zip
+.DS_Store
+work/

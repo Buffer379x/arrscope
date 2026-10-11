@@ -1,0 +1,149 @@
+import argparse, json, os, re, socket, subprocess, sys, tempfile, threading, time, urllib.request, urllib.parse, http.cookiejar, uuid
+parser = argparse.ArgumentParser(description='Isolated ArrScope container test with synthetic Arr/Emby APIs; no real service access.')
+parser.add_argument('--image', default='arrscope:test')
+parser.add_argument('--files-per-service', type=int, default=50000)
+args = parser.parse_args()
+if not 1 <= args.files_per_service <= 100000:
+    parser.error('Use 1 to 100000 files per service.')
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+N = args.files_per_service
+PER_SERIES = 50
+overlap = None
+env = os.environ.copy()
+
+def docker(*args, check=True):
+    return subprocess.run(['docker', *args], env=env, capture_output=True, text=True, check=check).stdout.strip()
+
+def media_name(i, service):
+    return f'{service}.{i:05d}.2020.1080p.WEB-DL.x264.mkv'
+
+def arrfile(i, service, series=0):
+    return {'id': i, 'movieId': i, 'seriesId': series, 'seasonNumber': 1, 'relativePath': media_name(i, service), 'size': 4000000000, 'quality': {'quality': {'name': 'WEBDL-1080p'}}, 'mediaInfo': {'videoCodec': 'AVC'}}
+
+class Fixture(BaseHTTPRequestHandler):
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        u = urllib.parse.urlparse(self.path)
+        q = urllib.parse.parse_qs(u.query)
+        if u.path == '/api/v3/movie':
+            data = [{'id': i, 'title': f'Movie {i:05d}', 'year': 2020} for i in range(1, N + 1)]
+        elif u.path == '/api/v3/moviefile':
+            data = [arrfile(int(i), 'radarr') for i in q['movieId']]
+        elif u.path == '/api/v3/series':
+            data = [{'id': i, 'title': f'Series {i:05d}'} for i in range(1, (N + PER_SERIES - 1) // PER_SERIES + 1)]
+        elif u.path in ['/api/v3/episodefile', '/api/v3/episode']:
+            sid = int(q['seriesId'][0])
+            ids = range((sid - 1) * PER_SERIES + 1, min(sid * PER_SERIES, N) + 1)
+            data = [arrfile(i, 'sonarr', sid) for i in ids] if u.path.endswith('episodefile') else [{'id': i, 'episodeFileId': i, 'episodeNumber': (i - 1) % PER_SERIES + 1, 'title': f'Episode {i:05d}', 'airDate': '2020-01-01'} for i in ids]
+        elif u.path == '/emby/Items':
+            service = 'radarr' if q['IncludeItemTypes'][0] == 'Movie' else 'sonarr'
+            start = int(q['StartIndex'][0])
+            limit = int(q['Limit'][0])
+            itemtype = q['IncludeItemTypes'][0]
+            if overlap and start + limit >= N:
+                try:
+                    overlap.wait(timeout=15)
+                except threading.BrokenBarrierError:
+                    pass
+            data = {'Items': [{'Id': str(i), 'Type': itemtype, 'MediaSources': [{'Path': '/media/' + media_name(i, service), 'Size': 4000000000, 'MediaStreams': [{'Type': 'Audio', 'Index': 1, 'Codec': 'dts', 'Language': 'ger', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Audio', 'Index': 2, 'Codec': 'ac3', 'Language': 'eng', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Video', 'Index': 0, 'ExtendedVideoType': 'DolbyVision', 'ExtendedVideoSubType': 'Hdr10'}]}]} for i in range(start + 1, min(start + limit, N) + 1)], 'TotalRecordCount': N}
+        else:
+            data = {'version': 'synthetic'}
+        raw = json.dumps(data).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', len(raw))
+        self.end_headers()
+        try:
+            self.wfile.write(raw)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+fixture = ThreadingHTTPServer(('0.0.0.0', 0), Fixture)
+threading.Thread(target=fixture.serve_forever, daemon=True).start()
+with socket.socket() as sock:
+    sock.bind(('127.0.0.1', 0))
+    port = sock.getsockname()[1]
+name = 'arrscope-review-' + uuid.uuid4().hex[:10]
+base = f'http://127.0.0.1:{port}'
+csrf = ''
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+def req(path, data=None, method=None):
+    r = urllib.request.Request(base + path, data=None if data is None else json.dumps(data).encode(), method=method, headers={'Content-Type': 'application/json', 'X-CSRF-Token': csrf})
+    with opener.open(r, timeout=10) as response:
+        return json.load(response)
+result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, GOMEMLIMIT=192MiB'}
+with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
+    os.chmod(data, 511)
+    try:
+        docker('run', '-d', '--name', name, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)
+        result['memory_plus_swap_limit_mib'] = json.loads(docker('inspect', name))[0]['HostConfig']['MemorySwap'] / 1024 ** 2
+        for _ in range(100):
+            try:
+                req('/healthz')
+                break
+            except Exception:
+                time.sleep(0.05)
+        token = docker('exec', name, 'cat', '/data/setup-token')
+        req('/api/setup', {'username': 'review', 'password': 'Synthetic-review-2026', 'token': token})
+        csrf = req('/api/status')['csrf']
+        cfg = req('/api/settings')
+        for service in ['radarr', 'sonarr', 'emby']:
+            cfg[service].update(enabled=True, url=f'http://host.docker.internal:{fixture.server_port}', apiKey='synthetic', interval=0)
+        start = time.perf_counter()
+        req('/api/settings', cfg, 'PUT')
+        peak = 0
+        rss_peak = 0
+        status = {}
+        for _ in range(600):
+            state = json.loads(docker('inspect', name))[0]['State']
+            if not state['Running']:
+                result.update(completed=False, oom_killed=state['OOMKilled'], exit_code=state['ExitCode'])
+                break
+            raw = docker('exec', name, 'cat', '/sys/fs/cgroup/memory.peak', check=False)
+            if raw.isdigit():
+                peak = max(peak, int(raw))
+            rss = re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status', check=False))
+            if rss:
+                rss_peak = max(rss_peak, int(rss[1]) / 1024)
+            try:
+                status = req('/api/status')['sync']
+            except Exception:
+                time.sleep(0.1)
+                continue
+            if not any((v['running'] for v in status.values())):
+                result.update(completed=all((v['count'] == N and (not v['error']) for v in status.values())), statuses=status, oom_killed=False)
+                break
+            time.sleep(0.1)
+        result.update(seconds=round(time.perf_counter() - start, 3), cgroup_peak_mib=round(peak / 1024 ** 2, 2), sampled_app_rss_peak_mib=round(rss_peak, 2))
+        if result.get('completed'):
+            timings = []
+            for i in range(40):
+                service = 'radarr' if i % 2 == 0 else 'sonarr'
+                t = time.perf_counter()
+                out = req(f'/api/files?service={service}&resolution=1080p&codec=x264')
+                timings.append((time.perf_counter() - t) * 1000)
+                assert out['total'] == N
+            result['http_filter_p95_ms'] = round(sorted(timings)[37], 3)
+            for endpoint in ['statistics', 'facets?service=radarr']:
+                t = time.perf_counter()
+                req('/api/' + endpoint)
+                result[endpoint.split('?')[0] + '_cold_ms'] = round((time.perf_counter() - t) * 1000, 3)
+                cached = []
+                for _ in range(20):
+                    t = time.perf_counter()
+                    req('/api/' + endpoint)
+                    cached.append((time.perf_counter() - t) * 1000)
+                result[endpoint.split('?')[0] + '_cached_p95_ms'] = round(sorted(cached)[18], 3)
+            result['app_rss_after_queries_mib'] = round(int(re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status'))[1]) / 1024, 2)
+    except Exception as e:
+        result['test_error'] = str(e)
+    finally:
+        result['container_state'] = json.loads(docker('inspect', name))[0]['State']
+        docker('rm', '-f', name, check=False)
+fixture.shutdown()
+print(json.dumps(result, indent=2))
+if not result.get('completed') or result.get('test_error'):
+    sys.exit(1)

@@ -1,0 +1,12 @@
+.git
+.env
+appdata
+web/node_modules
+web/dist
+docs/screenshots
+*.zip
+*.db*
+secret.key
+setup-token
+
+work/

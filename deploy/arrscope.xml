@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>arrscope</Name>
+  <Repository>ghcr.io/buffer379x/arrscope:stable</Repository>
+  <Registry>https://github.com/Buffer379x/arrscope/pkgs/container/arrscope</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Buffer379x/arrscope/issues</Support>
+  <Project>https://github.com/Buffer379x/arrscope</Project>
+  <Overview>Filter your Radarr and Sonarr media library using existing filenames and API metadata. Local SQLite cache. No media mounts, no scans. One local admin login. Configure API connections in the WebUI.</Overview>
+  <Category>MediaApp:Other Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/Buffer379x/arrscope/main/web/public/icon-256.png</Icon>
+  <ExtraParams>--user=99:100 --read-only --tmpfs=/tmp:rw,noexec,nosuid,nodev,size=32m --cap-drop=ALL --security-opt=no-new-privileges --memory=256m --memory-swap=256m</ExtraParams>
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="WebUI port on the dedicated container IP." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/cache/appdata/arrscope" Mode="rw" Description="Local SSD/pool path. No SMB/NFS. Owner must match UID/GID in Extra Parameters." Type="Path" Display="always" Required="true" Mask="false">/mnt/cache/appdata/arrscope</Config>
+  <Config Name="HTTPS proxy" Target="ARRSCOPE_HTTPS" Default="false" Mode="" Description="Set true only when the browser accesses this app through HTTPS." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="Go memory target" Target="GOMEMLIMIT" Default="192MiB" Mode="" Description="Soft Go memory target; container hard limit is 256 MiB." Type="Variable" Display="advanced" Required="false" Mask="false">192MiB</Config>
+  <Config Name="Go CPU parallelism" Target="GOMAXPROCS" Default="2" Mode="" Description="Limit Go execution threads to two by default." Type="Variable" Display="advanced" Required="false" Mask="false">2</Config>
+</Container>

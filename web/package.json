@@ -1,0 +1,22 @@
+{
+  "name": "arrscope-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "lucide-preact": "0.468.0",
+    "preact": "10.27.3"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "typescript": "5.9.3",
+    "vite": "8.3.4"
+  }
+}

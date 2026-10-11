@@ -1,0 +1,150 @@
+.column-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.column-settings fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.column-options {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+@media (max-width: 600px) {
+  .column-settings {
+    grid-template-columns: 1fr;
+  }
+}
+
+.column-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.column-option .check-field {
+  min-width: 0;
+  flex: 1;
+}
+.column-move-tools {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.column-move-tools .icon-button {
+  width: 30px;
+  height: 30px;
+}
+.results-tools {
+  flex-wrap: wrap;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  flex-wrap: wrap;
+}
+.field-label-row .field-label {
+  min-width: 0;
+}
+.filter-operator {
+  width: auto;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 5px;
+  font-size: 11px;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+.select-values {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.select-button svg {
+  flex-shrink: 0;
+}
+.filter-chip.excluded,
+.select-button.selected.excluded {
+  color: #e4b86f;
+  border-color: #9b773f;
+  background: #423521;
+}
+:root[data-theme="light"] .filter-chip.excluded,
+:root[data-theme="light"] .select-button.selected.excluded {
+  color: #744310;
+  border-color: #cb9b52;
+  background: #ffedcd;
+}
+
+.filter-help {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+.filter-help:empty {
+  display: none;
+}
+.language-details {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.language-details .icon-button {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.audio-information {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.audio-information h4 {
+  margin: 0 0 8px;
+}
+.audio-information p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 6px 0;
+}
+
+.track-language-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.track-language-list > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.audio-track-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+.audio-track-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  font-size: 12px;
+}
+.audio-track-list small {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}

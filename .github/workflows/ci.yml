@@ -1,0 +1,54 @@
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.25.0
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - run: pnpm --dir web test
+      - run: pnpm --dir web build
+      - run: pnpm --dir web audit --audit-level=moderate
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: go test -race ./...
+      - run: go vet ./...
+      - name: 50k file performance check
+        run: GOMAXPROCS=2 ARRSCOPE_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
+      - name: Docker build and smoke test
+        run: |
+          docker build -t arrscope:test .
+          docker run -d --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --memory-swap 256m --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m --name arrscope-ci -e ARRSCOPE_DEMO=true arrscope:test
+          for n in $(seq 1 30); do
+            if docker exec arrscope-ci arrscope healthcheck; then break; fi
+            sleep 1
+          done
+          docker exec arrscope-ci arrscope healthcheck
+          test "$(docker inspect --format '{{.Config.User}}' arrscope-ci)" = '99:100'
+          docker stop arrscope-ci
+          docker start arrscope-ci
+          sleep 2
+          docker exec arrscope-ci arrscope healthcheck
+          docker rm -f arrscope-ci
+      - name: Scan runtime image for high and critical vulnerabilities
+        run: |
+          docker save arrscope:test -o "$RUNNER_TEMP/arrscope-image.tar"
+          docker run --rm -v "$RUNNER_TEMP/arrscope-image.tar:/scan/image.tar:ro" aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1
+      - name: 100k synthetic files with Emby, no swap, cached dashboard
+        run: python3 docs/scripts/containercheck.py --image arrscope:test
