@@ -4,7 +4,7 @@
 
 `ARRSCOPE_DATA_DIR` defaults to `/data`. `arrscope.db` and `secret.key` are created with mode 0600; new directories use 0700. An existing mounted directory must be accessible to the configured UID/GID. Never replace the local key: existing API keys cannot be decrypted without the matching `secret.key`.
 
-The container sets `GOMAXPROCS=2` and a soft Go memory target `GOMEMLIMIT=192MiB`. Docker separately limits RAM to 256 MiB and requests an equal RAM-plus-swap limit to prohibit additional swap. Host kernel support is required for enforcing the swap limit. Large API responses and metadata can require more memory; monitor the target host before tightening limits.
+The container sets `GOMAXPROCS=2` and a soft Go memory target `GOMEMLIMIT=128MiB`. The runtime also clamps this target to at most half of a detected container memory limit, leaving room for page cache and other process allocations. This protects existing Unraid templates with a higher target without requiring a configuration change. Docker separately limits RAM to 256 MiB and requests an equal RAM-plus-swap limit to prohibit additional swap. Host kernel support is required for enforcing the swap limit. Large API responses and metadata can require more memory; monitor the target host before tightening limits.
 
 The `/tmp` tmpfs is limited to 32 MiB. `SQLITE_TMPDIR=/data` allows large SQLite sorts to spill onto local Appdata storage. CSV exports also use protected temporary files there. Keep enough free local disk space; do not use SMB/NFS for SQLite WAL.
 
@@ -12,7 +12,7 @@ The `/tmp` tmpfs is limited to 32 MiB. `SQLITE_TMPDIR=/data` allows large SQLite
 
 ## Backup
 
-Settings → Maintenance → Back up cache uses SQLite `VACUUM INTO` to create a consistent copy under `/data/backups/`. The last three snapshots remain. Required schema migrations create a snapshot automatically.
+Settings → System → Back up cache uses SQLite `VACUUM INTO` to create a consistent copy under `/data/backups/`. The last three snapshots remain. Required schema migrations create a snapshot automatically.
 
 For a complete backup:
 
@@ -30,7 +30,7 @@ A database snapshot alone is insufficient for recovering encrypted keys. Other l
 3. Restore matching complete Appdata, or restore a consistent database snapshot of the matching schema as `arrscope.db` while retaining its corresponding key. After separately backing them up, remove stale target WAL/SHM files while the app remains stopped.
 4. Verify UID/GID and permissions, then start. Check login, connections and cache.
 
-An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.2.0 retains schema 4 and requires no migration. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
+An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.3.0 upgrades schema 4 to schema 5, with a pre-migration database snapshot. Rolling back to 0.2.3 requires restoring the matching schema-4 snapshot. Recognition rule edits create a backup and atomically reprocess the cache; custom rules remain in SQLite across updates. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
 
 ## Forgotten password
 

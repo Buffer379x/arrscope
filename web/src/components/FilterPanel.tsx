@@ -10,7 +10,13 @@ import {
 } from "lucide-preact";
 import type { Preset, Service } from "../types";
 
-import { FilterOperator, FilterUpdate, labels, operatorLabels } from "../ui";
+import {
+  embyMatchLabels,
+  FilterOperator,
+  FilterUpdate,
+  labels,
+  operatorLabels,
+} from "../ui";
 import { MultiFilter } from "./MultiFilter";
 type Props = {
   q: URLSearchParams;
@@ -232,7 +238,7 @@ export function FilterPanel({
               </label>
             ))}
             <label>
-              <span>{t("Data quality")}</span>
+              <span>{t("Metadata disagreement")}</span>
               <select
                 value={q.get("conflict") || ""}
                 onChange={(e) =>
@@ -245,6 +251,49 @@ export function FilterPanel({
                 <option value="">{t("All metadata")}</option>
                 <option value="true">{t("Conflicting")}</option>
                 <option value="false">{t("No conflicts")}</option>
+              </select>
+            </label>
+            <label>
+              <span>{t("Conflicting recognition rules")}</span>
+              <select
+                aria-label={t("Conflicting recognition rules")}
+                value={q.get("ruleConflict") || ""}
+                onChange={(e) =>
+                  change(
+                    "ruleConflict",
+                    e.currentTarget.value ? [e.currentTarget.value] : [],
+                  )
+                }
+              >
+                <option value="">{t("All files")}</option>
+                <option value="true">{t("Conflicting")}</option>
+                <option value="false">{t("No conflicts")}</option>
+              </select>
+            </label>
+            <label>
+              <span>{t("Emby matching")}</span>
+              <select
+                aria-label={t("Emby matching")}
+                value={q.get("embyMatch") || ""}
+                onChange={(e) =>
+                  change(
+                    "embyMatch",
+                    e.currentTarget.value ? [e.currentTarget.value] : [],
+                  )
+                }
+              >
+                <option value="">{t("All files")}</option>
+                {[
+                  "unmatched",
+                  "matched",
+                  "missing",
+                  "ambiguous",
+                  "missing_size",
+                  "no_tracks",
+                  "unconfigured",
+                ].map((key) => (
+                  <option value={key}>{embyMatchLabels[key]}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -323,7 +372,9 @@ export function FilterPanel({
                         q: t("Search"),
                         yearMin: t("From"),
                         yearMax: t("To"),
-                        conflict: t("Conflict"),
+                        conflict: t("Metadata disagreement"),
+                        ruleConflict: t("Conflicting recognition rules"),
+                        embyMatch: t("Emby matching"),
                         metadata: t("Metadata status"),
                         sizeMin: t("Bytes from"),
                         sizeMax: t("Bytes to"),
@@ -344,15 +395,19 @@ export function FilterPanel({
                     : [v]
                   )
                     .map((value) =>
-                      value === "__unknown__"
-                        ? t("Unknown")
-                        : k === "metadata"
-                          ? value === "incomplete"
-                            ? t("incomplete")
-                            : t("complete")
-                          : k === "language"
-                            ? t(audioLanguageKey(value))
-                            : value,
+                      k === "embyMatch"
+                        ? embyMatchLabels[value] || value
+                        : ["conflict", "ruleConflict"].includes(k)
+                          ? t(value === "true" ? "Conflicting" : "No conflicts")
+                          : value === "__unknown__"
+                            ? t("Unknown")
+                            : k === "metadata"
+                              ? value === "incomplete"
+                                ? t("incomplete")
+                                : t("complete")
+                              : k === "language"
+                                ? t(audioLanguageKey(value))
+                                : value,
                     )
                     .join(" + ")}
                   <X size={12} />

@@ -1,5 +1,5 @@
 import { t, useI18n } from "../i18n";
-import { audioLanguageKey } from "../languages";
+import { audioLanguageKey, sameAudioLanguage } from "../languages";
 import { ChevronDown } from "lucide-preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
@@ -20,6 +20,8 @@ export function MultiFilter({
   change: (v: FilterUpdate) => void;
 }) {
   useI18n();
+  const equivalent = (left: string, right: string) =>
+    name === "language" ? sameAudioLanguage(left, right) : left === right;
   const negative = operator === "not" || operator === "notAll";
   const compound = compoundFields.includes(name);
   const [open, setOpen] = useState(false);
@@ -135,13 +137,13 @@ export function MultiFilter({
               <label>
                 <input
                   type="checkbox"
-                  checked={selected.includes(v)}
+                  checked={selected.some((value) => equivalent(value, v))}
                   onChange={(e) => {
                     const checked = e.currentTarget.checked;
                     change((current) =>
                       checked
-                        ? [...new Set([...current, v])]
-                        : current.filter((x) => x !== v),
+                        ? [...current.filter((x) => !equivalent(x, v)), v]
+                        : current.filter((x) => !equivalent(x, v)),
                     );
                   }}
                 />

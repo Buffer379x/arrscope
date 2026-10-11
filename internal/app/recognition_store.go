@@ -1,0 +1,169 @@
+package app
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"strconv"
+	"strings"
+)
+
+var ErrRecognitionRevision = errors.New("Recognition rules changed in another session. Reload before saving.")
+
+func (s *Store) Recognition() RecognitionConfig {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	return s.recognition.Config()
+}
+func reparseFile(f *File, engine *RecognitionEngine) {
+	if f.RecognitionRevision == engine.config.Revision {
+		return
+	}
+	api := APIInfo{}
+	if f.APIInfo != nil {
+		api = *f.APIInfo
+	} else {
+		old := func(field, fallback string) string {
+			if e, ok := f.Evidence[field]; ok {
+				return e.API
+			}
+			return fallback
+		}
+		api.Resolution = old("resolution", f.Resolution)
+		api.VideoCodec = old("codec", f.Codec)
+		api.Quality = old("source", f.Source) + " " + old("processing", f.Processing)
+		api.VideoBitDepth, _ = strconv.Atoi(old("bitDepth", f.BitDepth))
+		api.VideoDynamicRangeType = old("hdr", f.HDR)
+		api.AudioCodec = old("audio", f.Audio)
+		api.AudioChannels, _ = strconv.ParseFloat(old("channels", f.Channels), 64)
+		api.AudioLanguages = old("language", f.Language)
+		api.AudioStreamCount = f.AudioStreamCount
+	}
+	embyHDR := f.Evidence["hdr"].Emby
+	EnrichWithRules(f, api, engine)
+	if embyHDR != "" {
+		f.HDR = mergeHDR(f.HDR, embyHDR)
+		e := f.Evidence["hdr"]
+		e.Emby = embyHDR
+		e.Origin = "combined"
+		f.Evidence["hdr"] = e
+	}
+	if f.EmbyMatch == "matched" && len(f.AudioTracks) > 0 {
+		streams := []embyStream{}
+		for _, track := range f.AudioTracks {
+			streams = append(streams, embyStream{Type: "Audio", Index: track.Index, Language: track.Language, Codec: track.Codec, Channels: track.Channels, ChannelLayout: track.ChannelLayout, Title: track.Title, IsDefault: track.Default})
+		}
+		applyEmby(f, streams)
+	}
+	updateCompleteness(f)
+}
+func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, revision string) (RecognitionConfig, error) {
+	engine, err := CompileRecognition(rules)
+	if err != nil {
+		return RecognitionConfig{}, err
+	}
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	if revision != s.recognition.config.Revision {
+		return RecognitionConfig{}, ErrRecognitionRevision
+	}
+	if engine.config.Revision == revision {
+		return engine.Config(), nil
+	}
+	if err = s.Backup(); err != nil {
+		return RecognitionConfig{}, err
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return RecognitionConfig{}, err
+	}
+	defer tx.Rollback()
+	if err = reparseCached(ctx, tx, engine); err != nil {
+		return RecognitionConfig{}, err
+	}
+	data, _ := json.Marshal(engine.Config())
+	if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(data)); err != nil {
+		return RecognitionConfig{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return RecognitionConfig{}, err
+	}
+	s.recognition = engine
+	s.invalidateAggregates()
+	return engine.Config(), nil
+}
+func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) error {
+	var last int64
+	for {
+		rows, err := tx.QueryContext(ctx, "SELECT rowid,data FROM files WHERE rowid>? ORDER BY rowid LIMIT 250", last)
+		if err != nil {
+			return err
+		}
+		type entry struct {
+			id   int64
+			file File
+		}
+		batch := []entry{}
+		for rows.Next() {
+			var id int64
+			var raw string
+			if err = rows.Scan(&id, &raw); err != nil {
+				rows.Close()
+				return err
+			}
+			var f File
+			if err = json.Unmarshal([]byte(raw), &f); err != nil {
+				rows.Close()
+				return err
+			}
+			batch = append(batch, entry{id, f})
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		if len(batch) == 0 {
+			return nil
+		}
+		for _, item := range batch {
+			reparseFile(&item.file, engine)
+			f := item.file
+			data, err := json.Marshal(f)
+			if err != nil {
+				return err
+			}
+			if _, err = tx.ExecContext(ctx, "UPDATE files SET resolution=?,codec=?,family=?,source=?,processing=?,hdr=?,bitDepth=?,audio=?,channels=?,language=?,conflict=?,rule_conflict=?,emby_match=?,data=? WHERE rowid=?", f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, f.Conflict, f.RuleConflict, f.EmbyMatch, string(data), item.id); err != nil {
+				return err
+			}
+			if err = replaceFileLanguages(ctx, tx, item.id, f); err != nil {
+				return err
+			}
+			last = item.id
+		}
+	}
+}
+func replaceFileLanguages(ctx context.Context, tx *sql.Tx, id int64, f File) error {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM file_languages WHERE file_rowid=?", id); err != nil {
+		return err
+	}
+	languages := splitLanguages(f.Language)
+	for _, trait := range f.UnknownTraits {
+		if trait == "language" {
+			languages = append(languages, "")
+		}
+	}
+	for _, language := range languages {
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO file_languages(file_rowid,language) VALUES(?,?)", id, language); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func splitLanguages(value string) []string {
+	if value == "" {
+		return []string{""}
+	}
+	return strings.Split(normLanguage(value), ", ")
+}

@@ -70,7 +70,7 @@ func TestLocalizedHTTPErrorAndCSV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 2 || records[0][0] != "Titolo" || records[1][4] != file.Filename || records[1][14] != file.Language {
+	if len(records) != 2 || records[0][0] != "Titolo" || records[1][4] != file.Filename || !strings.Contains(records[1][12], file.Language) {
 		t.Fatal(records)
 	}
 }

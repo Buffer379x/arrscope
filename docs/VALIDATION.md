@@ -45,3 +45,5 @@ The local ARM64 Docker test used 100,000 synthetic files (50,000 per service), t
 Frontend dependency audit reported no known vulnerabilities. Go symbol analysis found no reachable vulnerabilities (one advisory in an unused module path); the final ARM64 runtime image scan found no high or critical vulnerabilities. These are scan results at review time, not a guarantee against all flaws. Production remains on 0.1.0 until approval and release; the new version has not yet been validated against the user's live installation. Spanish and Italian translations have structural/browser coverage but have not received independent native-speaker review.
 
 [English 0.2.0 dashboard screenshot](screenshots/dashboard-0.2.0-en.png) uses synthetic demo data only.
+
+Version 0.3.0 adds configurable recognition, atomic cache reprocessing, separate conflict states, Emby matching filters and unique language statistics. See the [0.3.0 validation record](VALIDATION-0.3.0.md). The synthetic container check also verifies rule reprocessing without upstream requests and retention of per-track Emby data.

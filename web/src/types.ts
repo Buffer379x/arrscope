@@ -11,6 +11,7 @@ export type Connection = {
 export type Settings = {
   columnOrder: Record<Service, string[]>;
   visibleColumns: Record<Service, string[]>;
+  warningColors: Record<string, string>;
   tagColors: Record<string, string>;
   radarr: Connection;
   sonarr: Connection;
@@ -23,6 +24,7 @@ export type Evidence = {
   emby?: string;
   origin: string;
   conflict: boolean;
+  rules?: string[];
 };
 export type MediaFile = {
   id: number;
@@ -57,6 +59,8 @@ export type MediaFile = {
   language: string;
   size: number;
   conflict: boolean;
+  ruleConflict: boolean;
+  recognitionConflicts?: RecognitionConflict[];
   evidence: Record<string, Evidence>;
   matched: boolean;
   unknownTraits?: string[];
@@ -82,6 +86,7 @@ export type Status = {
   authenticated: boolean;
   version: string;
   demo: boolean;
+  recognitionRevision?: string;
   csrf?: string;
   sync?: Record<Service, SyncStatus>;
 };
@@ -93,6 +98,7 @@ export type Preset = {
 };
 
 export type Statistics = {
+  languageTotals: Record<string, number>;
   movies: number;
   series: number;
   episodes: number;
@@ -105,3 +111,30 @@ export type Statistics = {
   >;
 };
 export type FilmSort = { field: string; direction: "asc" | "desc" };
+
+export type RecognitionRule = {
+  id: string;
+  name: string;
+  field: string;
+  match: "token" | "regex";
+  pattern: string;
+  value: string;
+  mode: "direct" | "fallback" | "override";
+  priority: number;
+  enabled: boolean;
+  consume: boolean;
+  unless?: string;
+};
+export type RecognitionConfig = { rules: RecognitionRule[]; revision: string };
+export type RecognitionConflict = {
+  field: string;
+  values: string[];
+  rules: string[];
+  ruleNames: string[];
+};
+export type RecognitionResult = {
+  values: Record<string, string>;
+  matches: Record<string, string[]>;
+  origins: Record<string, string>;
+  conflicts: RecognitionConflict[];
+};

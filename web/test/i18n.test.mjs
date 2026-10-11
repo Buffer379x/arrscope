@@ -4,7 +4,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { translate, resolveLocale } from "../src/i18n-core.ts";
-import { audioLanguage, audioLanguageKey } from "../src/languages.ts";
+import {
+  audioLanguage,
+  audioLanguageKey,
+  sameAudioLanguage,
+} from "../src/languages.ts";
 import {
   makeDashboardFilter,
   dashboardService,
@@ -123,4 +127,14 @@ test("dashboard drilldown encodes values, handles unknowns and picks the service
   );
   assert.equal(dashboardService("all", "sonarr"), "sonarr");
   assert.equal(dashboardService("radarr", "sonarr"), "radarr");
+});
+
+test("legacy language aliases remain selected without rewriting query values", () => {
+  assert.ok(sameAudioLanguage("Spanish", "Spanisch"));
+  assert.ok(sameAudioLanguage("ita", "Italienisch"));
+  assert.ok(!sameAudioLanguage("Spanish", "German"));
+  assert.ok(!sameAudioLanguage("Unidentified", "Unknown"));
+  const query = new URLSearchParams("language=Spanish");
+  assert.ok(sameAudioLanguage(query.get("language"), "Spanisch"));
+  assert.equal(query.get("language"), "Spanish");
 });

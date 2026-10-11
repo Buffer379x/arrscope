@@ -11,7 +11,7 @@ Use the public release image and the included XML template. Existing installatio
 7. In Settings → Connections, enter/test/enable/save Radarr and Sonarr URLs and API keys. Optionally connect Emby. Keys are located under Settings → General in Arr services and Dashboard → API keys in Emby. Wait for the initial complete sync.
 8. Enable Autostart. Choose the interface language on login or under Settings → Appearance.
 
-Updates: Docker → Check for Updates → ArrScope → Update. The existing `/data` is reused; required schema migrations create a consistent database snapshot first. Version 0.2.0 does not change the database schema.
+Updates: Docker → Check for Updates → ArrScope → Update. The existing `/data` is reused; required schema migrations create a consistent database snapshot first. Version 0.3.0 upgrades SQLite to schema 5 with an automatic backup. A rollback to 0.2.3 also requires its matching pre-migration database snapshot.
 
 A dedicated container IP does not need host port mapping. Ensure the container can reach its services through your VLAN/firewall rules. Without HTTPS, keep `ARRSCOPE_HTTPS=false`; with an existing HTTPS proxy, set it to true. The template does not set up public Internet exposure. A swap-limit warning means the host cannot enforce that additional limit; it does not remove the RAM limit.
 

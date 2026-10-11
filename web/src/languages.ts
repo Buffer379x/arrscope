@@ -57,3 +57,12 @@ export function audioLanguage(value: string) {
 export function audioLanguageKey(value: string) {
   return audioLanguage(value)?.name || value || "Unknown";
 }
+
+// Compare known aliases for UI selection without rewriting saved filter values.
+export function sameAudioLanguage(left: string, right: string) {
+  return (
+    left === right ||
+    (!!audioLanguage(left) &&
+      audioLanguage(left)?.name === audioLanguage(right)?.name)
+  );
+}

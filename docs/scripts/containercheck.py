@@ -21,11 +21,13 @@ def arrfile(i, service, series=0):
     return {'id': i, 'movieId': i, 'seriesId': series, 'seasonNumber': 1, 'relativePath': media_name(i, service), 'size': 4000000000, 'quality': {'quality': {'name': 'WEBDL-1080p'}}, 'mediaInfo': {'videoCodec': 'AVC'}}
 
 class Fixture(BaseHTTPRequestHandler):
+    calls = 0
 
     def log_message(self, *a):
         pass
 
     def do_GET(self):
+        Fixture.calls += 1
         u = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(u.query)
         if u.path == '/api/v3/movie':
@@ -70,15 +72,20 @@ base = f'http://127.0.0.1:{port}'
 csrf = ''
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
-def req(path, data=None, method=None):
+def req(path, data=None, method=None, timeout=10):
     r = urllib.request.Request(base + path, data=None if data is None else json.dumps(data).encode(), method=method, headers={'Content-Type': 'application/json', 'X-CSRF-Token': csrf})
-    with opener.open(r, timeout=10) as response:
+    with opener.open(r, timeout=timeout) as response:
         return json.load(response)
-result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, GOMEMLIMIT=192MiB'}
+result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 128MiB under the 256MiB container limit'}
+# Match the host's unprivileged UID/GID so it can clean up private 0700 backup
+# directories on Linux bind mounts. Root callers still run the app as 99:100.
+test_uid = os.getuid() if os.getuid() else 99
+test_gid = os.getgid() if os.getuid() else 100
+result['container_user'] = f'{test_uid}:{test_gid}'
 with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
     os.chmod(data, 511)
     try:
-        docker('run', '-d', '--name', name, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)
+        docker('run', '-d', '--name', name, '--user', result['container_user'], '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)
         result['memory_plus_swap_limit_mib'] = json.loads(docker('inspect', name))[0]['HostConfig']['MemorySwap'] / 1024 ** 2
         for _ in range(100):
             try:
@@ -137,13 +144,32 @@ with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
                     req('/api/' + endpoint)
                     cached.append((time.perf_counter() - t) * 1000)
                 result[endpoint.split('?')[0] + '_cached_p95_ms'] = round(sorted(cached)[18], 3)
+            # Reprocess the entire cache under the same 256 MiB/no-swap limit.
+            # Verified Emby pairs must survive and no synthetic upstream GET may occur.
+            current = req('/api/recognition')
+            rule = {'id':'stress-source','name':'Synthetic source override','field':'source','match':'token','pattern':'WEB-DL','value':'UHD','mode':'override','priority':1,'enabled':True,'consume':False}
+            before_calls = Fixture.calls
+            t = time.perf_counter()
+            updated = req('/api/recognition', {'rules':current['rules']+[rule], 'revision':current['revision']}, 'PUT', timeout=85)
+            result['recognition_reprocess_ms'] = round((time.perf_counter()-t)*1000,3)
+            assert updated['revision'] != current['revision']
+            assert Fixture.calls == before_calls, 'Rule save contacted an upstream service'
+            for service in ['radarr','sonarr']:
+                out = req(f'/api/files?service={service}&source=UHD&language=Deutsch&audio=DTS')
+                assert out['total'] == N
+                assert len(out['files'][0]['audioTracks']) == 2
+                assert out['files'][0]['embyMatch'] == 'matched'
+            result['recognition_preserved_emby'] = True
+            result['recognition_upstream_requests'] = Fixture.calls - before_calls
+            raw = docker('exec', name, 'cat', '/sys/fs/cgroup/memory.peak', check=False)
+            if raw.isdigit(): result['cgroup_peak_mib'] = round(int(raw)/1024**2,2)
             result['app_rss_after_queries_mib'] = round(int(re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status'))[1]) / 1024, 2)
     except Exception as e:
         result['test_error'] = str(e)
     finally:
         result['container_state'] = json.loads(docker('inspect', name))[0]['State']
+        print(json.dumps(result, indent=2), flush=True)
         docker('rm', '-f', name, check=False)
 fixture.shutdown()
-print(json.dumps(result, indent=2))
 if not result.get('completed') or result.get('test_error'):
     sys.exit(1)

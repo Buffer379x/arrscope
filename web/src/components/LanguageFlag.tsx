@@ -13,7 +13,13 @@ const vertical: Record<string, string[]> = {
   fr: ["#0055a4", "#fff", "#ef4135"],
   pt: ["#006600", "#d42628"],
 };
-export function LanguageFlag({ value }: { value: string }) {
+export function LanguageFlag({
+  value,
+  focusable = true,
+}: {
+  value: string;
+  focusable?: boolean;
+}) {
   useI18n();
   const language = audioLanguage(value),
     label = t(audioLanguageKey(value));
@@ -24,7 +30,7 @@ export function LanguageFlag({ value }: { value: string }) {
       role="img"
       aria-label={label}
       title={label}
-      tabIndex={0}
+      tabIndex={focusable ? 0 : undefined}
     >
       {flag ? (
         <svg viewBox="0 0 30 20" aria-hidden="true" focusable="false">

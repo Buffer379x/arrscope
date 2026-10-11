@@ -17,6 +17,8 @@ import (
 )
 
 type Store struct {
+	recognitionMu   sync.Mutex
+	recognition     *RecognitionEngine
 	DB              *sql.DB
 	Dir             string
 	cacheMu         sync.Mutex
@@ -33,7 +35,7 @@ func OpenStore(dir string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(4)
-	s := &Store{DB: db, Dir: dir, facetCache: map[string]map[string][]string{}}
+	s := &Store{DB: db, Dir: dir, facetCache: map[string]map[string][]string{}, recognition: defaultRecognitionEngine}
 	fail := func(e error) (*Store, error) { db.Close(); return nil, e }
 	if _, err = db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		return fail(err)
@@ -43,7 +45,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 4 {
+	if version > 5 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -95,6 +97,64 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(err)
 		}
 	}
+	if version < 5 {
+		if originalVersion >= 4 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		for _, column := range []struct{ name, definition string }{{"rule_conflict", "INTEGER NOT NULL DEFAULT 0"}, {"emby_match", "TEXT NOT NULL DEFAULT ''"}} {
+			var exists int
+			e = tx.QueryRow("SELECT count(*) FROM pragma_table_info('files') WHERE name=?", column.name).Scan(&exists)
+			if e != nil {
+				break
+			}
+			if exists == 0 {
+				_, e = tx.Exec("ALTER TABLE files ADD COLUMN " + column.name + " " + column.definition)
+				if e != nil {
+					break
+				}
+			}
+		}
+		if e == nil {
+			_, e = tx.Exec(`UPDATE files SET emby_match=coalesce(json_extract(data,'$.embyMatch'),''); CREATE INDEX IF NOT EXISTS files_conflicts ON files(service,conflict); CREATE INDEX IF NOT EXISTS files_rule_conflicts ON files(service,rule_conflict); CREATE INDEX IF NOT EXISTS files_emby_match ON files(service,emby_match); CREATE TABLE IF NOT EXISTS file_languages(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,language TEXT NOT NULL,PRIMARY KEY(file_rowid,language)); CREATE INDEX IF NOT EXISTS file_languages_value ON file_languages(language,file_rowid);`)
+		}
+		if e == nil {
+			e = reparseCached(context.Background(), tx, defaultRecognitionEngine)
+		}
+		if e == nil {
+			_, e = tx.Exec("PRAGMA user_version=5")
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
+	var recognition RecognitionConfig
+	// A compact covering index avoids reading full evidence/audio JSON while
+	// counting and selecting IDs for compound filters and season membership.
+	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_traits ON files(service,resolution,codec,source,hdr,audio,language,media_id,season,processing,family,bitDepth,channels,size,conflict,rule_conflict,emby_match,title COLLATE NOCASE,id)`); err != nil {
+		return fail(err)
+	}
+	if err = s.Get("recognition", &recognition); err == nil {
+		s.recognition, err = CompileRecognition(recognition.Rules)
+		if err != nil {
+			return fail(err)
+		}
+	} else if err == sql.ErrNoRows {
+		if err = s.Put("recognition", s.recognition.Config()); err != nil {
+			return fail(err)
+		}
+	} else {
+		return fail(err)
+	}
 	os.Chmod(filepath.Join(dir, "arrscope.db"), 0600)
 	return s, nil
 }
@@ -134,6 +194,8 @@ func (s *Store) Put(key string, v any) error {
 	return e
 }
 func (s *Store) Replace(service string, files []File, status SyncStatus) error {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
 	tx, e := s.DB.Begin()
 	if e != nil {
 		return e
@@ -142,12 +204,15 @@ func (s *Store) Replace(service string, files []File, status SyncStatus) error {
 	if _, e = tx.Exec("DELETE FROM files WHERE service=?", service); e != nil {
 		return e
 	}
-	st, e := tx.Prepare("INSERT INTO files(service,id,media_id,season,title,filename,resolution,codec,family,source,processing,hdr,bitDepth,audio,channels,language,size,conflict,data,series,episode_sort) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+	st, e := tx.Prepare("INSERT INTO files(service,id,media_id,season,title,filename,resolution,codec,family,source,processing,hdr,bitDepth,audio,channels,language,size,conflict,data,series,episode_sort,rule_conflict,emby_match) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
 	if e != nil {
 		return e
 	}
 	defer st.Close()
 	for _, f := range files {
+		if f.APIInfo != nil || len(f.Evidence) > 0 || s.recognition.config.Revision != defaultRecognitionEngine.config.Revision {
+			reparseFile(&f, s.recognition)
+		}
 		updateCompleteness(&f)
 		f.Service = service
 		f.Matched = true
@@ -159,11 +224,14 @@ func (s *Store) Replace(service string, files []File, status SyncStatus) error {
 		if len(f.Episodes) > 0 {
 			episodeSort = f.Episodes[0].Number
 		}
-		r, e := st.Exec(service, f.ID, f.MediaID, f.Season, f.Title, f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, f.Size, f.Conflict, string(b), f.Series, episodeSort)
+		r, e := st.Exec(service, f.ID, f.MediaID, f.Season, f.Title, f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, f.Size, f.Conflict, string(b), f.Series, episodeSort, f.RuleConflict, f.EmbyMatch)
 		if e != nil {
 			return e
 		}
 		id, _ := r.LastInsertId()
+		if e = replaceFileLanguages(context.Background(), tx, id, f); e != nil {
+			return e
+		}
 		if _, e = tx.Exec("INSERT INTO search(rowid,title,filename) VALUES(?,?,?)", id, f.Series+" "+f.Title, f.Filename); e != nil {
 			return e
 		}
@@ -180,11 +248,15 @@ func (s *Store) Replace(service string, files []File, status SyncStatus) error {
 	if e = tx.Commit(); e != nil {
 		return e
 	}
+	s.invalidateAggregates()
+	return nil
+}
+
+func (s *Store) invalidateAggregates() {
 	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
 	s.facetCache = map[string]map[string][]string{}
 	s.statisticsCache = nil
-	s.cacheMu.Unlock()
-	return nil
 }
 
 var fields = []string{"resolution", "codec", "family", "source", "processing", "hdr", "bitDepth", "audio", "channels", "language"}
@@ -223,8 +295,13 @@ func where(q url.Values) (string, []any, error) {
 		if compound {
 			var parts []string
 			for _, v := range values {
+				if field == "language" && v != "__unknown__" {
+					v = normLanguage(v)
+				}
 				if v == "__unknown__" || v == "" {
-					if field == "audio" || field == "language" {
+					if field == "language" {
+						parts = append(parts, "f.rowid IN (SELECT l.file_rowid FROM file_languages l WHERE l.language='')")
+					} else if field == "audio" {
 						parts = append(parts, "(f."+field+"='' OR EXISTS(SELECT 1 FROM json_each(f.data,'$.unknownTraits') u WHERE u.value=?))")
 						a = append(a, field)
 					} else {
@@ -234,11 +311,12 @@ func where(q url.Values) (string, []any, error) {
 					continue
 				}
 				if field == "language" {
-					parts = append(parts, "(f.language=? OR instr(','||replace(f.language,', ', ',')||',', ','||?||',')>0)")
+					parts = append(parts, "f.rowid IN (SELECT l.file_rowid FROM file_languages l WHERE l.language=?)")
+					a = append(a, v)
 				} else {
 					parts = append(parts, "(f."+field+"=? OR instr(' + '||f."+field+"||' + ', ' + '||?||' + ')>0)")
+					a = append(a, v, v)
 				}
-				a = append(a, v, v)
 			}
 			join := " OR "
 			if op == "all" || op == "notAll" {
@@ -278,6 +356,26 @@ func where(q url.Values) (string, []any, error) {
 		}
 		w = append(w, "f.conflict=?")
 		a = append(a, c == "true")
+	}
+	if c := q.Get("ruleConflict"); c != "" {
+		if c != "true" && c != "false" {
+			return "", nil, fmt.Errorf("Invalid recognition conflict filter")
+		}
+		w = append(w, "f.rule_conflict=?")
+		a = append(a, c == "true")
+	}
+	if state := q.Get("embyMatch"); state != "" {
+		switch state {
+		case "unmatched":
+			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks')")
+		case "matched", "missing", "ambiguous", "missing_size", "no_tracks":
+			w = append(w, "f.emby_match=?")
+			a = append(a, state)
+		case "unconfigured":
+			w = append(w, "f.emby_match=''")
+		default:
+			return "", nil, fmt.Errorf("Invalid Emby match filter")
+		}
 	}
 	if q.Get("yearMin") != "" || q.Get("yearMax") != "" {
 		ys := []string{"y.file_rowid=f.rowid"}
@@ -340,29 +438,26 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 		return out, e
 	}
 	defer tx.Rollback()
+	if mode == "season" && q.Get("service") == "sonarr" && !all {
+		return querySeasonPage(ctx, tx, q, filter, args, out)
+	}
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files f WHERE "+filter, args...).Scan(&out.Total); e != nil {
 		return out, e
 	}
 	out.DisplayTotal = out.Total
-	display := filter
-	da := append([]any{}, args...)
-	if mode == "season" && q.Get("service") == "sonarr" && !all {
-		display = "f.service=? AND (f.media_id,f.season) IN (SELECT f.media_id,f.season FROM files f WHERE " + filter + ")"
-		da = append([]any{"sonarr"}, args...)
-		if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files f WHERE "+display, da...).Scan(&out.DisplayTotal); e != nil {
-			return out, e
-		}
-	}
 	order, e := displayOrder(q)
 	if e != nil {
 		return out, e
 	}
-	query := "SELECT f.data,(" + filter + ") FROM files f WHERE " + display + " ORDER BY " + order
-	qa := append(append([]any{}, args...), da...)
+	query := "SELECT f.data,1 FROM files f WHERE " + filter + " ORDER BY " + order
+	qa := append([]any{}, args...)
 	if !all {
-		query += " LIMIT ? OFFSET ?"
+		// Sort compact row IDs first, then load and evaluate only the current page.
+		// Carrying large evidence/track JSON through a 50k-row temp sort is avoidable.
+		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,1 FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
 		qa = append(qa, out.PageSize, (out.Page-1)*out.PageSize)
 	}
+
 	rows, e := tx.QueryContext(ctx, query, qa...)
 	if e != nil {
 		return out, e
@@ -380,6 +475,45 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 		}
 		f.Matched = matched
 		out.Files = append(out.Files, f)
+	}
+	return out, rows.Err()
+}
+
+func querySeasonPage(ctx context.Context, tx *sql.Tx, q url.Values, filter string, args []any, out Results) (Results, error) {
+	order, err := displayOrder(q)
+	if err != nil {
+		return out, err
+	}
+	// Evaluate costly compound filters once, then reuse compact IDs for season
+	// membership, counts and matched markers. The left join retains counts even
+	// when no results exist or the requested page is beyond the last page.
+	query := `WITH matched AS MATERIALIZED (SELECT f.rowid,f.media_id,f.season FROM files f WHERE ` + filter + `),
+groups AS MATERIALIZED (SELECT DISTINCT media_id,season FROM matched),
+counts AS MATERIALIZED (SELECT (SELECT count(*) FROM matched) AS total,(SELECT count(*) FROM files f INDEXED BY files_group WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups)) AS displayed),
+page AS MATERIALIZED (SELECT f.rowid FROM files f INDEXED BY files_series_sort WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups) ORDER BY ` + order + ` LIMIT ? OFFSET ?)
+SELECT f.data,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed
+FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY ` + order
+	params := append(append([]any{}, args...), out.PageSize, (out.Page-1)*out.PageSize)
+	rows, err := tx.QueryContext(ctx, query, params...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw sql.NullString
+		var matched bool
+		if err = rows.Scan(&raw, &matched, &out.Total, &out.DisplayTotal); err != nil {
+			return out, err
+		}
+		if !raw.Valid {
+			continue
+		}
+		var file File
+		if err = json.Unmarshal([]byte(raw.String), &file); err != nil {
+			return out, err
+		}
+		file.Matched = matched
+		out.Files = append(out.Files, file)
 	}
 	return out, rows.Err()
 }
@@ -474,7 +608,7 @@ func movieOrder(q url.Values) (string, error) {
 	expression, ok := map[string]string{
 		"title": "f.title COLLATE NOCASE", "year": "(SELECT min(year) FROM years y WHERE y.file_rowid=f.rowid)",
 		"resolution": "CASE f.resolution WHEN '4320p' THEN 4320 WHEN '2160p' THEN 2160 WHEN '1440p' THEN 1440 WHEN '1080p' THEN 1080 WHEN '720p' THEN 720 WHEN '576p' THEN 576 WHEN '480p' THEN 480 ELSE CAST(f.resolution AS INTEGER) END",
-		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "f.audio COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
+		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "(f.language||' '||f.audio) COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
 	}[field]
 	if !ok {
 		return "", fmt.Errorf("Invalid sort field")
@@ -487,6 +621,9 @@ func movieOrder(q url.Values) (string, error) {
 		return "", fmt.Errorf("Invalid sort direction")
 	}
 	unknown := "f." + field + "=''"
+	if field == "audio" {
+		unknown = "f.language='' AND f.audio=''"
+	}
 	if field == "year" {
 		unknown = "NOT EXISTS(SELECT 1 FROM years y WHERE y.file_rowid=f.rowid)"
 	}
@@ -501,18 +638,19 @@ type StatisticBucket struct {
 	Count int    `json:"count"`
 }
 type Statistics struct {
-	Movies        int                                     `json:"movies"`
-	Series        int                                     `json:"series"`
-	Episodes      int                                     `json:"episodes"`
-	Files         int                                     `json:"files"`
-	Emby          map[string]int                          `json:"emby"`
-	Incomplete    int                                     `json:"incomplete"`
-	Distributions map[string]map[string][]StatisticBucket `json:"distributions"`
+	LanguageTotals map[string]int                          `json:"languageTotals"`
+	Movies         int                                     `json:"movies"`
+	Series         int                                     `json:"series"`
+	Episodes       int                                     `json:"episodes"`
+	Files          int                                     `json:"files"`
+	Emby           map[string]int                          `json:"emby"`
+	Incomplete     int                                     `json:"incomplete"`
+	Distributions  map[string]map[string][]StatisticBucket `json:"distributions"`
 }
 
 // One read transaction keeps widgets and diagrams consistent during a sync.
 func (s *Store) statistics(ctx context.Context) (Statistics, error) {
-	out := Statistics{Emby: map[string]int{}, Distributions: map[string]map[string][]StatisticBucket{}}
+	out := Statistics{LanguageTotals: map[string]int{}, Emby: map[string]int{}, Distributions: map[string]map[string][]StatisticBucket{}}
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return out, e
@@ -527,7 +665,7 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files WHERE json_extract(data,'$.metadataIncomplete')=1").Scan(&out.Incomplete); e != nil {
 		return out, e
 	}
-	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(json_extract(data,'$.embyMatch'),''),'unconfigured'),count(*) FROM files GROUP BY 1")
+	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(emby_match,''),'unconfigured'),count(*) FROM files GROUP BY 1")
 	if e != nil {
 		return out, e
 	}
@@ -575,6 +713,41 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 			}
 			out.Distributions[service][field] = buckets
 		}
+	}
+	// Decode episode associations once, rather than once per language and scope.
+	// DISTINCT entity identities retain multi-episode and duplicate-file semantics.
+	entity := `f.service||':'||f.media_id||CASE WHEN f.service='sonarr' THEN ':'||f.season||':'||CASE WHEN json_extract(ep.value,'$.number') IS NULL THEN 'file:'||f.id ELSE 'episode:'||json_extract(ep.value,'$.number') END ELSE '' END`
+	query := `WITH entities AS MATERIALIZED (SELECT f.rowid AS file_rowid,f.service,` + entity + ` AS identity FROM files f LEFT JOIN json_each(CASE WHEN f.service='sonarr' THEN json_extract(f.data,'$.episodes') ELSE '[]' END) ep),
+scopes(service) AS (VALUES('all'),('radarr'),('sonarr'))
+SELECT s.service,'' AS language,1 AS is_total,count(DISTINCT e.identity) AS n FROM scopes s LEFT JOIN entities e ON s.service='all' OR e.service=s.service GROUP BY s.service
+UNION ALL
+SELECT s.service,l.language,0,count(DISTINCT e.identity) FROM scopes s JOIN entities e ON s.service='all' OR e.service=s.service JOIN file_languages l ON l.file_rowid=e.file_rowid GROUP BY s.service,l.language
+ORDER BY 1,3 DESC,4 DESC,2`
+	for _, service := range []string{"all", "radarr", "sonarr"} {
+		out.Distributions[service]["language"] = []StatisticBucket{}
+	}
+	rows, e = tx.QueryContext(ctx, query)
+	if e != nil {
+		return out, e
+	}
+	for rows.Next() {
+		var service string
+		var bucket StatisticBucket
+		var total bool
+		if e = rows.Scan(&service, &bucket.Value, &total, &bucket.Count); e != nil {
+			rows.Close()
+			return out, e
+		}
+		if total {
+			out.LanguageTotals[service] = bucket.Count
+		} else {
+			out.Distributions[service]["language"] = append(out.Distributions[service]["language"], bucket)
+		}
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return out, e
 	}
 	return out, tx.Commit()
 }

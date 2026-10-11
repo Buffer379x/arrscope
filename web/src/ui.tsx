@@ -30,10 +30,12 @@ export const tableColumns = [
   ["bitDepth", "Bit depth"],
   ["audio", "Audio"],
   ["channels", "Channels"],
-  ["language", "Language"],
 ];
 export type ConnectionService = Service | "emby";
 export const embyMatchLabels: Record<string, string> = translatedLabels({
+  unmatched: "All unsuccessful matches",
+  matched: "Matched",
+  unconfigured: "Without Emby enrichment",
   missing: "No unique match in Emby",
   missing_size: "File size missing for matching",
   ambiguous: "Ambiguous file or audio track match",
@@ -132,3 +134,8 @@ export function Tag({
     </span>
   );
 }
+
+export const defaultWarningColors: Record<string, string> = {
+  metadata: "#d9a870",
+  recognition: "#b994f0",
+};

@@ -90,7 +90,7 @@ func localizedMessage(locale, message string) string {
 	if strings.HasPrefix(message, prefix) {
 		return localizedMessage(locale, prefix) + localizedMessage(locale, strings.TrimPrefix(message, prefix))
 	}
-	for _, key := range []string{"Service returned HTTP %d", "Invalid filter operator for %s"} {
+	for _, key := range []string{"Service returned HTTP %d", "Invalid filter operator for %s", "Invalid or empty-matching regular expression in rule %s", "Invalid exclusion expression in rule %s"} {
 		marker := "%s"
 		if strings.Contains(key, "%d") {
 			marker = "%d"

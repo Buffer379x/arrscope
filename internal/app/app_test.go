@@ -580,6 +580,7 @@ func TestPerformance50K(t *testing.T) {
 	qs = append(qs, url.Values{"service": {"radarr"}, "resolution": {"1080p"}, "codec": {"x264"}, "source": {"BluRay", "WEB-DL"}, "sourceOp": {"not"}}, url.Values{"service": {"sonarr"}, "codec": {"x265"}, "codecOp": {"not"}, "source": {"__unknown__"}, "sourceOp": {"not"}})
 	qs = append(qs, url.Values{"service": {"radarr"}, "hdr": {"HDR10", "Dolby Vision"}, "hdrOp": {"all"}}, url.Values{"service": {"sonarr"}, "hdr": {"HDR10", "Dolby Vision"}, "hdrOp": {"notAll"}}, url.Values{"service": {"radarr"}, "audio": {"DTS", "AC-3"}, "audioOp": {"all"}}, url.Values{"service": {"sonarr"}, "language": {"Deutsch", "Englisch"}, "languageOp": {"notAll"}})
 	times := []time.Duration{}
+	queryTimes := make([][]time.Duration, len(qs))
 	for i := 0; i < 60; i++ {
 		start = time.Now()
 		mode := "matches"
@@ -593,7 +594,13 @@ func TestPerformance50K(t *testing.T) {
 		if len(r.Files) > 100 {
 			t.Fatal("unbounded page")
 		}
-		times = append(times, time.Since(start))
+		duration := time.Since(start)
+		times = append(times, duration)
+		queryTimes[i%len(qs)] = append(queryTimes[i%len(qs)], duration)
+	}
+	for i, durations := range queryTimes {
+		sort.Slice(durations, func(a, b int) bool { return durations[a] < durations[b] })
+		t.Logf("Query %s · median %s · max %s", qs[i].Encode(), durations[len(durations)/2], durations[len(durations)-1])
 	}
 	sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
 	t.Logf("50,000 files · insert %s · p50 %s · p95 %s · %s/%s · CPUs %d", insert, times[30], times[57], runtime.GOOS, runtime.GOARCH, runtime.NumCPU())
@@ -924,7 +931,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 func TestColumnOrderLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.ColumnOrder = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 11 || cfg.ColumnOrder["radarr"][0] != "title" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 10 || cfg.ColumnOrder["radarr"][0] != "title" {
 		t.Fatal("missing legacy column order", err)
 	}
 	duplicate := defaultColumnOrder()["radarr"]
@@ -956,7 +963,7 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().ColumnOrder["sonarr"]) != 11 {
+	if len(server.Config().ColumnOrder["sonarr"]) != 10 {
 		t.Fatal("legacy server order missing")
 	}
 }

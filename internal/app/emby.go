@@ -193,6 +193,8 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	}
 	for key, indices := range wanted {
 		candidate, ok := matches[key]
+		// Release raw stream records as verified tracks replace them.
+		delete(matches, key)
 		if len(indices) != 1 || (ok && candidate.ambiguous) {
 			for _, i := range indices {
 				files[i].EmbyMatch = "ambiguous"
@@ -323,21 +325,25 @@ func applyEmby(f *File, streams []embyStream) {
 	updateCompleteness(f)
 }
 
-func audioTrackSummary(tracks []AudioTrack) string {
+func audioTrackSummary(tracks []AudioTrack, locale ...string) string {
+	labelLanguage := "en"
+	if len(locale) > 0 {
+		labelLanguage = locale[0]
+	}
 	values := []string{}
 	for _, t := range tracks {
 		language, codec := t.Language, t.Codec
 		if language == "" {
-			language = "Unbekannt"
+			language = localizedMessage(labelLanguage, "Unknown")
 		}
 		if codec == "" {
-			codec = "Unbekannt"
+			codec = localizedMessage(labelLanguage, "Unknown")
 		}
 		channel := ""
 		if t.ChannelLayout != "" {
 			channel = " · " + t.ChannelLayout
 		} else if t.Channels > 0 {
-			channel = fmt.Sprintf(" · %d Kanäle", t.Channels)
+			channel = " · " + strings.ReplaceAll(localizedMessage(labelLanguage, "{count} channels"), "{count}", strconv.Itoa(t.Channels))
 		}
 		values = append(values, fmt.Sprintf("#%d %s → %s%s", t.Index, language, codec, channel))
 	}

@@ -61,6 +61,12 @@ ArrScope reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`,
 
 Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `ARRSCOPE_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 
+## Filename recognition
+
+Manage rules in **Settings → System → Manage recognition rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
+
+The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
+
 ## Development
 
 Use the Go version in `go.mod`, Node 24 and pnpm 11.25.0:
