@@ -103,7 +103,7 @@ func (s *Settings) Connections() []*ServiceConfig {
 func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 	if in.ClearKey {
 		if in.Enabled || in.APIKey != "" {
-			return fmt.Errorf("Zum Löschen des API-Keys Dienst deaktivieren und Eingabefeld leeren")
+			return fmt.Errorf("Disable the service and clear the input to delete the API key")
 		}
 		in.APIKey = ""
 	} else if in.APIKey == "" {
@@ -135,17 +135,17 @@ func normalizeVisibleColumns(cfg *Settings) error {
 	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "language": true}
 	for service, columns := range cfg.VisibleColumns {
 		if service != "radarr" && service != "sonarr" {
-			return fmt.Errorf("Ungültiger Dienst für die Spaltenauswahl")
+			return fmt.Errorf("Invalid service for column selection")
 		}
 		seen := map[string]bool{}
 		for _, column := range columns {
 			if !allowed[column] || seen[column] {
-				return fmt.Errorf("Ungültige Spaltenauswahl")
+				return fmt.Errorf("Invalid column selection")
 			}
 			seen[column] = true
 		}
 		if !seen["title"] {
-			return fmt.Errorf("Titel beziehungsweise Episode muss sichtbar bleiben")
+			return fmt.Errorf("Title or episode must remain visible")
 		}
 	}
 	for service, columns := range defaultVisibleColumns() {
@@ -158,15 +158,15 @@ func normalizeVisibleColumns(cfg *Settings) error {
 	}
 	for service, columns := range cfg.ColumnOrder {
 		if service != "radarr" && service != "sonarr" {
-			return fmt.Errorf("Ungültiger Dienst für die Spaltenreihenfolge")
+			return fmt.Errorf("Invalid service for column order")
 		}
 		if len(columns) != len(allowed) {
-			return fmt.Errorf("Die Spaltenreihenfolge muss alle Spalten enthalten")
+			return fmt.Errorf("Column order must include all columns")
 		}
 		seen := map[string]bool{}
 		for _, column := range columns {
 			if !allowed[column] || seen[column] {
-				return fmt.Errorf("Ungültige Spaltenreihenfolge")
+				return fmt.Errorf("Invalid column order")
 			}
 			seen[column] = true
 		}
@@ -183,13 +183,13 @@ var tagColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 func validateTagColors(colors map[string]string) error {
 	if len(colors) > 512 {
-		return fmt.Errorf("Zu viele Tag-Farben")
+		return fmt.Errorf("Too many tag colors")
 	}
 	for key, color := range colors {
 		field, value, ok := strings.Cut(key, ":")
 		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio"
 		if !ok || !valid || value == "" || len(key) > 200 || !tagColorPattern.MatchString(color) {
-			return fmt.Errorf("Ungültige Tag-Farbe")
+			return fmt.Errorf("Invalid tag color")
 		}
 	}
 	return nil

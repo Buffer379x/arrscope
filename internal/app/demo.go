@@ -14,7 +14,7 @@ func SeedDemo(s *Store) error {
 		return e
 	}
 	if sec.Initialized() && !marker {
-		return fmt.Errorf("Demo benötigt ein separates, leeres Datenverzeichnis")
+		return fmt.Errorf("Demo mode requires a separate, empty data directory")
 	}
 	if !sec.Initialized() {
 		if e = sec.Setup("demo", "ArrScope-demo-2026", sec.setupToken); e != nil {

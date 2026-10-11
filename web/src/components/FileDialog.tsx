@@ -1,3 +1,5 @@
+import { t, useI18n } from "../i18n";
+import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
 import { Modal } from "./Modal";
 
 import { AlertTriangle, FileVideo2, Info } from "lucide-preact";
@@ -11,8 +13,9 @@ export function FileDialog({
   file: MediaFile;
   close: () => void;
 }) {
+  useI18n();
   return (
-    <Modal title="Datei & Metadaten" close={close} wide>
+    <Modal title={t("File & metadata")} close={close} wide>
       <h3>
         {file.series && file.series + " · "}
         {file.title}
@@ -22,36 +25,43 @@ export function FileDialog({
         <code>{file.filename}</code>
       </div>
       <p class="quiet">
-        Dateiname zuerst. Eindeutige Emby-Tonspuren liefern präzisere Audio- und
-        Sprachangaben. Abweichungen sind markiert.
+        {t(
+          "Filename first. Uniquely matched Emby tracks provide more precise audio and language data. Conflicts are marked.",
+        )}
       </p>
       {file.metadataIncomplete && (
         <p class="notice">
-          <Info size={15} /> Metadaten unvollständig. Nicht erkannte
-          Eigenschaften sind kein sicherer Nachweis für deren Abwesenheit.
+          <Info size={15} />
+          {t(
+            "Incomplete metadata. Undetected attributes do not prove their absence.",
+          )}
         </p>
       )}
-      <section class="audio-information" aria-label="Tonspurinformationen">
-        <h4>Tonspuren</h4>
+      <section
+        class="audio-information"
+        aria-label={t("Audio track information")}
+      >
+        <h4>{t("Audio tracks")}</h4>
         {file.audioTracks?.length ? (
           <>
             <p class="quiet">
-              Zuordnung aus vorhandenen Emby-Metadaten. Die Datei wurde anhand
-              ihres Namens und ihrer Größe eindeutig zugeordnet.
+              {t(
+                "Matched using existing Emby metadata. The file was uniquely identified by filename and size.",
+              )}
             </p>
             <ul class="audio-track-list">
               {file.audioTracks.map((track) => (
                 <li key={track.index}>
                   <span>#{track.index}</span>
-                  <strong>{track.language || "Unbekannt"}</strong>
+                  <LanguageFlag value={track.language} />
                   <Tag value={track.codec} kind="audio" />
                   <span>
                     {track.channelLayout ||
                       (track.channels
-                        ? track.channels + " Kanäle"
-                        : "Kanäle unbekannt")}
+                        ? t("{count} channels", { count: track.channels })
+                        : t("Unknown channels"))}
                   </span>
-                  <span>{track.default ? "Standard" : ""}</span>
+                  <span>{track.default ? t("Default") : ""}</span>
                   {track.title && <small>{track.title}</small>}
                 </li>
               ))}
@@ -60,10 +70,14 @@ export function FileDialog({
         ) : (
           <>
             <p>
-              Erkannte Sprachen: <b>{file.language || "Unbekannt"}</b> ·
-              Erkannte Codecs: <b>{file.audio || "Unbekannt"}</b>
+              {t("Detected languages:")} <LanguageFlags value={file.language} />{" "}
+              {t(" · Detected codecs:")} <b>{file.audio || t("Unknown")}</b>
               {file.audioStreamCount > 0 && (
-                <> · {file.audioStreamCount} Tonspuren laut API</>
+                <>
+                  {t(" · {count} audio tracks reported by API", {
+                    count: file.audioStreamCount,
+                  })}
+                </>
               )}
             </p>
             <p class="quiet">
@@ -72,42 +86,42 @@ export function FileDialog({
                   <b>{embyMatchLabels[file.embyMatch]}.</b>{" "}
                 </>
               )}
-              Zuordnung Sprache → Codec nicht verfügbar. Radarr und Sonarr
-              liefern keine Eigenschaften pro Tonspur. Emby lässt sich in den
-              Einstellungen ergänzend verbinden. Weitere Codecs können in den
-              Angaben fehlen.
+              {t(
+                "Language → codec mapping unavailable. Radarr and Sonarr do not provide per-track attributes. Connect Emby in settings to enrich them. Additional codecs may be missing from the metadata.",
+              )}
             </p>
           </>
         )}
         <p class="quiet">
-          Die Spalte „Kanäle“ verwendet weiterhin die Dateinamenangabe oder die
-          primäre Tonspur aus Radarr/Sonarr.
+          {t(
+            "The Channels column still uses the filename or primary audio track from Radarr/Sonarr.",
+          )}
         </p>
       </section>
       <div class="evidence-table">
         <div class="evidence-head">
-          <span>Eigenschaft</span>
-          <span>Dateiname</span>
+          <span>{t("Attribute")}</span>
+          <span>{t("Filename")}</span>
           <span>Radarr / Sonarr</span>
           <span>Emby</span>
-          <span>Verwendet</span>
+          <span>{t("Used")}</span>
         </div>
         {Object.entries(file.evidence).map(([k, e]) => (
           <div class={e.conflict ? "evidence-conflict" : ""}>
             <b>{labels[k] || k}</b>
-            <span data-label="Dateiname">{e.filename || "—"}</span>
+            <span data-label={t("Filename")}>{e.filename || "—"}</span>
             <span data-label="Radarr / Sonarr">{e.api || "—"}</span>
             <span data-label="Emby">{e.emby || "—"}</span>
-            <span data-label="Verwendet">
+            <span data-label={t("Used")}>
               {e.origin === "filename"
-                ? "Dateiname"
+                ? t("Filename")
                 : e.origin === "api"
                   ? "API"
                   : e.origin === "emby"
                     ? "Emby"
                     : e.origin === "combined"
-                      ? "Ergänzt"
-                      : "Unbekannt"}
+                      ? t("Enriched")
+                      : t("Unknown")}
               {e.conflict && <AlertTriangle size={14} />}
             </span>
           </div>

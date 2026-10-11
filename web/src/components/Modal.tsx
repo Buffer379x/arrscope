@@ -1,3 +1,4 @@
+import { t, useI18n } from "../i18n";
 import { X } from "lucide-preact";
 import { useEffect, useId, useRef } from "preact/hooks";
 
@@ -12,6 +13,7 @@ export function Modal({
   children: preact.ComponentChildren;
   wide?: boolean;
 }) {
+  useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const headingId = useId();
   useEffect(() => {
@@ -42,7 +44,7 @@ export function Modal({
     >
       <div class="modal-heading">
         <h2 id={headingId}>{title}</h2>
-        <button class="icon-button" aria-label="Schließen" onClick={close}>
+        <button class="icon-button" aria-label={t("Close")} onClick={close}>
           <X size={20} />
         </button>
       </div>

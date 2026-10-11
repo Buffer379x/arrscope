@@ -15,9 +15,12 @@ import (
 	"time"
 )
 
-var version = "0.1.0-dev"
+var version = ""
 
 func main() {
+	if version == "" {
+		version = arrscope.Version()
+	}
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		client := &http.Client{Timeout: 3 * time.Second}
 		res, err := client.Get("http://127.0.0.1:8080/healthz")
@@ -49,12 +52,12 @@ func main() {
 		}
 		password, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil && password == "" {
-			log.Fatal("Neues Passwort über stdin eingeben")
+			log.Fatal("Enter the new password on stdin")
 		}
 		if err = sec.Reset(strings.TrimRight(password, "\r\n")); err != nil {
 			log.Fatal(err)
 		}
-		log.Print("Passwort geändert; alle Sitzungen beendet")
+		log.Print("Password changed; all sessions ended")
 		return
 	}
 	if os.Getenv("ARRSCOPE_DEMO") == "true" {
@@ -80,7 +83,7 @@ func main() {
 		defer done()
 		httpServer.Shutdown(shutdownCtx)
 	}()
-	log.Printf("ArrScope %s auf %s · keine Medien-Mounts oder Scans", version, addr)
+	log.Printf("ArrScope %s listening on %s · no media mounts or scans", version, addr)
 	if !server.Security.Initialized() {
 		log.Print("Ersteinrichtung: Code aus /data/setup-token (ARRSCOPE_DATA_DIR/setup-token) verwenden")
 	}

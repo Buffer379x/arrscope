@@ -196,7 +196,7 @@ func where(q url.Values) (string, []any, error) {
 	}
 	service := q.Get("service")
 	if !serviceOK(service) {
-		return "", nil, fmt.Errorf("Ungültiger Dienst")
+		return "", nil, fmt.Errorf("Invalid service")
 	}
 	w := []string{"f.service=?"}
 	a := []any{service}
@@ -213,7 +213,7 @@ func where(q url.Values) (string, []any, error) {
 		op := q.Get(field + "Op")
 		compound := field == "language" || field == "hdr" || field == "audio"
 		if len(opValues) > 1 || (op != "" && op != "eq" && op != "not" && !(compound && (op == "all" || op == "notAll"))) {
-			return "", nil, fmt.Errorf("Ungültiger Filteroperator für %s", field)
+			return "", nil, fmt.Errorf("Invalid filter operator for %s", field)
 		}
 		negative := op == "not" || op == "notAll"
 		values := q[field]
@@ -267,14 +267,14 @@ func where(q url.Values) (string, []any, error) {
 	}
 	if state := q.Get("metadata"); state != "" {
 		if state != "complete" && state != "incomplete" {
-			return "", nil, fmt.Errorf("Ungültiger Metadatenstatus")
+			return "", nil, fmt.Errorf("Invalid metadata status")
 		}
 		w = append(w, "coalesce(json_extract(f.data,'$.metadataIncomplete'),0)=?")
 		a = append(a, state == "incomplete")
 	}
 	if c := q.Get("conflict"); c != "" {
 		if c != "true" && c != "false" {
-			return "", nil, fmt.Errorf("Ungültiger Konfliktfilter")
+			return "", nil, fmt.Errorf("Invalid conflict filter")
 		}
 		w = append(w, "f.conflict=?")
 		a = append(a, c == "true")
@@ -285,7 +285,7 @@ func where(q url.Values) (string, []any, error) {
 			if v := q.Get(part.key); v != "" {
 				n, e := strconv.Atoi(v)
 				if e != nil || n < 1800 || n > 3000 {
-					return "", nil, fmt.Errorf("Ungültiges Jahr")
+					return "", nil, fmt.Errorf("Invalid year")
 				}
 				ys = append(ys, "y.year"+part.op+"?")
 				a = append(a, n)
@@ -303,7 +303,7 @@ func where(q url.Values) (string, []any, error) {
 		if v := q.Get(part.key); v != "" {
 			n, e := strconv.ParseInt(v, 10, 64)
 			if e != nil || n < 0 {
-				return "", nil, fmt.Errorf("Ungültige Größe")
+				return "", nil, fmt.Errorf("Invalid size")
 			}
 			w = append(w, "f.size"+part.op+"?")
 			a = append(a, n)
@@ -332,7 +332,7 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 	if v := q.Get("page"); v != "" {
 		out.Page, e = strconv.Atoi(v)
 		if e != nil || out.Page < 1 || out.Page > 100000 {
-			return out, fmt.Errorf("Ungültige Seite")
+			return out, fmt.Errorf("Invalid page")
 		}
 	}
 	tx, e := s.DB.BeginTx(ctx, nil)
@@ -385,7 +385,7 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 }
 func (s *Store) facets(ctx context.Context, service string) (map[string][]string, error) {
 	if !serviceOK(service) {
-		return nil, fmt.Errorf("Ungültiger Dienst")
+		return nil, fmt.Errorf("Invalid service")
 	}
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -477,14 +477,14 @@ func movieOrder(q url.Values) (string, error) {
 		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "f.audio COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
 	}[field]
 	if !ok {
-		return "", fmt.Errorf("Ungültige Sortierung")
+		return "", fmt.Errorf("Invalid sort field")
 	}
 	direction := q.Get("dir")
 	if direction == "" {
 		direction = "asc"
 	}
 	if direction != "asc" && direction != "desc" {
-		return "", fmt.Errorf("Ungültige Sortierrichtung")
+		return "", fmt.Errorf("Invalid sort direction")
 	}
 	unknown := "f." + field + "=''"
 	if field == "year" {

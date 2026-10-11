@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Approved version without v prefix (first release: 0.1.0)"
+        description: "Approved version matching VERSION, without v prefix"
         required: true
         type: string
 permissions:
@@ -27,6 +27,7 @@ jobs:
       - name: Validate version and reject existing releases
         shell: bash
         run: |
+          node scripts/check-version.mjs --release
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           if git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo 'Version tag already exists; choose a new version.'
@@ -89,7 +90,7 @@ jobs:
           python3 docs/scripts/containercheck.py --image "$IMAGE:$VERSION"
       - name: Publish version and release notes
         run: |
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "ArrScope $VERSION" --generate-notes
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "ArrScope $VERSION" --notes-file "docs/releases/$VERSION.md"
       - name: Promote approved image to stable
         env:
           DIGEST: ${{ steps.build.outputs.digest }}

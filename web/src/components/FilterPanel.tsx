@@ -1,3 +1,5 @@
+import { t, useI18n } from "../i18n";
+import { audioLanguageKey } from "../languages";
 import {
   Bookmark,
   ChevronDown,
@@ -40,18 +42,20 @@ export function FilterPanel({
   deletePreset,
   change,
 }: Props) {
+  useI18n();
   return (
     <section
       class={"filter-panel" + (collapsed ? " collapsed" : "")}
-      aria-label="Filter"
+      aria-label={t("Filters")}
     >
       <div class="filter-heading">
         <span>
-          <SlidersHorizontal size={16} /> FILTER
+          <SlidersHorizontal size={16} />
+          {t("FILTERS")}
         </span>
         <div class="preset-toolbar">
           <select
-            aria-label="Filter-Preset"
+            aria-label={t("Filter preset")}
             value={
               selectedPreset
                 ? String(selectedPreset.id)
@@ -67,8 +71,8 @@ export function FilterPanel({
               else if (e.currentTarget.value === "all") reset();
             }}
           >
-            <option value="">Eigene Filter</option>
-            <option value="all">Alle Dateien</option>
+            <option value="">{t("Custom filters")}</option>
+            <option value="all">{t("All files")}</option>
             {presets
               .filter((p) => p.service === service)
               .map((p) => (
@@ -77,16 +81,16 @@ export function FilterPanel({
           </select>
           <button
             class="icon-button"
-            aria-label="Preset speichern"
-            title="Filter dauerhaft als Preset speichern"
+            aria-label={t("Save preset")}
+            title={t("Save filters as a permanent preset")}
             onClick={() => setSavePreset(true)}
           >
             <Bookmark size={16} />
           </button>
           <button
             class="icon-button"
-            aria-label="Ausgewähltes Preset löschen"
-            title="Ausgewähltes Preset löschen"
+            aria-label={t("Delete selected preset")}
+            title={t("Delete selected preset")}
             disabled={!selectedPreset}
             onClick={deletePreset}
           >
@@ -100,7 +104,7 @@ export function FilterPanel({
             aria-controls="filter-controls"
             onClick={() => setCollapsed(!collapsed)}
           >
-            {collapsed ? "Filter ausklappen" : "Filter einklappen"}
+            {collapsed ? t("Expand filters") : t("Collapse filters")}
             <ChevronDown size={15} class={!collapsed ? "rotated" : ""} />
           </button>
         </div>
@@ -109,14 +113,14 @@ export function FilterPanel({
         <div id="filter-controls">
           <div class="filter-grid">
             <label class="search-field">
-              <span>Titel oder Dateiname</span>
+              <span>{t("Title or filename")}</span>
               <div class="input-wrap">
                 <Search size={17} />
                 <input
                   placeholder={
                     service === "radarr"
-                      ? "Film oder Datei suchen …"
-                      : "Serie, Episode oder Datei …"
+                      ? t("Search movie or file …")
+                      : t("Series, episode or file …")
                   }
                   value={q.get("q") || ""}
                   onInput={(e) =>
@@ -142,14 +146,14 @@ export function FilterPanel({
               />
             ))}
             <label class="year-field">
-              <span>Jahr</span>
+              <span>{t("Year")}</span>
               <div class="year-inputs">
                 <input
                   type="number"
                   min="1800"
                   max="3000"
-                  placeholder="Von"
-                  aria-label="Jahr von"
+                  placeholder={t("From")}
+                  aria-label={t("Year from")}
                   value={q.get("yearMin") || ""}
                   onInput={(e) =>
                     change(
@@ -163,8 +167,8 @@ export function FilterPanel({
                   type="number"
                   min="1800"
                   max="3000"
-                  placeholder="Bis"
-                  aria-label="Jahr bis"
+                  placeholder={t("To")}
+                  aria-label={t("Year to")}
                   value={q.get("yearMax") || ""}
                   onInput={(e) =>
                     change(
@@ -200,7 +204,11 @@ export function FilterPanel({
             ))}
             {["sizeMin", "sizeMax"].map((k) => (
               <label>
-                <span>Dateigröße {k === "sizeMin" ? "von" : "bis"} (GiB)</span>
+                <span>
+                  {k === "sizeMin"
+                    ? t("File size from (GiB)")
+                    : t("File size to (GiB)")}
+                </span>
                 <input
                   type="number"
                   min="0"
@@ -224,7 +232,7 @@ export function FilterPanel({
               </label>
             ))}
             <label>
-              <span>Datenqualität</span>
+              <span>{t("Data quality")}</span>
               <select
                 value={q.get("conflict") || ""}
                 onChange={(e) =>
@@ -234,15 +242,15 @@ export function FilterPanel({
                   )
                 }
               >
-                <option value="">Alle Angaben</option>
-                <option value="true">Widersprüchlich</option>
-                <option value="false">Ohne Widerspruch</option>
+                <option value="">{t("All metadata")}</option>
+                <option value="true">{t("Conflicting")}</option>
+                <option value="false">{t("No conflicts")}</option>
               </select>
             </label>
             <label>
-              <span>Metadaten-Vollständigkeit</span>
+              <span>{t("Metadata completeness")}</span>
               <select
-                aria-label="Metadaten-Vollständigkeit"
+                aria-label={t("Metadata completeness")}
                 value={q.get("metadata") || ""}
                 onChange={(e) =>
                   change(
@@ -251,9 +259,11 @@ export function FilterPanel({
                   )
                 }
               >
-                <option value="">Alle Dateien</option>
-                <option value="incomplete">Metadaten unvollständig</option>
-                <option value="complete">Grundmerkmale vollständig</option>
+                <option value="">{t("All files")}</option>
+                <option value="incomplete">{t("Incomplete metadata")}</option>
+                <option value="complete">
+                  {t("Core attributes complete")}
+                </option>
               </select>
             </label>
             {["unknownYear", "unknownSize"].map((k) => (
@@ -266,8 +276,8 @@ export function FilterPanel({
                   }
                 />
                 {k === "unknownYear"
-                  ? "Jahr unbekannt"
-                  : "Dateigröße unbekannt"}
+                  ? t("Unknown year")
+                  : t("Unknown file size")}
               </label>
             ))}
           </div>
@@ -276,12 +286,9 @@ export function FilterPanel({
       <p class="filter-help">
         {!collapsed && (
           <>
-            Mehrere Eigenschaften gelten mit UND. Bei Audio, HDR und Sprache
-            bestimmt der Operator, ob einzelne oder alle gewählten Werte
-            vorhanden sein müssen. „Enthält nicht alle“ bedeutet: Mindestens
-            eines fehlt in den erkannten Angaben. Das beweist bei
-            unvollständigen Metadaten nicht, dass es in der Datei fehlt.
-            „Unbekannt“ findet auch teilweise unbekannte Tonspuren.
+            {t(
+              "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
+            )}
           </>
         )}
       </p>
@@ -313,15 +320,15 @@ export function FilterPanel({
                   {labels[k] ||
                     (
                       {
-                        q: "Suche",
-                        yearMin: "Ab",
-                        yearMax: "Bis",
-                        conflict: "Konflikt",
-                        metadata: "Metadatenstatus",
-                        sizeMin: "Bytes ab",
-                        sizeMax: "Bytes bis",
-                        unknownYear: "Jahr unbekannt",
-                        unknownSize: "Größe unbekannt",
+                        q: t("Search"),
+                        yearMin: t("From"),
+                        yearMax: t("To"),
+                        conflict: t("Conflict"),
+                        metadata: t("Metadata status"),
+                        sizeMin: t("Bytes from"),
+                        sizeMax: t("Bytes to"),
+                        unknownYear: t("Unknown year"),
+                        unknownSize: t("Unknown size"),
                       } as Record<string, string>
                     )[k] ||
                     k}
@@ -338,24 +345,26 @@ export function FilterPanel({
                   )
                     .map((value) =>
                       value === "__unknown__"
-                        ? "Unbekannt"
+                        ? t("Unknown")
                         : k === "metadata"
                           ? value === "incomplete"
-                            ? "unvollständig"
-                            : "vollständig"
-                          : value,
+                            ? t("incomplete")
+                            : t("complete")
+                          : k === "language"
+                            ? t(audioLanguageKey(value))
+                            : value,
                     )
                     .join(" + ")}
                   <X size={12} />
                 </button>
               ))
           ) : (
-            <span class="quiet">Keine aktiven Filter</span>
+            <span class="quiet">{t("No active filters")}</span>
           )}
         </div>
         {active.length > 0 && (
           <button class="text-button" onClick={reset}>
-            Zurücksetzen
+            {t("Reset")}
           </button>
         )}
       </div>

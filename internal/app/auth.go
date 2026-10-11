@@ -98,11 +98,11 @@ func (s *Security) Open(v string) (string, error) {
 		return "", nil
 	}
 	if !strings.HasPrefix(v, "enc:") {
-		return "", fmt.Errorf("Ungültiger verschlüsselter API-Key")
+		return "", fmt.Errorf("Invalid encrypted API key")
 	}
 	b, e := base64.StdEncoding.DecodeString(strings.TrimPrefix(v, "enc:"))
 	if e != nil || len(b) < s.aead.NonceSize() {
-		return "", fmt.Errorf("API-Key konnte nicht entschlüsselt werden")
+		return "", fmt.Errorf("Could not decrypt API key")
 	}
 	n := s.aead.NonceSize()
 	p, e := s.aead.Open(nil, b[:n], b[n:], []byte("arrscope-api-key-v1"))
@@ -113,13 +113,13 @@ func (s *Security) Setup(user, password, token string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Initialized() {
-		return fmt.Errorf("Bereits eingerichtet")
+		return fmt.Errorf("Already configured")
 	}
 	if s.setupToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.setupToken)) != 1 {
-		return fmt.Errorf("Einrichtungscode ist ungültig")
+		return fmt.Errorf("Setup code is invalid")
 	}
 	if len(strings.TrimSpace(user)) < 2 || len(user) > 64 || !validPassword(password) {
-		return fmt.Errorf("Benutzername mindestens 2 Zeichen; Passwort 12–72 UTF-8-Bytes")
+		return fmt.Errorf("Username requires 2 characters; password requires 12–72 UTF-8 bytes")
 	}
 	h, e := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if e != nil {
@@ -192,7 +192,7 @@ func (s *Security) Session(r *http.Request) (string, string, bool) {
 	return hash, csrf, e == nil && time.Now().Unix() < expires
 }
 
-var errCredentialsChanged = errors.New("Anmeldedaten wurden geändert; erneut anmelden")
+var errCredentialsChanged = errors.New("Credentials changed; sign in again")
 
 func (s *Security) LoginSession(w http.ResponseWriter, r *http.Request, user, password, ip string) (bool, error) {
 	hash := s.loginHash(user, password, ip)
@@ -230,7 +230,7 @@ func (s *Security) createSession(w http.ResponseWriter, r *http.Request, verifie
 func (s *Security) Reset(password string) error { return s.reset(password, "") }
 func (s *Security) reset(password, verifiedHash string) error {
 	if !validPassword(password) {
-		return fmt.Errorf("Passwort muss 12–72 UTF-8-Bytes lang sein")
+		return fmt.Errorf("Password must contain 12–72 UTF-8 bytes")
 	}
 	var c credentials
 	if e := s.store.Get("admin", &c); e != nil {

@@ -23,7 +23,7 @@ func NewEmby(c ServiceConfig) *EmbyClient {
 }
 func (c *EmbyClient) get(ctx context.Context, endpoint string, q url.Values, out any) error {
 	if endpoint != "System/Info" && endpoint != "Items" {
-		return errors.New("Emby-Endpunkt nicht erlaubt")
+		return errors.New("Emby endpoint is not allowed")
 	}
 	base := strings.TrimRight(c.transport.Base, "/")
 	if !strings.HasSuffix(strings.ToLower(base), "/emby") {
@@ -31,7 +31,7 @@ func (c *EmbyClient) get(ctx context.Context, endpoint string, q url.Values, out
 	}
 	u, err := url.Parse(base + "/" + endpoint)
 	if err != nil {
-		return errors.New("Ungültige Emby-Adresse")
+		return errors.New("Invalid Emby address")
 	}
 	u.RawQuery = q.Encode()
 	return c.transport.readJSON(ctx, u, "X-Emby-Token", out)
@@ -89,7 +89,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		}
 	}()
 	if !serviceOK(service) {
-		return errors.New("Ungültiger Dienst")
+		return errors.New("Invalid service")
 	}
 	wanted := map[fileIdentity][]int{}
 	for i := range files {
@@ -125,20 +125,20 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 			return err
 		}
 		if page.Items == nil || page.TotalRecordCount == nil || *page.TotalRecordCount < 0 {
-			return errors.New("Emby liefert keine vollständige Seitenzählung")
+			return errors.New("Emby did not provide a complete page count")
 		}
 		total := *page.TotalRecordCount
 		if expectedTotal < 0 {
 			expectedTotal = total
 		} else if total != expectedTotal {
-			return errors.New("Emby-Bestand während Sync geändert; erneut synchronisieren")
+			return errors.New("Emby library changed during sync; sync again")
 		}
 		if len(page.Items) > 250 || start+len(page.Items) > total || (len(page.Items) == 0 && start < total) {
-			return errors.New("Unvollständige Emby-Seite")
+			return errors.New("Incomplete Emby page")
 		}
 		for _, item := range page.Items {
 			if item.Id == "" || seenItems[item.Id] {
-				return errors.New("Emby-Seiten enthalten fehlende oder doppelte IDs")
+				return errors.New("Emby pages contain missing or duplicate IDs")
 			}
 			seenItems[item.Id] = true
 			if item.Type != itemType {

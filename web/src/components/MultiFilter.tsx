@@ -1,3 +1,5 @@
+import { t, useI18n } from "../i18n";
+import { audioLanguageKey } from "../languages";
 import { ChevronDown } from "lucide-preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
@@ -17,6 +19,7 @@ export function MultiFilter({
   operatorChange: (operator: FilterOperator) => void;
   change: (v: FilterUpdate) => void;
 }) {
+  useI18n();
   const negative = operator === "not" || operator === "notAll";
   const compound = compoundFields.includes(name);
   const [open, setOpen] = useState(false);
@@ -54,22 +57,22 @@ export function MultiFilter({
         </span>
         <select
           class="filter-operator"
-          aria-label={labels[name] + ": Operator"}
+          aria-label={t("{field}: operator", { field: labels[name] })}
           value={operator}
           onChange={(e) =>
             operatorChange(e.currentTarget.value as FilterOperator)
           }
         >
           <option value="eq">
-            {compound ? "enthält mindestens eines" : "ist"}
+            {compound ? t("contains at least one") : t("is")}
           </option>
           <option value="not">
-            {compound ? "enthält keines" : "ist nicht"}
+            {compound ? t("contains none") : t("is not")}
           </option>
           {compound && (
             <>
-              <option value="all">enthält alle</option>
-              <option value="notAll">enthält nicht alle</option>
+              <option value="all">{t("contains all")}</option>
+              <option value="notAll">{t("does not contain all")}</option>
             </>
           )}
         </select>
@@ -92,18 +95,24 @@ export function MultiFilter({
         <span class="select-values">
           {selected.length
             ? (operator === "notAll"
-                ? "Nicht alle: "
+                ? t("Not all: ")
                 : operator === "all"
-                  ? "Alle: "
+                  ? t("All: ")
                   : negative
-                    ? "Nicht: "
+                    ? t("Not: ")
                     : "") +
               selected
-                .map((v) => (v === "__unknown__" ? "Unbekannt" : v))
+                .map((v) =>
+                  v === "__unknown__"
+                    ? t("Unknown")
+                    : name === "language"
+                      ? t(audioLanguageKey(v))
+                      : v,
+                )
                 .join(", ")
             : negative
-              ? "Keine Ausschlüsse"
-              : "Alle"}
+              ? t("No exclusions")
+              : t("All")}
         </span>
         <ChevronDown size={15} />
       </button>
@@ -119,7 +128,7 @@ export function MultiFilter({
           }}
         >
           <button class="text-button" onClick={() => change([])}>
-            Auswahl zurücksetzen
+            {t("Reset selection")}
           </button>
           {values.length ? (
             values.map((v) => (
@@ -136,11 +145,15 @@ export function MultiFilter({
                     );
                   }}
                 />
-                {v === "__unknown__" ? "Unbekannt" : v}
+                {v === "__unknown__"
+                  ? t("Unknown")
+                  : name === "language"
+                    ? t(audioLanguageKey(v))
+                    : v}
               </label>
             ))
           ) : (
-            <span class="quiet">Noch keine Werte im Cache</span>
+            <span class="quiet">{t("No values in cache yet")}</span>
           )}
         </div>
       )}

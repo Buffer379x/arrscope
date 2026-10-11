@@ -1,22 +1,29 @@
-# Veröffentlichung
+# Releases and versioning
 
-Geplant ist das öffentliche Repository `Buffer379x/arrscope` mit MIT-Lizenz und das öffentliche Paket `ghcr.io/buffer379x/arrscope`. Dieses Dokument beschreibt den vorbereiteten Ablauf; die lokale Quellcode-Auslieferung allein veröffentlicht noch nichts.
+Public source: `Buffer379x/arrscope`. Public images: `ghcr.io/buffer379x/arrscope`. Version 0.1.0 is published. The stable channel changes only after an approved release succeeds; normal pushes do not deploy an update.
 
-## Erstmalig
+## Prepare every change batch
 
-1. Nach Abnahme Repository mit Standardbranch `main` anlegen und den geprüften Quellcode pushen. Keine lokalen Appdata-/Testverzeichnisse, Tokens oder persönlichen Installationsprofile hochladen.
-2. GitHub Actions aktivieren und den Workflow **Checks** abwarten. Er baut die Oberfläche, prüft Go mit Race-Detector und vet, misst Filter und startet einen Container einschließlich Neustartprüfung. Zusätzlich laufen Frontend-Kontrasttests, pnpm audit, govulncheck, ein Scan des Laufzeitimages auf hohe/kritische CVEs und der 100.000-Dateien-Container-Test ohne Swap.
-3. Bei Fehlern korrigieren und Checks erneut abwarten. Kein Release bei roten Checks.
-4. **Approved release** auf `main` manuell mit Version `0.1.0` starten. Der Workflow prüft Paket-Abhängigkeiten und Tests erneut, baut und pusht die Versions-Images, testet beide Architekturen, scannt die Images und prüft den großen synthetischen Bestand ohne Swap. Anschließend erstellt er Tag/Release; erst danach wird `stable` auf denselben Digest gesetzt.
-5. GHCR → Paket `arrscope` → Package settings → Visibility → **Public**. Die Repository-Sichtbarkeit alleine macht das Paket nicht öffentlich. Dies einmalig mit dem Betreiber durchführen.
-6. Einen anonymen Pull überprüfen und das Image in Unraid installieren. PNG und XML werden aus dem öffentlichen Repository geladen.
+1. Update root `VERSION` using semantic versioning. Use a minor bump for new features and a patch bump for fixes. Never reuse a released version.
+2. Match `web/package.json` and both Docker `ARG VERSION` defaults. Local Go builds embed `VERSION` directly; release builds validate the override.
+3. Add an English entry to `CHANGELOG.md` and `docs/releases/<version>.md`, describing behavior, validation, migrations and rollback implications.
+4. Run `node scripts/check-version.mjs`, frontend tests/build and Go race/vet checks. On GitHub, CI also checks that changes after the latest release use a newer version. Rerunning checks on the exact released commit remains valid.
+5. Review the working preview and wait for approval before dispatching a release.
 
-Keine PATs sind im Repository erforderlich: der Workflow verwendet das kurzlebige `GITHUB_TOKEN` mit `contents:write` und `packages:write`. Drittanbieter-Actions sind auf Commit-SHAs fixiert, Dependabot schlägt monatliche Updates vor. [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+## Publish an approved release
 
-## Weitere Versionen
+Run **Approved release** on `main`, using the exact version in `VERSION` without `v`. Existing version tags and mismatched source versions are rejected. The workflow:
 
-Änderungen und Tests zunächst auf einem Branch/PR, danach geprüfter Stand auf `main`. Erst nach Abnahme neuen manuellen Release starten, z. B. `0.1.1`. Bestehende veröffentlichte Git-Tags werden abgewiesen. `stable` bewegt sich nur im Release-Workflow nach bestandenen Prüfungen. Normale Pushes veröffentlichen kein Update.
+- Rechecks translations, frontend, Go, audits, performance and version consistency.
+- Builds and pushes versioned images for `linux/amd64` and `linux/arm64`.
+- Starts both architectures, scans runtime images for known high/critical vulnerabilities and exercises 100,000 synthetic files under the container memory limit without swap.
+- Creates the immutable version tag and GitHub release using the checked-in **English** notes file.
+- Promotes the tested image digest to `stable` last.
 
-Release-Notizen werden aus GitHub-Änderungen generiert. Der erste Release beschreibt eine neue Anwendung; bei späteren Migrationen ergänzend Änderungen und Rollback-Hinweise in der Release-Beschreibung angeben.
+The workflow uses the short-lived `GITHUB_TOKEN` with `contents:write` and `packages:write`; no PAT is committed. Third-party actions are pinned to commit SHAs. Dependabot proposes dependency updates. Verify that the GHCR package is **Public** and confirm an anonymous pull; public repository visibility alone does not ensure public package access.
 
-Unraid zieht `stable`, sobald der Betreiber ein Update anstößt. Compose: `docker compose pull && docker compose up -d`. Kein Hintergrund-Pull durch ArrScope. Falls der Workflow nach Veröffentlichung der Versions-Images vor Promotion scheitert, bleibt `stable` unverändert; Ursache prüfen, bevor ein erneuter Lauf gestartet wird.
+If a run fails before promotion, stable remains unchanged. Inspect the failed stage before retrying, especially if versioned images or a release already exist. Do not overwrite published tags to bypass a failure.
+
+## Install updates
+
+Unraid: Docker → Check for Updates → ArrScope → Update. Compose: `docker compose pull` then `docker compose up -d`. Keep `/data` and its local key. See [operations](OPERATIONS.md) for backup and rollback. ArrScope does not perform automatic background pulls or access the Docker socket.

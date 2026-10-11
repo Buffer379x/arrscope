@@ -24,7 +24,7 @@ type ArrClient struct {
 
 func NewArr(c ServiceConfig) *ArrClient {
 	return &ArrClient{c.URL, c.APIKey, &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		return errors.New("Weiterleitung nicht erlaubt; direkte Dienstadresse verwenden")
+		return errors.New("Redirects are not allowed; use the direct service address")
 	}}}
 }
 func ValidateConfig(c ServiceConfig) error {
@@ -33,28 +33,28 @@ func ValidateConfig(c ServiceConfig) error {
 	}
 	validInterval := map[int]bool{0: true, 15: true, 30: true, 60: true, 360: true, 1440: true}
 	if !validInterval[c.Interval] {
-		return errors.New("Ungültiges Sync-Intervall")
+		return errors.New("Invalid sync interval")
 	}
 	if !c.Enabled && c.URL == "" {
 		return nil
 	}
 	u, e := url.Parse(c.URL)
 	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return errors.New("Dienstadresse muss eine HTTP(S)-URL ohne Zugangsdaten, Query oder Fragment sein")
+		return errors.New("Service address must be an HTTP(S) URL without credentials, query or fragment")
 	}
 	if c.Enabled && c.APIKey == "" {
-		return errors.New("API-Key fehlt")
+		return errors.New("API key is missing")
 	}
 	return nil
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
 	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true}
 	if !allowed[path] {
-		return errors.New("API-Endpunkt nicht erlaubt")
+		return errors.New("API endpoint is not allowed")
 	}
 	u, e := url.Parse(strings.TrimRight(c.Base, "/") + "/api/v3/" + path)
 	if e != nil {
-		return errors.New("Ungültige Dienstadresse")
+		return errors.New("Invalid service address")
 	}
 	u.RawQuery = q.Encode()
 	return c.readJSON(ctx, u, "X-Api-Key", out)
@@ -74,7 +74,7 @@ func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, 
 		}
 		r, e := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if e != nil {
-			return errors.New("Anfrage konnte nicht erstellt werden")
+			return errors.New("Could not create request")
 		}
 		r.Header.Set(keyHeader, c.Key)
 		r.Header.Set("Accept", "application/json")
@@ -86,7 +86,7 @@ func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, 
 			if attempt < 2 {
 				continue
 			}
-			return errors.New("Dienst nicht erreichbar, Zeitlimit oder TLS-Prüfung fehlgeschlagen")
+			return errors.New("Service unreachable, timed out or TLS validation failed")
 		}
 		if res.StatusCode != 200 {
 			res.Body.Close()
@@ -94,18 +94,18 @@ func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, 
 				continue
 			}
 			if res.StatusCode == 401 || res.StatusCode == 403 {
-				return errors.New("API-Key wurde abgelehnt")
+				return errors.New("API key was rejected")
 			}
-			return fmt.Errorf("Dienst meldet HTTP %d", res.StatusCode)
+			return fmt.Errorf("Service returned HTTP %d", res.StatusCode)
 		}
 		e = decodeServiceJSON(res.Body, out, 64<<20)
 		res.Body.Close()
 		if e != nil {
-			return errors.New("Ungültige oder zu große API-Antwort")
+			return errors.New("Invalid or oversized API response")
 		}
 		return nil
 	}
-	return errors.New("API-Anfrage fehlgeschlagen")
+	return errors.New("API request failed")
 }
 
 // Require a complete non-null object/list without holding a second response copy.
@@ -121,7 +121,7 @@ func decodeServiceJSON(body io.Reader, out any, max int64) error {
 			continue
 		}
 		if b != '[' && b != '{' {
-			return errors.New("API-Antwort muss eine Liste oder ein Objekt sein")
+			return errors.New("API response must be a list or object")
 		}
 		if err = reader.UnreadByte(); err != nil {
 			return err
@@ -134,10 +134,10 @@ func decodeServiceJSON(body io.Reader, out any, max int64) error {
 	}
 	var extra struct{}
 	if err := decoder.Decode(&extra); err != io.EOF {
-		return errors.New("Unvollständige oder mehrteilige API-Antwort")
+		return errors.New("Incomplete or multipart API response")
 	}
 	if limited.N == 0 {
-		return errors.New("API-Antwort überschreitet das Größenlimit")
+		return errors.New("API response exceeds the size limit")
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (c *ArrClient) Fetch(ctx context.Context, service string) ([]File, error) {
 	if service == "sonarr" {
 		return c.series(ctx)
 	}
-	return nil, errors.New("Ungültiger Dienst")
+	return nil, errors.New("Invalid service")
 }
 func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 	var movies []struct {
@@ -226,10 +226,10 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 	}{}
 	for _, m := range movies {
 		if m.ID <= 0 || m.Title == "" {
-			return nil, errors.New("Unvollständiger Filmkatalog")
+			return nil, errors.New("Incomplete movie catalog")
 		}
 		if _, duplicate := index[m.ID]; duplicate {
-			return nil, errors.New("Doppelte Film-ID im Katalog")
+			return nil, errors.New("Duplicate movie ID in catalog")
 		}
 		index[m.ID] = struct {
 			title string
@@ -255,12 +255,12 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 		}
 		for _, a := range files {
 			if a.ID <= 0 || seenFiles[a.ID] || !batch[a.MovieID] || basename(a) == "" || a.Size < 0 {
-				return nil, errors.New("Ungültige oder doppelte Filmdatei")
+				return nil, errors.New("Invalid or duplicate movie file")
 			}
 			seenFiles[a.ID] = true
 			m, ok := index[a.MovieID]
 			if !ok {
-				return nil, errors.New("Filmzuordnung während Sync geändert; bitte erneut synchronisieren")
+				return nil, errors.New("Movie mapping changed during sync; sync again")
 			}
 			f := File{ID: a.ID, Service: "radarr", MediaID: a.MovieID, Title: m.title, Filename: basename(a), SourcePath: a.Path, Size: a.Size, Years: []int{}, Episodes: []Episode{}}
 			if m.year > 0 {
@@ -285,7 +285,7 @@ func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 	seenSeries, seenFiles := map[int]bool{}, map[int]bool{}
 	for _, s := range series {
 		if s.ID <= 0 || s.Title == "" || seenSeries[s.ID] {
-			return nil, errors.New("Ungültiger Serienkatalog")
+			return nil, errors.New("Invalid series catalog")
 		}
 		seenSeries[s.ID] = true
 		q := url.Values{"seriesId": {strconv.Itoa(s.ID)}}
@@ -310,7 +310,7 @@ func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 		}
 		for _, a := range files {
 			if a.ID <= 0 || seenFiles[a.ID] || (a.SeriesID != 0 && a.SeriesID != s.ID) || basename(a) == "" || a.Size < 0 {
-				return nil, errors.New("Ungültige oder doppelte Episodendatei")
+				return nil, errors.New("Invalid or duplicate episode file")
 			}
 			seenFiles[a.ID] = true
 			eps := byFile[a.ID]

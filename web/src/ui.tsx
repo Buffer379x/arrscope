@@ -1,50 +1,55 @@
+import { getLocale, t, useI18n } from "./i18n";
 import { colorStyle } from "./color";
 import { createContext } from "preact";
 import { useContext } from "preact/hooks";
 import type { Results, Service } from "./types";
-export const labels: Record<string, string> = {
-  resolution: "Auflösung",
-  codec: "Codec / Encoder",
-  family: "Codec-Familie",
+const translatedLabels = <T extends Record<string, string>>(values: T): T =>
+  new Proxy(values, {
+    get: (target, key: string) => (key in target ? t(target[key]) : undefined),
+  });
+export const labels: Record<string, string> = translatedLabels({
+  resolution: "Resolution",
+  codec: "Codec / encoder",
+  family: "Codec family",
   source: "Source",
-  processing: "Verarbeitung",
+  processing: "Processing",
   hdr: "HDR",
-  bitDepth: "Bit-Tiefe",
-  audio: "Audio-Codec",
-  channels: "Kanäle",
-  language: "Sprache",
-};
+  bitDepth: "Bit depth",
+  audio: "Audio codec",
+  channels: "Channels",
+  language: "Language",
+});
 export const tableColumns = [
-  ["title", "Titel / Episode"],
-  ["year", "Jahr"],
-  ["resolution", "Auflösung"],
+  ["title", "Title / episode"],
+  ["year", "Year"],
+  ["resolution", "Resolution"],
   ["codec", "Codec"],
   ["source", "Source"],
-  ["size", "Größe"],
+  ["size", "Size"],
   ["hdr", "HDR"],
-  ["bitDepth", "Bit-Tiefe"],
+  ["bitDepth", "Bit depth"],
   ["audio", "Audio"],
-  ["channels", "Kanäle"],
-  ["language", "Sprache"],
+  ["channels", "Channels"],
+  ["language", "Language"],
 ];
 export type ConnectionService = Service | "emby";
-export const embyMatchLabels: Record<string, string> = {
-  missing: "In Emby nicht eindeutig gefunden",
-  missing_size: "Dateigröße fehlt für die Zuordnung",
-  ambiguous: "Mehrdeutige Datei- oder Tonspurzuordnung",
-  no_tracks: "Emby liefert keine Tonspurmetadaten",
-};
+export const embyMatchLabels: Record<string, string> = translatedLabels({
+  missing: "No unique match in Emby",
+  missing_size: "File size missing for matching",
+  ambiguous: "Ambiguous file or audio track match",
+  no_tracks: "Emby provides no audio track metadata",
+});
 export type FilterOperator = "eq" | "not" | "all" | "notAll";
-export const operatorLabels: Record<FilterOperator, string> = {
-  eq: "ist",
-  not: "ist nicht",
-  all: "enthält alle",
-  notAll: "enthält nicht alle",
-};
+export const operatorLabels: Record<FilterOperator, string> = translatedLabels({
+  eq: "is",
+  not: "is not",
+  all: "contains all",
+  notAll: "does not contain all",
+});
 export const compoundFields = ["hdr", "audio", "language"];
 export type FilterUpdate = string[] | ((current: string[]) => string[]);
 export const defaultColumnOrder = tableColumns.map(([field]) => field);
-export const columnLabels = Object.fromEntries(tableColumns);
+export const columnLabels = translatedLabels(Object.fromEntries(tableColumns));
 export const defaultColumns = [
   "title",
   "year",
@@ -59,22 +64,23 @@ export const emptyResults: Results = {
   page: 1,
   pageSize: 100,
 };
-export const count = (n: number) => new Intl.NumberFormat("de-DE").format(n);
+export const count = (n: number) =>
+  new Intl.NumberFormat(getLocale()).format(n);
 export const bytes = (n: number) =>
   n
-    ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(
+    ? new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 }).format(
         n / 1024 ** 3,
       ) + " GiB"
-    : "Unbekannt";
+    : t("Unknown");
 export const date = (s: string | null | undefined) =>
   s
-    ? new Date(s).toLocaleString("de-DE", {
+    ? new Date(s).toLocaleString(getLocale(), {
         day: "2-digit",
         month: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
       })
-    : "Noch nicht synchronisiert";
+    : t("Not synced yet");
 export const TagColors = createContext<Record<string, string>>({});
 export const colorFields = [
   "resolution",
@@ -111,6 +117,7 @@ export function Tag({
   kind?: string;
   title?: string;
 }) {
+  useI18n();
   const inherited = useContext(TagColors);
   const color = (colors || inherited)[
     kind.split(" ")[0] + ":" + (value || "__unknown__")
@@ -121,7 +128,7 @@ export function Tag({
       class={"tag " + kind + (!value ? " unknown" : "")}
       title={title}
     >
-      {value || "Unbekannt"}
+      {value || t("Unknown")}
     </span>
   );
 }
