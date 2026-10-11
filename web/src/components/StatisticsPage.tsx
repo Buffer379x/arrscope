@@ -1,3 +1,4 @@
+import { getLocale, t, useI18n } from "../i18n";
 import {
   BarChart3,
   Clapperboard,
@@ -22,7 +23,14 @@ const chartPalette = [
   "#aaa96e",
   "#c9946c",
 ];
-export function StatisticsPage({ status }: { status: Status }) {
+export function StatisticsPage({
+  status,
+  onFilter,
+}: {
+  status: Status;
+  onFilter: (field: string, value: string, scope: string) => void;
+}) {
+  useI18n();
   const [data, setData] = useState<Statistics | null>(null),
     [scope, setScope] = useState("all"),
     [error, setError] = useState("");
@@ -43,14 +51,15 @@ export function StatisticsPage({ status }: { status: Status }) {
     };
   }, [status.sync?.radarr.lastSuccess, status.sync?.sonarr.lastSuccess]);
   return (
-    <section class="statistics-page" aria-label="Dashboard">
+    <section class="statistics-page" aria-label={t("Dashboard")}>
       <div class="statistics-heading">
         <div>
-          <h1>Dashboard</h1>
-          <p>Deine gespeicherte Bibliothek auf einen Blick.</p>
+          <h1>{t("Dashboard")}</h1>
+          <p>{t("Your cached library at a glance.")}</p>
         </div>
         <span class="quiet">
-          <Database size={14} /> Aus dem lokalen Cache
+          <Database size={14} />
+          {t("From the local cache")}
         </span>
       </div>
       {error && (
@@ -60,7 +69,8 @@ export function StatisticsPage({ status }: { status: Status }) {
       )}
       {!data && !error && (
         <p class="quiet">
-          <LoaderCircle class="spin" size={16} /> Dashboard wird geladen …
+          <LoaderCircle class="spin" size={16} />
+          {t("Loading dashboard …")}
         </p>
       )}
       {data && (
@@ -68,28 +78,28 @@ export function StatisticsPage({ status }: { status: Status }) {
           <div class="stat-widgets">
             {[
               {
-                label: "Filme",
+                label: t("Movies"),
                 value: data.movies,
                 icon: Film,
-                detail: "mit vorhandenen Dateien",
+                detail: t("with existing files"),
               },
               {
-                label: "Serien",
+                label: t("TV series"),
                 value: data.series,
                 icon: Tv,
-                detail: "mit vorhandenen Episoden",
+                detail: t("with existing episodes"),
               },
               {
-                label: "Episoden",
+                label: t("Episodes"),
                 value: data.episodes,
                 icon: Clapperboard,
-                detail: "inklusive Specials und Mehrfachepisoden",
+                detail: t("including specials and multi-episode files"),
               },
               {
-                label: "Mediendateien",
+                label: t("Media files"),
                 value: data.files,
                 icon: FileVideo2,
-                detail: "Filme und Episodendateien",
+                detail: t("movie and episode files"),
               },
             ].map((widget) => (
               <article class="stat-widget">
@@ -104,18 +114,18 @@ export function StatisticsPage({ status }: { status: Status }) {
           </div>
           <div class="distribution-heading">
             <div>
-              <h2>Medienmerkmale</h2>
-              <p>Verteilung nach Dateien · unabhängig von Listenfiltern</p>
+              <h2>{t("Media attributes")}</h2>
+              <p>{t("Distribution by files · independent of list filters")}</p>
             </div>
             <div
               class="statistics-scopes"
               role="group"
-              aria-label="Statistikbestand"
+              aria-label={t("Statistics scope")}
             >
               {[
-                { value: "all", label: "Gesamtbestand" },
-                { value: "radarr", label: "Filme" },
-                { value: "sonarr", label: "Serien" },
+                { value: "all", label: t("Entire library") },
+                { value: "radarr", label: t("Movies") },
+                { value: "sonarr", label: t("TV series") },
               ].map((item) => (
                 <button
                   class={scope === item.value ? "active" : ""}
@@ -127,25 +137,26 @@ export function StatisticsPage({ status }: { status: Status }) {
               ))}
             </div>
           </div>
-          <section class="quality-widgets" aria-label="Metadatenqualität">
+          <section class="quality-widgets" aria-label={t("Metadata quality")}>
             <article class="stat-widget">
-              <span>Metadaten unvollständig</span>
+              <span>{t("Incomplete metadata")}</span>
               <strong>{count(data.incomplete)}</strong>
               <small>
-                Auflösung, Codec, Source, Audio und Sprache; HDR kann SDR oder
-                unbekannt sein.
+                {t(
+                  "Resolution, codec, source, audio and language; HDR may be SDR or unknown.",
+                )}
               </small>
             </article>
             <article class="stat-widget">
-              <span>Emby-Zuordnung</span>
+              <span>{t("Emby matching")}</span>
               <dl>
                 {[
-                  ["matched", "Zugeordnet"],
-                  ["missing", "Nicht gefunden"],
-                  ["ambiguous", "Mehrdeutig"],
-                  ["missing_size", "Größe fehlt"],
-                  ["no_tracks", "Tonspuren fehlen"],
-                  ["unconfigured", "Ohne Emby-Ergänzung"],
+                  ["matched", t("Matched")],
+                  ["missing", t("Not found")],
+                  ["ambiguous", t("Ambiguous")],
+                  ["missing_size", t("Size missing")],
+                  ["no_tracks", t("Audio tracks missing")],
+                  ["unconfigured", t("Without Emby enrichment")],
                 ].map(([key, label]) => (
                   <div>
                     <dt>{label}</dt>
@@ -154,8 +165,7 @@ export function StatisticsPage({ status }: { status: Status }) {
                 ))}
               </dl>
               <small>
-                Eine Zuordnung kann trotzdem einzelne unbekannte Tonspurmerkmale
-                enthalten.
+                {t("A match may still contain unknown audio track attributes.")}
               </small>
             </article>
           </section>
@@ -163,14 +173,15 @@ export function StatisticsPage({ status }: { status: Status }) {
             {["resolution", "codec", "source"].map((field) => (
               <DistributionChart
                 field={field}
+                onFilter={(value) => onFilter(field, value, scope)}
                 buckets={data.distributions[scope]?.[field] || []}
               />
             ))}
           </div>
           <p class="statistics-footnote">
-            Gezählt werden Filme und Serien mit Dateien im Cache. Jede
-            eindeutige Episode zählt einmal; eine Datei kann mehrere Episoden
-            enthalten. „Unbekannt“ bleibt in den Diagrammen sichtbar.
+            {t(
+              "Counts include movies and series with cached files. Each unique episode counts once; one file may contain multiple episodes. Unknown values remain visible in charts.",
+            )}
           </p>
         </>
       )}
@@ -180,10 +191,13 @@ export function StatisticsPage({ status }: { status: Status }) {
 function DistributionChart({
   field,
   buckets,
+  onFilter,
 }: {
   field: string;
+  onFilter: (value: string) => void;
   buckets: { value: string; count: number }[];
 }) {
+  useI18n();
   const colors = useContext(TagColors);
   const total = buckets.reduce((sum, b) => sum + b.count, 0);
   const colored = buckets.map((bucket, i) => ({
@@ -196,7 +210,9 @@ function DistributionChart({
     <article class="distribution-card">
       <div class="distribution-title">
         <h3>{labels[field]}</h3>
-        <span>{count(total)} Dateien</span>
+        <span>
+          {count(total)} {t("files")}
+        </span>
       </div>
       {total ? (
         <>
@@ -207,7 +223,7 @@ function DistributionChart({
               labels[field] +
               ": " +
               colored
-                .map((b) => (b.value || "Unbekannt") + " " + count(b.count))
+                .map((b) => (b.value || t("Unknown")) + " " + count(b.count))
                 .join(", ")
             }
           >
@@ -217,14 +233,22 @@ function DistributionChart({
                   width: (b.count / total) * 100 + "%",
                   backgroundColor: b.color,
                 }}
-                title={(b.value || "Unbekannt") + ": " + count(b.count)}
+                title={(b.value || t("Unknown")) + ": " + count(b.count)}
               />
             ))}
           </div>
           <ul class="distribution-list">
             {colored.map((b) => (
               <li>
-                <div class="distribution-label">
+                <button
+                  type="button"
+                  class="distribution-label chart-filter"
+                  onClick={() => onFilter(b.value)}
+                  aria-label={t("Filter {field}: {value}", {
+                    field: labels[field],
+                    value: b.value || t("Unknown"),
+                  })}
+                >
                   <span
                     class="chart-dot"
                     style={{ backgroundColor: b.color }}
@@ -237,12 +261,12 @@ function DistributionChart({
                   />
                   <b>{count(b.count)}</b>
                   <span>
-                    {new Intl.NumberFormat("de-DE", {
+                    {new Intl.NumberFormat(getLocale(), {
                       maximumFractionDigits: 1,
                     }).format((b.count / total) * 100)}{" "}
                     %
                   </span>
-                </div>
+                </button>
                 <div class="distribution-track">
                   <span
                     style={{
@@ -258,7 +282,7 @@ function DistributionChart({
       ) : (
         <div class="statistics-empty">
           <BarChart3 size={28} />
-          <p>Noch keine Dateien im Cache</p>
+          <p>{t("No files in cache yet")}</p>
         </div>
       )}
     </article>

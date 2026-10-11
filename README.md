@@ -1,67 +1,69 @@
 # ArrScope
 
-Deine Radarr- und Sonarr-Bibliothek im Blick. Filtere vorhandene Mediendateien nach Auflösung, Encoder, Codec-Familie, Quelle, Jahr und weiteren Merkmalen – ohne Medien-Scan.
+Explore and filter your Radarr and Sonarr libraries using existing filenames and API metadata. A lightweight, self-hosted web app with a local SQLite cache — no media scans, media mounts or external database server.
 
-![ArrScope](docs/screenshots/desktop.jpg)
+![ArrScope dashboard](docs/screenshots/dashboard-0.2.0-en.png)
 
-## Funktionen
+## Features
 
-- Getrennte Film- und Serienansichten, dunkles und helles Design, responsive Oberfläche auf Deutsch.
-- Dateiname zuerst, API-Metadaten als Ergänzung; Herkunft und Widersprüche je Merkmal sichtbar. Mehrere Audio-Codecs und HDR-Profile erscheinen als einzelne Tags.
-- Optional Emby: vorhandene Tonspurmetadaten ergänzen Sprache → Codec und Kanäle pro Spur. Eindeutige Emby-Tonspuren liefern präzisere Audio-/Sprachmerkmale als Dateiname oder zusammengefasste Arr-Angaben.
-- `1080p UND x264`, mehrere Werte eines Filters mit ODER; Titel-/Dateisuche, Jahresbereich, Größe, HDR, Bit-Tiefe, Audio, Kanäle, Sprache und unbekannte Werte.
-- `4K` wird zu `2160p`. `x264` bleibt von `AVC` unterscheidbar; zusätzlich gemeinsame Codec-Familie `H.264/AVC`.
-- Serien nach Staffel gruppiert, Specials und Mehrfachepisoden unterstützt. Wahlweise nur Treffer oder ganze passende Staffeln mit markierten Treffern.
-- Klickbare Film-Tabellenüberschriften sortieren auf-/absteigend; Spalte und Richtung bleiben im Browser gespeichert. Standard: Titel aufsteigend.
-- Dashboard mit Film-, Serien-, Episoden- und Dateianzahl sowie Diagrammen für Auflösungen, Codecs und Sources, gesamt oder je Dienst.
-- Benannte Presets und CSV aller tatsächlichen Treffer, unabhängig von der Seite. Standard: 100 Dateien pro Seite.
-- SQLite mit FTS5 und Indizes; atomarer Dienst-Sync erhält bei Fehlern den letzten vollständigen Bestand.
-- Globale Sync-Warteschlange, zwischengespeicherte Filterwerte und Dashboard-Aggregate; Datenqualitätsfilter findet auch teilweise unbekannte Tonspuren.
-- Ein lokales Admin-Konto, verschlüsselte API-Keys, geschützte Sitzungen und CSRF-Prüfung.
-- Ein Container, ein Go-Prozess, kein Node-Laufzeitprozess, kein Medien-Mount, kein Docker-Socket.
+- Separate movie and TV libraries, a default dashboard, responsive layouts, dark and light themes.
+- English, German, Spanish and Italian interfaces, with a browser-specific language preference and straightforward [translation contributions](docs/TRANSLATING.md).
+- Filename-first resolution, codec/encoder and source detection, supplemented by existing API metadata. Inspect provenance and conflicting values in each file’s details.
+- Combined resolution, codec family, source, processing, year, size, HDR, bit depth, audio codec, channels and audio language filters. Search titles and filenames; select unknown and incomplete metadata.
+- Include/exclude filters and “contains all” / “does not contain all” for audio, HDR and language. Saved presets and CSV use the same filter logic.
+- Grouped TV seasons, specials and multi-episode files. Show only matching files or complete matching seasons with highlighted matches.
+- Dashboard counts and distributions by resolution, codec and source. Click a tag to open a temporary filter while preserving previous filters and presets.
+- Optional Emby enrichment reads already available audio tracks. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
+- Persistent configurable columns, column order and tag colors. Temporary “All columns” view; clickable movie headers for sorting.
+- Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
+- One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
+- A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.
 
-## Installation
+## Install
 
-Für Unraid siehe [Unraid-Anleitung](docs/UNRAID.md), für andere Docker-Installationen:
+See [Unraid installation](docs/UNRAID.md). For other Docker hosts:
 
 ```sh
 cp .env.example .env
-# ARRSCOPE_APPDATA, ARRSCOPE_PORT und UID/GID in .env anpassen
-mkdir -p /lokaler/pool/appdata/arrscope
-# Für UID/GID 99:100 (bei anderer UID/GID anpassen):
-sudo chown 99:100 /lokaler/pool/appdata/arrscope
-sudo chmod 700 /lokaler/pool/appdata/arrscope
+# Set ARRSCOPE_APPDATA, ARRSCOPE_PORT and UID/GID in .env.
+mkdir -p /local/pool/appdata/arrscope
+sudo chown 99:100 /local/pool/appdata/arrscope
+sudo chmod 700 /local/pool/appdata/arrscope
 docker compose pull
 docker compose up -d
 ```
 
-`compose.yaml` verwendet `ghcr.io/buffer379x/arrscope:stable`. Das Image ist erst nach dem ersten genehmigten Release verfügbar. Für einen lokalen Test vorher:
+Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/arrscope:stable`. Open port 8080, obtain the one-time setup code with `docker exec arrscope cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Connections, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
 
-```sh
-docker build -t arrscope:local .
-docker run --rm -p 127.0.0.1:8080:8080 -v arrscope-test:/data arrscope:local
-```
+Connect exactly one instance per service. URL subpaths are supported, for example `http://radarr:7878/radarr`; do not append `/api/v3` or put credentials/query parameters in the URL. TLS certificates are verified and redirects are rejected. Sync intervals: manual only, 15, 30, 60 (default), 360 or 1440 minutes. Emby follows the corresponding Radarr/Sonarr sync.
 
-Öffne die Oberfläche an Port 8080. Der einmalige Einrichtungscode liegt im Appdata-Verzeichnis `setup-token`; für Docker lässt er sich mit `docker exec arrscope cat /data/setup-token` lesen. Gib ihn und dein neues Admin-Passwort direkt in der Oberfläche ein. Danach in den Einstellungen Dienstadresse und API-Key hinterlegen, Verbindung testen, Dienst aktivieren und speichern. Der erste Sync startet automatisch.
+## Filters and metadata
 
-Verwendet wird je Dienst genau eine Instanz. URL-Unterpfade sind möglich, z. B. `http://radarr:7878/radarr`. Verwende die direkte Dienstadresse ohne `/api/v3`, Query oder Zugangsdaten in der URL. HTTPS-Zertifikate werden geprüft; Weiterleitungen werden nicht verfolgt. Das Sync-Intervall ist standardmäßig 60 Minuten; möglich sind 15, 30, 60, 360, 1440 Minuten oder nur manuell.
+Different fields use AND; multiple values of one ordinary field use OR. For example, choose `1080p`, `x265`, and Source **is not** `BluRay` and `WEB-DL`. None of the excluded sources may occur. Unknown values remain included unless explicitly excluded.
 
-## Daten und Betrieb
+Audio, HDR and language also support **contains all** and **does not contain all**. With HDR10 and Dolby Vision selected, “does not contain all” finds files missing at least one **reported attribute**; it does not prove physical absence in a file. Generic HDR does not imply HDR10, and Dolby Vision alone does not imply an HDR10 fallback. `4K` maps to `2160p`; `x264` remains distinct from `AVC` while both share the `H.264/AVC` family.
 
-Das persistente `/data` enthält `arrscope.db`, WAL-Dateien, `secret.key` und Datenbanksicherungen. Es muss auf einem lokalen Dateisystem liegen; kein SMB/NFS. Sichere den gesamten Appdata-Bestand einschließlich des Schlüssels. Die letzten drei konsistenten Datenbankkopien bleiben erhalten. Vor Schema-Migrationen erfolgt automatisch eine Sicherung. [Backup und Rollback](docs/OPERATIONS.md).
+Movie titles and years come from Radarr. Episode titles, seasons and first-air years come from Sonarr. One file containing multiple episodes appears once. A dashboard movie count refers to distinct movies, so it may differ from the movie file count. The default page size is 100; CSV exports every actual match, excluding extra season context.
 
-ArrScope liest ausschließlich die API-v3-Endpunkte `system/status`, `movie`, `moviefile`, `series`, `episode` und `episodefile` per GET. Es veranlasst keine Scans, Downloads, Umbenennungen oder Änderungen an Radarr/Sonarr. Die Dienste selbst können unabhängig andere Aufgaben ausführen. Ohne Datei im Dienst gibt es keinen Dateieintrag in ArrScope. Fehlende Angaben bleiben unbekannt. Sprachen beziehen sich auf explizite Dateinamenangaben beziehungsweise gemeldete Audio-Sprachen; keine Ableitung aus Titel oder Herkunft. Source und Verarbeitung wie Remux sind getrennt.
+Emby uses exact basename plus identical positive byte size and requires a unique match on both sides. Optional path mappings add a full-path check. Matching respects MediaSources for multiple versions. External audio and subtitle streams are excluded. Missing or ambiguous identity is shown rather than guessed. Without Emby, multiple filename tokens can be recognized, but a reliable language-to-codec mapping is unavailable. The Channels column retains filename/Arr metadata; file details show each Emby track’s own channels.
 
-Die API sammelt keinen serverweiten Snapshot: Während eines Syncs können sich die Dienste ändern. Inkonsistente Zuordnungen führen zu einem Fehler und erhalten den bisherigen Cache. Ein erneuter Sync gleicht den Stand ab. Ein Wechsel der Serveradresse erhält den alten Cache bis zum nächsten vollständig erfolgreichen Sync.
+Flags are representative language symbols, not claims about a file’s country or dialect. English uses the UK flag; an unrecognized language uses a neutral icon and its original label. Text-based filters retain original stored values across interface languages.
 
-Für LAN/VPN vorgesehen. Ein HTTPS-Reverse-Proxy kann ergänzt werden; dann `ARRSCOPE_HTTPS=true` setzen, damit Sitzungscookies ausschließlich über HTTPS übertragen werden. ArrScope vertraut keinen beliebigen Forwarded-Headern. Hinter einem Proxy gilt die Login-Begrenzung pro Proxy-Adresse.
+## Storage and security
 
-## Entwicklung und Prüfung
+Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-Benötigt: Go gemäß `go.mod`, Node 24 und pnpm 11.25.0.
+ArrScope reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile`. Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download, rename or other upstream write requests are made. Independent tasks performed by those services remain outside ArrScope’s control.
+
+Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `ARRSCOPE_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
+
+## Development
+
+Use the Go version in `go.mod`, Node 24 and pnpm 11.25.0:
 
 ```sh
 pnpm --dir web install --frozen-lockfile
+node scripts/check-version.mjs
 pnpm --dir web test
 pnpm --dir web build
 pnpm --dir web audit --audit-level=moderate
@@ -71,49 +73,14 @@ go build -o work/arrscope ./cmd/arrscope
 ARRSCOPE_DATA_DIR=./work/appdata ./work/arrscope
 ```
 
-Die Oberfläche wird aus `web/dist` eingebettet und muss vor dem Go-Build gebaut werden. Für eine ausdrücklich getrennte Vorschau mit synthetischen Daten:
+Build `web/dist` before compiling Go. For a separate synthetic demo, set `ARRSCOPE_DEMO=true` and a fresh `ARRSCOPE_DATA_DIR=./work/demo`. Demo credentials: `demo` / `ArrScope-demo-2026`. Existing real accounts are rejected; upstream connections are locked. Never enable demo mode for a production installation.
 
-```sh
-ARRSCOPE_DEMO=true ARRSCOPE_DATA_DIR=./work/demo ./work/arrscope
-```
+`VERSION` is the project version. Local Go builds embed it; package and Docker defaults must agree. Changes after a published release require a higher version, an English changelog entry and `docs/releases/<version>.md`. See [release workflow](docs/RELEASING.md) and [validation](docs/VALIDATION.md).
 
-Demo-Anmeldung: `demo` / `ArrScope-demo-2026`. Demo-Daten werden ausschließlich in einem neuen Demo-Bestand angelegt; echte Konten werden abgewiesen. Keine Dienstverbindungen im Demo-Modus. Nicht für die produktive Installation aktivieren.
+Pull requests and `main` changes run tests and container checks. Only the manually approved release workflow promotes `stable`. Unraid updates are user-triggered; ArrScope does not access a Docker socket or run an updater.
 
-```sh
-GOMAXPROCS=2 ARRSCOPE_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
-```
+## Contributing
 
-[Testbericht und Grenzen der Messung](docs/VALIDATION.md), [Architektur und HTTP-API](docs/ARCHITECTURE.md).
+[Add or improve translations](docs/TRANSLATING.md), report an issue, or open a pull request. Write public issue/PR descriptions, release notes and documentation in English. Keep credentials, Appdata and private library data out of contributions. [Architecture and API](docs/ARCHITECTURE.md).
 
-## Releases
-
-Pull Requests und Änderungen an `main` führen Tests und einen Container-Smoke-Test aus. Der manuelle Workflow **Approved release** nimmt eine freigegebene Versionsnummer wie `0.1.0` entgegen. Er prüft erneut, baut `linux/amd64` und `linux/arm64`, prüft beide Images, erstellt Git-Tag und Release-Notizen und aktualisiert anschließend `stable`. Versions-Tags werden nicht überschrieben. Unraid-Updates werden vom Benutzer ausgelöst; kein automatischer Updater und kein Zugriff auf den Docker-Socket. [Veröffentlichung](docs/RELEASING.md).
-
-Das PNG-Icon wurde für ArrScope generiert. Transparente Varianten in 1024, 256 und 64 Pixeln sowie PNG-/ICO-Favicon und Apple-Touch-Icon liegen in `web/public`. Das Icon erscheint in Kopfzeile und Anmeldung; die Favicon-Varianten sind im HTML eingebunden. UI-Icons: Lucide (ISC); Preact/Vite und weitere Abhängigkeiten behalten ihre eigenen Lizenzen.
-
-Lizenz: [MIT](LICENSE).
-
-## Dashboard, Filter, Spalten und Farben
-
-Das Dashboard ist die Startseite nach der Anmeldung und steht im Menü vor Radarr und Sonarr.
-
-Merkmalsfilter besitzen die Operatoren „ist“ und „ist nicht“. Mehrere positive Werte gelten mit ODER; bei „ist nicht“ darf keiner der ausgewählten Werte vorkommen. Verschiedene Eigenschaften werden mit UND verbunden. Beispiel: Auflösung ist 1080p, Codec ist x265, Source ist nicht BluRay und WEB-DL. Unbekannte Angaben bleiben bei Ausschlüssen enthalten, bis „Unbekannt“ ebenfalls ausgeschlossen wird. Bei Sprache, Audio und HDR werden die einzelnen Werte mehrteiliger Angaben berücksichtigt. Ausschlüsse erscheinen als `Source ≠ BluRay` in den aktiven Filter-Tags. Operatoren werden in Presets gespeichert und gelten identisch für Liste und CSV.
-
-Für Audio, HDR und Sprache stehen zusätzlich „enthält alle“ (UND) und „enthält nicht alle“ (NICHT die vollständige Kombination) zur Verfügung. Bei HDR10 und Dolby Vision zeigt „enthält nicht alle“ Dateien, denen mindestens eine dieser **erkannten Angaben** fehlt; „enthält keines“ schließt beide vollständig aus. Unbekannte Angaben sind ebenfalls Treffer bei „enthält nicht alle“. Ein aktiver Kombinationsfilter erscheint als gemeinsames Tag; dessen Kreuz entfernt die ganze Auswahl dieses Merkmals. Die Einzelauswahl bleibt im Dropdown möglich. HDR-Profile aus Dateiname und vorhandenen API-Angaben ergänzen sich; DV alleine lässt ArrScope keinen HDR10-Fallback erfinden.
-
-Emby ist optional und wird in den Einstellungen mit URL und API-Key aktiviert. ArrScope liest ausschließlich `GET /emby/System/Info` und paginierte `GET /emby/Items` mit vorhandenen MediaSources/MediaStreams. Der Key wird per `X-Emby-Token` übertragen und wie die Arr-Keys verschlüsselt gespeichert; Browserantworten enthalten nur den Hinweis auf einen gespeicherten Key. Die [Emby-API](https://dev.emby.media/reference/RestAPI/ItemsService/getItems.html) liefert einzelne Audio-Streams mit Sprache, Codec, Profil, Kanälen und Standardspur. Es werden keine Wiedergabe-, Probe-, Refresh- oder Scan-Aufrufe ausgeführt.
-
-Die Zuordnung verwendet einen **eindeutigen vollständigen Dateinamen und dieselbe positive Byte-Größe**, auch wenn die Container unterschiedliche Medienpfade verwenden. Mehrfachversionen werden über ihre jeweilige MediaSource zugeordnet. Gleichnamige und gleich große Dateien an unterschiedlichen Pfaden, doppelte Arr-Dateien und widersprüchliche Tonspur-IDs werden als mehrdeutig markiert und nicht ergänzt. Fehlende Größe oder Streams bleiben sichtbar. Externe Audio- und Untertitelspuren zählen nicht als Tonspuren der Datei. Die Sprachspalte zeigt zum Beispiel `Deutsch · DTS` und `Englisch · AC-3`; der Dateidialog zeigt alle Spuren einschließlich Kanälen und Standardmarkierung. CSV ergänzt die Spalten „Tonspuren“ und „Emby-Zuordnung“.
-
-Emby folgt dem Intervall des jeweiligen Radarr-/Sonarr-Syncs. Fehler oder ein während der Pagination geänderter Bestand behalten den letzten vollständigen Cache. Ohne Emby kann ArrScope mehrere Codec-/HDR-Tokens erkennen, aber keine verlässliche Zuordnung einer Sprache zu einem Audio-Codec herstellen. Fehlende Sprach-/Codec-Angaben in einer Emby-Spur bleiben „Unbekannt“. Filter zeigen erkannte Metadaten und garantieren nicht die physische Abwesenheit eines nicht gemeldeten Merkmals.
-
-Der Filterbereich zeigt ausgeklappt alle Filtermöglichkeiten und lässt sich vollständig einklappen; aktive Filter und das Preset-Dropdown bleiben zugänglich. Das Lesezeichen speichert eine benannte Filterkombination dauerhaft in SQLite, getrennt für Filme und Serien. Gespeicherte Presets bleiben nach Abmeldung, Browser- und Container-Neustart erhalten, bis sie mit dem Papierkorb gelöscht werden. Eine geänderte Kombination zeigt „Eigene Filter“.
-
-Unter Einstellungen → Standardspalten wählst du getrennt für Radarr und Sonarr die sichtbaren Spalten aus. Die Pfeile bestimmen die Reihenfolge von links nach rechts, einschließlich ausgeblendeter Spalten. Titel beziehungsweise Episode bleibt sichtbar, kann aber ebenfalls verschoben werden. Die Auswahl wird in SQLite gespeichert und bleibt nach Browser- und Container-Neustarts erhalten. „Standard wiederherstellen“ setzt Auswahl und Reihenfolge des jeweiligen Dienstes zurück: sichtbar sind Titel/Episode, Jahr, Auflösung, Codec und Source. „Alle Spalten“ neben dem CSV-Export zeigt vorübergehend sämtliche Spalten in dieser Reihenfolge; „Standardansicht“ kehrt zur gespeicherten Auswahl zurück. Dieser Schalter gilt getrennt je Bibliothek für die aktuelle Sitzung. Die Spaltenauswahl verändert weder Filtermöglichkeiten noch den vollständigen CSV-Export.
-
-Unter Einstellungen → Tag-Farben lassen sich bereits erkannte Auflösungen, Codecs, Sources, Verarbeitungsarten, HDR-Formate und Audio-Codecs einzeln einfärben. Die Farben gelten in beiden Bibliotheken und Designs. „Standard“ entfernt die jeweilige eigene Farbe; „Einstellungen speichern“ übernimmt die Änderungen dauerhaft. Im hellen Design erhalten auch Standard-Tags kräftigere farbige Hintergründe.
-
-
-Die Einstellungen sind in **Verbindungen**, **Darstellung** und **Wartung** unterteilt. Gespeicherte API-Keys können ausdrücklich entfernt werden. Emby unterstützt optionale absolute Pfadzuordnungen als zusätzliche Identitätsprüfung. Mehrsprachigkeit wird als Menge normalisiert; zusätzliche API-Sprachen ergänzen erkannte Dateinamen-Sprachen. Der Filter **Metadaten-Vollständigkeit** und Dashboard-Widgets machen fehlende Tonspurangaben und Emby-Zuordnungen sichtbar.
-
-Die Korrekturen, Regressionstests und aktuellen Container-Messungen stehen im [Korrekturbericht](docs/REVIEW-FIXES.md). Für einen isolierten Lasttest mit ausschließlich synthetischen Arr-/Emby-Diensten: `python3 docs/scripts/containercheck.py --image arrscope:local`. Der Test legt nur seinen eigenen temporären Container und Datenbestand an; er benötigt Docker und verwendet kein bestehendes ArrScope-Appdata.
+The generated ArrScope PNG icon, favicons and Apple touch icon are included under `web/public`. UI icons are Lucide (ISC); dependencies retain their own licenses. Project license: [MIT](LICENSE). [Changelog](CHANGELOG.md).

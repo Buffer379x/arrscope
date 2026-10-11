@@ -1,3 +1,4 @@
+import { LanguageSelect, t, useI18n } from "../i18n";
 import { Modal } from "./Modal";
 
 import {
@@ -38,10 +39,12 @@ export function SettingsDialog({
   close: () => void;
   saved: () => Promise<void>;
 }) {
+  useI18n();
   const [cfg, setCfg] = useState<Settings>(structuredClone(settings)),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [test, setTest] = useState<Record<string, string>>({}),
+    [testing, setTesting] = useState<Record<string, boolean>>({}),
     [current, setCurrent] = useState(""),
     [password, setPassword] = useState(""),
     [section, setSection] = useState("connections"),
@@ -99,12 +102,12 @@ export function SettingsDialog({
     }
   };
   return (
-    <Modal title="Einstellungen" close={close} wide>
-      <nav class="settings-tabs" aria-label="Einstellungsbereiche">
+    <Modal title={t("Settings")} close={close} wide>
+      <nav class="settings-tabs" aria-label={t("Settings sections")}>
         {[
-          ["connections", "Verbindungen"],
-          ["appearance", "Darstellung"],
-          ["maintenance", "Wartung"],
+          ["connections", t("Connections")],
+          ["appearance", t("Appearance")],
+          ["maintenance", t("Maintenance")],
         ].map(([value, label]) => (
           <button
             type="button"
@@ -118,12 +121,13 @@ export function SettingsDialog({
       </nav>
       <form onSubmit={submit}>
         <p class="quiet">
-          Deine Dienste, dein Cache. Medienverzeichnisse werden nicht benötigt.
+          {t("Your services, your cache. No media directories required.")}
         </p>
         {demo && (
           <div class="notice">
-            Demo-Verbindungen sind gesperrt. Serienansicht, Standardspalten und
-            Tag-Farben kannst du ausprobieren.
+            {t(
+              "Demo connections are locked. Try the TV view, default columns and tag colors.",
+            )}
           </div>
         )}
         <div class="settings-section" hidden={section !== "connections"}>
@@ -136,13 +140,13 @@ export function SettingsDialog({
                     ? "Radarr"
                     : service === "sonarr"
                       ? "Sonarr"
-                      : "Emby · optional"}
+                      : t("Emby · optional")}
                 </legend>
                 {service === "emby" && (
                   <p class="quiet">
-                    Ergänzt bereits vorhandene Tonspurmetadaten. Keine Scans
-                    oder Medienzugriffe. Zuordnung nur bei eindeutigem
-                    Dateinamen und identischer Dateigröße.
+                    {t(
+                      "Adds existing audio track metadata. No scans or media access. Matching requires a unique filename and identical file size.",
+                    )}
                   </p>
                 )}
                 <label class="check-field">
@@ -154,11 +158,11 @@ export function SettingsDialog({
                       update(service, { enabled: e.currentTarget.checked })
                     }
                   />{" "}
-                  Dienst aktivieren
+                  {t("Enable service")}
                 </label>
                 <div class="connection-grid">
                   <label>
-                    Serveradresse
+                    {t("Server address")}
                     <input
                       type="url"
                       disabled={demo}
@@ -175,20 +179,22 @@ export function SettingsDialog({
                       }
                     />
                     <small>
-                      Auch mit URL-Unterpfad, zum Beispiel /
-                      {service === "emby" ? "emby" : service}.
+                      {t(
+                        "URL subpaths are supported, for example /{service}.",
+                        { service },
+                      )}
                     </small>
                   </label>
                   <label>
-                    API-Key
+                    {t("API key")}
                     <input
                       type="password"
                       disabled={demo}
                       autoComplete="off"
                       placeholder={
                         cfg[service].hasKey
-                          ? "Gespeichert · leer lassen zum Beibehalten"
-                          : "API-Key eingeben"
+                          ? t("Saved · leave empty to keep")
+                          : t("Enter API key")
                       }
                       value={cfg[service].apiKey || ""}
                       onInput={(e) =>
@@ -197,8 +203,10 @@ export function SettingsDialog({
                     />
                     <small>
                       {service === "emby"
-                        ? "Im Emby-Dashboard unter API-Schlüssel. Einen eigenen Schlüssel für ArrScope verwenden."
-                        : "Im jeweiligen Dienst unter Einstellungen → Allgemein."}
+                        ? t(
+                            "Emby dashboard → API keys. Use a dedicated key for ArrScope.",
+                          )
+                        : t("In each service under Settings → General.")}
                     </small>
                   </label>
                   <label class="check-field">
@@ -215,13 +223,13 @@ export function SettingsDialog({
                         })
                       }
                     />
-                    Gespeicherten API-Key beim Speichern löschen
+                    {t("Delete saved API key on save")}
                   </label>
                   {service === "emby" && (
                     <label class="path-mapping-field">
-                      Optionale Pfadzuordnungen
+                      {t("Optional path mappings")}
                       <textarea
-                        aria-label="Emby-Pfadzuordnungen"
+                        aria-label={t("Emby path mappings")}
                         disabled={demo}
                         rows={3}
                         value={cfg.emby.pathMappings || ""}
@@ -233,16 +241,15 @@ export function SettingsDialog({
                         }
                       />
                       <small>
-                        Eine Zeile je Medienpfad: Arr-Pfad =&gt; Emby-Pfad. Wenn
-                        gesetzt, muss zusätzlich der zugeordnete vollständige
-                        Pfad übereinstimmen. Unterschiedliche Ordnernamen
-                        innerhalb der Bibliothek verhindern dann die Ergänzung.
+                        {t(
+                          "One line per media path: Arr path => Emby path. If configured, the full mapped path must also match. Different folder names inside the library prevent enrichment.",
+                        )}
                       </small>
                     </label>
                   )}
                   {service !== "emby" ? (
                     <label>
-                      Synchronisieren
+                      {t("Synchronize")}
                       <select
                         disabled={demo}
                         value={cfg[service].interval}
@@ -253,12 +260,12 @@ export function SettingsDialog({
                         }
                       >
                         {[
-                          [0, "Nur manuell"],
-                          [15, "Alle 15 Minuten"],
-                          [30, "Alle 30 Minuten"],
-                          [60, "Stündlich"],
-                          [360, "Alle 6 Stunden"],
-                          [1440, "Täglich"],
+                          [0, t("Manual only")],
+                          [15, t("Every 15 minutes")],
+                          [30, t("Every 30 minutes")],
+                          [60, t("Hourly")],
+                          [360, t("Every 6 hours")],
+                          [1440, t("Daily")],
                         ].map(([value, label]) => (
                           <option value={value}>{label}</option>
                         ))}
@@ -266,17 +273,25 @@ export function SettingsDialog({
                     </label>
                   ) : (
                     <p class="quiet">
-                      Wird zusammen mit Radarr und Sonarr synchronisiert. Ein
-                      Fehler behält den letzten vollständigen Cache-Stand.
+                      {t(
+                        "Synced with Radarr and Sonarr. An error preserves the last complete cache.",
+                      )}
                     </p>
                   )}
                   <div class="connection-test">
                     <button
                       type="button"
                       class="button"
-                      disabled={demo || test[service] === "Prüfe …"}
+                      disabled={demo || testing[service]}
                       onClick={async () => {
-                        setTest({ ...test, [service]: "Prüfe …" });
+                        setTesting((current) => ({
+                          ...current,
+                          [service]: true,
+                        }));
+                        setTest((current) => ({
+                          ...current,
+                          [service]: t("Testing …"),
+                        }));
                         try {
                           const r = await api<{ version: string }>(
                             "test",
@@ -287,16 +302,27 @@ export function SettingsDialog({
                               apiKey: cfg[service].apiKey || "",
                             },
                           );
-                          setTest({
-                            ...test,
-                            [service]: "Verbunden · Version " + r.version,
-                          });
+                          setTest((current) => ({
+                            ...current,
+                            [service]: t("Connected · version {version}", {
+                              version: r.version,
+                            }),
+                          }));
                         } catch (e) {
-                          setTest({ ...test, [service]: (e as Error).message });
+                          setTest((current) => ({
+                            ...current,
+                            [service]: (e as Error).message,
+                          }));
+                        } finally {
+                          setTesting((current) => ({
+                            ...current,
+                            [service]: false,
+                          }));
                         }
                       }}
                     >
-                      Verbindung testen <ArrowUpRight size={14} />
+                      {t("Test connection")}
+                      <ArrowUpRight size={14} />
                     </button>
                     <small role="status">{test[service]}</small>
                   </div>
@@ -307,11 +333,21 @@ export function SettingsDialog({
         </div>
         <div class="settings-section" hidden={section !== "appearance"}>
           <fieldset class="connection">
+            <legend>{t("Interface language")}</legend>
+            <LanguageSelect />
+            <small>
+              {t(
+                "Saved in this browser. Media names and filter values stay unchanged.",
+              )}
+            </small>
+          </fieldset>
+          <fieldset class="connection">
             <legend>
-              <Layers size={16} /> Serienansicht
+              <Layers size={16} />
+              {t("TV view")}
             </legend>
             <label>
-              Ergebnisse bei aktiven Filtern
+              {t("Results with active filters")}
               <select
                 value={cfg.seasonMode}
                 onChange={(e) =>
@@ -321,31 +357,30 @@ export function SettingsDialog({
                   })
                 }
               >
-                <option value="matches">Nur passende Dateien anzeigen</option>
+                <option value="matches">{t("Show matching files only")}</option>
                 <option value="season">
-                  Ganze passende Staffel · Treffer markieren
+                  {t("Full matching season · highlight matches")}
                 </option>
               </select>
             </label>
             <small>
-              Eine passende Datei genügt, um ihre Staffel im Kontext anzuzeigen.
+              {t("One matching file is enough to show its season in context.")}
             </small>
           </fieldset>
           <fieldset class="connection">
-            <legend>Standardspalten</legend>
+            <legend>{t("Default columns")}</legend>
             <p class="quiet">
-              Wähle die sichtbaren Spalten und verschiebe sie mit den Pfeilen.
-              Die Reihenfolge gilt von links nach rechts, auch für ausgeblendete
-              Spalten. Beides wird dauerhaft gespeichert. Filter und CSV
-              enthalten weiterhin alle Merkmale.
+              {t(
+                "Choose visible columns and move them with the arrows. The order runs left to right, including hidden columns. Both are saved permanently. Filters and CSV still include all fields.",
+              )}
             </p>
             <div class="column-settings">
               {(["radarr", "sonarr"] as Service[]).map((service) => (
                 <fieldset>
                   <legend>
                     {service === "radarr"
-                      ? "Filme · Radarr"
-                      : "Serien · Sonarr"}
+                      ? t("Movies · Radarr")
+                      : t("TV series · Sonarr")}
                   </legend>
                   <div class="column-options">
                     {cfg.columnOrder[service].map((field, index) => (
@@ -354,7 +389,10 @@ export function SettingsDialog({
                           <input
                             type="checkbox"
                             aria-label={
-                              (service === "radarr" ? "Filme: " : "Serien: ") +
+                              (service === "radarr"
+                                ? t("Movies")
+                                : t("TV series")) +
+                              ": " +
                               columnLabels[field]
                             }
                             checked={cfg.visibleColumns[service].includes(
@@ -383,8 +421,8 @@ export function SettingsDialog({
                           />
                           {field === "title"
                             ? service === "radarr"
-                              ? "Titel (immer sichtbar)"
-                              : "Episode (immer sichtbar)"
+                              ? t("Title (always visible)")
+                              : t("Episode (always visible)")
                             : columnLabels[field]}
                         </label>
                         <div class="column-move-tools">
@@ -394,17 +432,18 @@ export function SettingsDialog({
                               class="icon-button"
                               aria-label={
                                 (service === "radarr"
-                                  ? "Filme: "
-                                  : "Serien: ") +
+                                  ? t("Movies") + ": "
+                                  : t("TV series") + ": ") +
                                 columnLabels[field] +
+                                " · " +
                                 (direction === -1
-                                  ? " nach oben"
-                                  : " nach unten")
+                                  ? t("Move up")
+                                  : t("Move down"))
                               }
                               title={
                                 direction === -1
-                                  ? "Spalte nach links verschieben"
-                                  : "Spalte nach rechts verschieben"
+                                  ? t("Move column left")
+                                  : t("Move column right")
                               }
                               disabled={
                                 direction === -1
@@ -463,22 +502,23 @@ export function SettingsDialog({
                       }))
                     }
                   >
-                    Standard wiederherstellen
+                    {t("Restore defaults")}
                   </button>
                 </fieldset>
               ))}
             </div>
           </fieldset>
           <fieldset class="connection tag-color-settings">
-            <legend>Tag-Farben</legend>
+            <legend>{t("Tag colors")}</legend>
             <p class="quiet">
-              Eigene Farben gelten für beide Bibliotheken und beide Designs. Sie
-              bleiben bis zum Zurücksetzen gespeichert.
+              {t(
+                "Custom colors apply to both libraries and themes. They remain saved until reset.",
+              )}
             </p>
             <label>
-              Tag-Eigenschaft
+              {t("Tag field")}
               <select
-                aria-label="Tag-Eigenschaft"
+                aria-label={t("Tag field")}
                 value={colorField}
                 onChange={(e) => setColorField(e.currentTarget.value)}
               >
@@ -490,7 +530,7 @@ export function SettingsDialog({
             <div class="tag-color-grid">
               {colorValues.map((value) => {
                 const key = colorField + ":" + value;
-                const label = value === "__unknown__" ? "Unbekannt" : value;
+                const label = value === "__unknown__" ? t("Unknown") : value;
                 return (
                   <div class="tag-color-row">
                     <Tag
@@ -500,7 +540,7 @@ export function SettingsDialog({
                     />
                     <input
                       type="color"
-                      aria-label={"Farbe für " + label}
+                      aria-label={t("Color for {value}", { value: label })}
                       value={
                         cfg.tagColors?.[key] || defaultColor(colorField, value)
                       }
@@ -511,9 +551,11 @@ export function SettingsDialog({
                       class="text-button"
                       disabled={!cfg.tagColors?.[key]}
                       onClick={() => setColor(key)}
-                      aria-label={"Standardfarbe für " + label}
+                      aria-label={t("Default color for {value}", {
+                        value: label,
+                      })}
                     >
-                      Standard
+                      {t("Default")}
                     </button>
                   </div>
                 );
@@ -521,7 +563,7 @@ export function SettingsDialog({
             </div>
             {!colorValues.length && (
               <p class="quiet">
-                Noch keine Tags erkannt. Synchronisiere zuerst eine Bibliothek.
+                {t("No tags detected yet. Sync a library first.")}
               </p>
             )}
           </fieldset>
@@ -536,8 +578,9 @@ export function SettingsDialog({
           class="settings-section maintenance-panel"
         >
           <p class="quiet">
-            Sichere Cache und Einstellungen. Eine vollständige Appdata-Sicherung
-            benötigt zusätzlich den lokalen Schlüssel.
+            {t(
+              "Back up cache and settings. A complete Appdata backup also requires the local key.",
+            )}
           </p>{" "}
           <button
             type="button"
@@ -547,21 +590,23 @@ export function SettingsDialog({
                 await api("backup", "POST");
                 setTest({
                   ...test,
-                  backup:
-                    "Konsistente Sicherung im Appdata-Verzeichnis erstellt.",
+                  backup: t(
+                    "Consistent backup created in the Appdata directory.",
+                  ),
                 });
               } catch (e) {
                 setError((e as Error).message);
               }
             }}
           >
-            <Database size={15} /> Cache sichern
+            <Database size={15} />
+            {t("Back up cache")}
           </button>
           {test.backup && <p role="status">{test.backup}</p>}
         </div>
         <div class="modal-actions settings-save-bar">
           <button type="button" class="button" onClick={close}>
-            Schließen
+            {t("Close")}
           </button>
           <button class="primary" disabled={busy}>
             {busy ? (
@@ -569,14 +614,15 @@ export function SettingsDialog({
             ) : (
               <Check size={16} />
             )}{" "}
-            Einstellungen speichern
+            {t("Save settings")}
           </button>
         </div>
       </form>
       <div hidden={section !== "maintenance"}>
         <details class="password-settings">
           <summary>
-            <LockKeyhole size={15} /> Passwort ändern
+            <LockKeyhole size={15} />
+            {t("Change password")}
           </summary>
           <form
             onSubmit={async (e) => {
@@ -590,7 +636,7 @@ export function SettingsDialog({
             }}
           >
             <label>
-              Aktuelles Passwort
+              {t("Current password")}
               <input
                 type="password"
                 autoComplete="current-password"
@@ -600,7 +646,7 @@ export function SettingsDialog({
               />
             </label>
             <label>
-              Neues Passwort
+              {t("New password")}
               <input
                 type="password"
                 autoComplete="new-password"
@@ -611,7 +657,7 @@ export function SettingsDialog({
               />
             </label>
             <button class="button" disabled={demo}>
-              Passwort ändern und abmelden
+              {t("Change password and sign out")}
             </button>
           </form>
         </details>

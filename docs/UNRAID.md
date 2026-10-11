@@ -1,17 +1,18 @@
-# Unraid
+# Unraid installation
 
-ArrScope benötigt ein öffentliches Release-Image. Es wird über das mitgelieferte Template verwaltet, anschließend nutzt Unraid seine normalen Update-Funktionen.
+Use the public release image and the included XML template. Existing installations update through Unraid’s normal container update action.
 
-1. `deploy/arrscope.xml` als `my-arrscope.xml` in `/boot/config/plugins/dockerMan/templates-user/` ablegen. Falls du ein persönliches Template erhalten hast, dieses verwenden.
-2. Docker → Add Container → Template `arrscope` auswählen.
-3. Repository `ghcr.io/buffer379x/arrscope:stable`, Privileged aus, Shell `sh`. Für Bridge einen freien Host-Port angeben. Für ein bereits eingerichtetes Docker-VLAN dessen Custom-Netz und eine reservierte feste IP wählen; Port 8080 ist dann direkt auf dieser IP erreichbar.
-4. `/data` auf einen lokalen SSD-/NVMe-Pool-Pfad wie `/mnt/cache/appdata/arrscope` abbilden. Passe den tatsächlichen Poolnamen an. Kein Medienverzeichnis hinzufügen. Vor dem ersten Start das neue ArrScope-Verzeichnis mit `mkdir -p /mnt/cache/appdata/arrscope`, `chown 99:100 /mnt/cache/appdata/arrscope` und `chmod 700 /mnt/cache/appdata/arrscope` vorbereiten (Pool-Pfad und UID/GID anpassen).
-5. Extra Parameters enthalten `--user=99:100 --read-only --tmpfs=/tmp:rw,noexec,nosuid,nodev,size=32m --cap-drop=ALL --security-opt=no-new-privileges --memory=256m`. Bei anderer UID/GID diese ändern und den Appdata-Besitz entsprechend setzen. `PUID`/`PGID`-Variablen werden nicht verwendet, da kein Root-Entrypoint startet.
-6. Apply. Nach erfolgreichem Start WebUI öffnen. In der Container-Konsole `cat /data/setup-token` ausführen; Code und neues Passwort selbst in der Einrichtung eingeben.
-7. Radarr/Sonarr-Adressen und API-Keys in den App-Einstellungen eingeben, testen, aktivieren und speichern. API-Keys stehen im jeweiligen Dienst unter Einstellungen → Allgemein. Die erste vollständige Synchronisation abwarten.
+1. Save `deploy/arrscope.xml` as `my-arrscope.xml` under `/boot/config/plugins/dockerMan/templates-user/`.
+2. Select Docker → Add Container → template `arrscope`.
+3. Use repository `ghcr.io/buffer379x/arrscope:stable`, keep Privileged off, and select Shell `sh`. With Bridge, choose a free host port. With an existing custom Docker VLAN, choose that network and a reserved fixed IP; port 8080 is reachable directly on that IP.
+4. Mount `/data` at a local SSD/NVMe pool path such as `/mnt/cache/appdata/arrscope`. Adjust the pool name. Add no media directories. Before first start, create the directory and set ownership/mode for the container: `mkdir -p /mnt/cache/appdata/arrscope`, `chown 99:100 /mnt/cache/appdata/arrscope`, `chmod 700 /mnt/cache/appdata/arrscope`.
+5. Extra Parameters: `--user=99:100 --read-only --tmpfs=/tmp:rw,noexec,nosuid,nodev,size=32m --cap-drop=ALL --security-opt=no-new-privileges --memory=256m --memory-swap=256m`. Match the directory owner when changing UID/GID. PUID/PGID environment variables are not used; there is no root entrypoint.
+6. Apply and open WebUI. Read `cat /data/setup-token` in the container console, then enter the code and new credentials yourself in the interface.
+7. In Settings → Connections, enter/test/enable/save Radarr and Sonarr URLs and API keys. Optionally connect Emby. Keys are located under Settings → General in Arr services and Dashboard → API keys in Emby. Wait for the initial complete sync.
+8. Enable Autostart. Choose the interface language on login or under Settings → Appearance.
 
-Aktiviere Autostart für ArrScope. Updates: Docker → Check for Updates → ArrScope → Update. Unraid zieht den freigegebenen `stable`-Stand und verwendet das bestehende `/data`. Die App erstellt bei notwendigen Migrationen eine Datenbankkopie.
+Updates: Docker → Check for Updates → ArrScope → Update. The existing `/data` is reused; required schema migrations create a consistent database snapshot first. Version 0.2.0 does not change the database schema.
 
-Bei Nutzung einer eigenen IP ist keine Host-Portfreigabe nötig. ArrScope muss beide Dienste erreichen können; VLAN-/Firewallregeln werden vom Betreiber festgelegt. Ohne HTTPS bleibt `ARRSCOPE_HTTPS=false`; bei einem bestehenden HTTPS-Proxy auf `true` umstellen. Kein öffentlicher Internetzugriff wird durch das Template eingerichtet.
+A dedicated container IP does not need host port mapping. Ensure the container can reach its services through your VLAN/firewall rules. Without HTTPS, keep `ARRSCOPE_HTTPS=false`; with an existing HTTPS proxy, set it to true. The template does not set up public Internet exposure. A swap-limit warning means the host cannot enforce that additional limit; it does not remove the RAM limit.
 
-Falls das Image mit einer Zugriffsmeldung nicht geladen werden kann: Die GHCR-Paket-Sichtbarkeit muss **Public** sein. Ein öffentliches GitHub-Repository allein reicht dafür nicht.
+If pulling reports access denied, verify that the GHCR package is Public, independently of repository visibility. See [operations](OPERATIONS.md) for backup and recovery.

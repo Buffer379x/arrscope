@@ -55,16 +55,16 @@ func (m *Syncer) Invalidate(service string) {
 }
 func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, supplemental ...ServiceConfig) error {
 	if !serviceOK(service) || !c.Enabled {
-		return errors.New("Dienst ist nicht aktiviert")
+		return errors.New("Service is not enabled")
 	}
 	m.mu.Lock()
 	if m.stopped || parent.Err() != nil {
 		m.mu.Unlock()
-		return errors.New("App wird beendet")
+		return errors.New("App is shutting down")
 	}
 	if m.status[service].Running {
 		m.mu.Unlock()
-		return errors.New("Sync läuft bereits")
+		return errors.New("Sync already running")
 	}
 	now := time.Now().UTC()
 	st := m.status[service]
@@ -105,7 +105,7 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 		}
 		if err == nil && len(supplemental) > 0 && supplemental[0].Enabled {
 			if err = NewEmby(supplemental[0]).Enrich(ctx, service, files); err != nil {
-				err = errors.New("Emby-Ergänzung fehlgeschlagen: " + err.Error())
+				err = errors.New("Emby enrichment failed: " + err.Error())
 			}
 		}
 		if err == nil {

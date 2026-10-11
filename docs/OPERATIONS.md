@@ -1,40 +1,40 @@
-# Betrieb, Sicherung und Rollback
+# Operations, backups and rollback
 
-## Dateien und Rechte
+## Files and resource limits
 
-`ARRSCOPE_DATA_DIR` ist standardmäßig `/data`. `arrscope.db` und `secret.key` werden mit Modus 0600 angelegt; Verzeichnisse mit 0700, soweit neu erstellt. Ein bestehendes Mount-Verzeichnis muss für die Container-UID/GID zugänglich sein. Niemals den Schlüssel ersetzen: Ohne passenden `secret.key` lassen sich gespeicherte API-Keys nicht entschlüsseln.
+`ARRSCOPE_DATA_DIR` defaults to `/data`. `arrscope.db` and `secret.key` are created with mode 0600; new directories use 0700. An existing mounted directory must be accessible to the configured UID/GID. Never replace the local key: existing API keys cannot be decrypted without the matching `secret.key`.
 
-Die Container-Konfiguration setzt `GOMAXPROCS=2` für zwei parallele Go-Ausführungsthreads.
+The container sets `GOMAXPROCS=2` and a soft Go memory target `GOMEMLIMIT=192MiB`. Docker separately limits RAM to 256 MiB and requests an equal RAM-plus-swap limit to prohibit additional swap. Host kernel support is required for enforcing the swap limit. Large API responses and metadata can require more memory; monitor the target host before tightening limits.
 
-`GOMEMLIMIT=192MiB` ist ein weiches Go-Limit; Docker begrenzt separat auf 256 MiB und deaktiviert Swap durch ein gleich hohes RAM-plus-Swap-Limit. Große reale API-Antworten und besonders umfangreiche Metadaten können mehr Speicher benötigen. Speicherverbrauch auf dem Zielserver beobachten, bevor man Grenzen enger setzt.
+The `/tmp` tmpfs is limited to 32 MiB. `SQLITE_TMPDIR=/data` allows large SQLite sorts to spill onto local Appdata storage. CSV exports also use protected temporary files there. Keep enough free local disk space; do not use SMB/NFS for SQLite WAL.
 
-Das flüchtige `/tmp`-tmpfs bleibt auf 32 MiB begrenzt. Das Image setzt `SQLITE_TMPDIR=/data`, damit größere SQLite-Sortierungen lokale temporäre Dateien auf dem Appdata-Datenträger anlegen können. Der CSV-Export nutzt ebenfalls Appdata für temporäre Dateien. Genügend freien lokalen Speicher vorhalten; keine Netzfreigabe. Das vermeidet Fehler großer Dashboard-Abfragen bei schreibgeschütztem Root-Dateisystem und kleinem tmpfs.
-
-`ARRSCOPE_LISTEN` ist standardmäßig `:8080`; produktive Templates nutzen diesen Port. Der Container-Healthcheck prüft `127.0.0.1:8080/healthz`. `ARRSCOPE_HTTPS=true` verlangt HTTPS für Browser-Sitzungscookies. `ARRSCOPE_DEMO=true` ist ausschließlich für eigene Testdaten vorgesehen.
+`ARRSCOPE_LISTEN` defaults to `:8080`, and the container healthcheck reads `127.0.0.1:8080/healthz`. Set `ARRSCOPE_HTTPS=true` when browser access uses HTTPS, so cookies require secure transport. Use `ARRSCOPE_DEMO=true` only for a separate fresh synthetic dataset.
 
 ## Backup
 
-Einstellungen → **Wartung → Cache sichern** erzeugt mittels SQLite `VACUUM INTO` eine konsistente Kopie in `/data/backups/`. Die letzten drei Kopien bleiben erhalten. Vor Schemaänderungen geschieht dies automatisch. Für eine vollständige Sicherung:
+Settings → Maintenance → Back up cache uses SQLite `VACUUM INTO` to create a consistent copy under `/data/backups/`. The last three snapshots remain. Required schema migrations create a snapshot automatically.
 
-1. Cache sichern.
-2. ArrScope stoppen.
-3. Gesamten Appdata-Ordner einschließlich `secret.key`, Datenbank, WAL/SHM und Backups in das eigene Backup-System aufnehmen.
-4. ArrScope starten.
+For a complete backup:
 
-Eine Datenbanksicherung ohne den Schlüssel reicht für eine vollständige Wiederherstellung nicht aus. API-Keys in der Datenbank sind verschlüsselt, weitere Bibliotheks- und Kontodaten liegen lokal in SQLite.
+1. Create a cache backup.
+2. Stop ArrScope.
+3. Back up the entire Appdata directory, including database, `secret.key`, WAL/SHM files and snapshots.
+4. Start ArrScope.
 
-## Wiederherstellung / Rollback
+A database snapshot alone is insufficient for recovering encrypted keys. Other library/account information is stored locally in SQLite.
 
-1. ArrScope stoppen, aktuellen Appdata-Ordner vollständig separat sichern.
-2. In Unraid Repository auf das gewünschte Versions-Image wie `ghcr.io/buffer379x/arrscope:0.1.0` setzen.
-3. Einen vollständigen passenden Appdata-Stand wiederherstellen. Alternativ eine konsistente Datenbankkopie der passenden Schemaversion als `arrscope.db` kopieren und den dazugehörigen `secret.key` behalten. Veraltete WAL-/SHM-Dateien aus dem Zielverzeichnis entfernen, während ArrScope gestoppt ist, nachdem sie separat gesichert wurden.
-4. UID/GID und Zugriffsrechte prüfen; Container starten. Anmeldung, Einstellungen und Cache prüfen.
+## Restore or rollback
 
-Ältere App-Versionen verweigern eine neuere Datenbankversion. Ein bloßer Wechsel des Images kann nach Migrationen daher nicht genügen. Bei API-Änderungen der Dienste gelten weiterhin deren Kompatibilitätsgrenzen.
+1. Stop ArrScope and separately preserve the complete current Appdata directory.
+2. Select the required versioned image, for example `ghcr.io/buffer379x/arrscope:0.1.0`.
+3. Restore matching complete Appdata, or restore a consistent database snapshot of the matching schema as `arrscope.db` while retaining its corresponding key. After separately backing them up, remove stale target WAL/SHM files while the app remains stopped.
+4. Verify UID/GID and permissions, then start. Check login, connections and cache.
 
-## Passwort vergessen
+An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.2.0 retains schema 4 and requires no migration. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
 
-In der Container-Konsole das neue Passwort über stdin an `arrscope reset-password` übergeben. Es muss 12 bis 72 UTF-8-Bytes lang sein. Verwende die verdeckte Terminaleingabe, statt das Passwort als Befehlsargument oder in Chat-Nachrichten zu setzen:
+## Forgotten password
+
+Pass the new password on stdin to `arrscope reset-password`. It must contain 12–72 UTF-8 bytes. Use hidden terminal input, never a command-line argument or a chat message:
 
 ```sh
 stty -echo
@@ -45,15 +45,10 @@ printf '%s\n' "$arrscope_password" | arrscope reset-password
 unset arrscope_password
 ```
 
-Das Konto bleibt bestehen, alle bisherigen Sitzungen werden beendet. Ein neues Passwort wird ausschließlich vom Betreiber eingegeben.
+The account remains and existing sessions are revoked. New credentials are entered by the operator.
 
-## Fehler und Abbruch
+## Connections and failures
 
-Ein API-Key-Fehler, Zeitlimit, ungültige Antwort oder Datenbankfehler ersetzt den vorhandenen Cache nicht. Status und Zeitpunkt des letzten erfolgreichen Syncs stehen in der Oberfläche. Alle Dienst-Syncs werden global nacheinander verarbeitet; wartende Aufträge erscheinen als vorgemerkt. Geänderte Einstellungen verwerfen Ergebnisse bereits laufender alter Aufträge. Beenden per SIGTERM bricht HTTP-Anfragen ab und wartet auf deren Abschluss; ein laufender SQLite-Commit ist atomar.
+An empty API-key input keeps the saved key. To remove it, select **Delete saved API key on save** and save; the service is disabled. Optional Emby mappings use one absolute prefix mapping per line: `/movies => /library/movies`. With mappings configured, the full mapped path must also match. Different subfolders or missing mappings prevent enrichment. Paths come from metadata; no media files are accessed. Changed service settings queue new snapshots for enabled Arr services.
 
-
-## Verbindungen und optionale Pfadzuordnung
-
-Ein leerer API-Key bedeutet weiterhin „gespeicherten Schlüssel beibehalten“. Zum Entfernen die Option **Gespeicherten API-Key beim Speichern löschen** wählen und speichern; die Verbindung wird dabei deaktiviert. Für Emby können absolute Containerpfade zeilenweise zugeordnet werden, z. B. `/movies => /library/movies` und `/tv => /library/tv`. Die Zuordnung ergänzt vorhandene API-Daten und liest keine Medien. Fehlt die passende Zuordnung oder unterscheiden sich weitere Unterordner, bleibt die Emby-Ergänzung aus. Bei Änderung wird für aktive Arr-Dienste ein neuer Sync vorgemerkt.
-
-Schemaversion 4 ergänzt die Vollständigkeitsmerkmale und repariert Sprach-/HDR-Angaben aus dem bestehenden Cache. Vor dem Upgrade wird gesichert; Emby-Tonspuren, Einstellungen, Presets und Farben bleiben erhalten. Ein Rollback auf die vorherige App benötigt die Datenbanksicherung vor der Migration.
+Invalid credentials, timeouts, invalid responses, inconsistent identities and database failures preserve the last complete service cache. The UI shows the last successful sync and any current error. A global queue processes service snapshots one at a time. Configuration changes cancel old generations and prevent stale commits. SIGTERM cancels HTTP requests and waits for completion; SQLite commits remain atomic.

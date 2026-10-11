@@ -7,3 +7,105 @@
 @import "./styles/dashboard.css";
 @import "./styles/settings-and-filters.css";
 @import "./styles/improvements.css";
+/* Language icons are self-contained SVGs; no remote images or platform emoji dependency. */
+.language-select {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.language-select select {
+  width: auto;
+  min-width: 9rem;
+}
+.login-form > .language-select {
+  margin-bottom: 1.5rem;
+  justify-content: flex-end;
+  font-size: 0.8rem;
+}
+.language-flag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 22px;
+  flex: none;
+  border-radius: 4px;
+  outline-offset: 3px;
+  vertical-align: middle;
+}
+.language-flag > svg {
+  width: 27px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #8885;
+}
+.flag-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  padding: 6px 9px;
+  border-radius: 5px;
+  background: #152027;
+  color: #fff;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.language-flag:hover .flag-tooltip,
+.language-flag:focus .flag-tooltip {
+  display: block;
+}
+.language-flags {
+  display: inline-flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.distribution-label.chart-filter {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 4px 0;
+  text-align: left;
+  cursor: pointer;
+}
+.chart-filter:hover .tag,
+.chart-filter:focus-visible .tag {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.dashboard-filter-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.dashboard-filter-notice .text-button {
+  margin-left: auto;
+}
+.app-version {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .app-version {
+    display: none;
+  }
+  .dashboard-filter-notice select {
+    width: auto;
+  }
+  .language-select select {
+    min-width: 8rem;
+  }
+}

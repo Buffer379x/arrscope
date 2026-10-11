@@ -1,3 +1,4 @@
+import { t, useI18n } from "../i18n";
 import {
   AlertTriangle,
   ArrowDown,
@@ -40,6 +41,14 @@ import type {
 } from "../types";
 
 import { api } from "../api";
+import {
+  dashboardService,
+  makeDashboardFilter,
+  type DashboardFilter,
+} from "../dashboard-filter";
+import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
+import { getLocale } from "../i18n";
+import { labels } from "../ui";
 import { useFacets, useLibraryQuery } from "../hooks/useLibraryQuery";
 import {
   bytes,
@@ -92,6 +101,7 @@ export function Library({
   status: Status;
   refresh: () => Promise<void>;
 }) {
+  useI18n();
   const [service, setService] = useState<Service>("radarr"),
     [view, setView] = useState<"library" | "statistics">("statistics"),
     [movieSort, setMovieSort] = useState<FilmSort>(initialMovieSort),
@@ -125,7 +135,12 @@ export function Library({
     ),
     [savePreset, setSavePreset] = useState(false),
     [presetName, setPresetName] = useState("");
-  const q = new URLSearchParams(filters[service]);
+  const [dashboardFilter, setDashboardFilter] =
+    useState<DashboardFilter | null>(null);
+  const effectiveFilters = dashboardFilter
+    ? { radarr: dashboardFilter.query, sonarr: dashboardFilter.query }
+    : filters;
+  const q = new URLSearchParams(effectiveFilters[service]);
   const sync = status.sync?.[service];
   const configured = settings?.[service].enabled;
   const visibleColumns = settings?.visibleColumns[service] || defaultColumns;
@@ -159,7 +174,7 @@ export function Library({
   useLibraryQuery({
     view,
     service,
-    filters,
+    filters: effectiveFilters,
     page,
     movieSort,
     lastSuccess: sync?.lastSuccess,
@@ -169,17 +184,43 @@ export function Library({
     setError,
   });
   const change = (key: string, values: FilterUpdate) => {
-    setFilters((current) => {
+    const updateFilters = (current: Record<Service, string>) => {
       const n = new URLSearchParams(current[service]);
       const next =
         typeof values === "function" ? values(n.getAll(key)) : values;
       n.delete(key);
       next.forEach((v) => n.append(key, v));
       return { ...current, [service]: n.toString() };
-    });
+    };
+    if (dashboardFilter)
+      setDashboardFilter((current) =>
+        current
+          ? {
+              ...current,
+              query: updateFilters({
+                radarr: current.query,
+                sonarr: current.query,
+              })[service],
+            }
+          : current,
+      );
+    else setFilters(updateFilters);
+    setPage(1);
+  };
+  const openDashboardFilter = (field: string, value: string, scope: string) => {
+    setDashboardFilter(makeDashboardFilter(field, value, scope));
+    setService(dashboardService(scope, service));
+    setPage(1);
+    setResults(emptyResults);
+    setView("library");
+  };
+  const closeDashboardFilter = () => {
+    if (!dashboardFilter) return;
+    setDashboardFilter(null);
     setPage(1);
   };
   const applyPreset = (p: Preset) => {
+    setDashboardFilter(null);
     setPresetIds({ ...presetIds, [p.service]: p.id });
     setService(p.service);
     const n = new URLSearchParams(p.query);
@@ -191,6 +232,10 @@ export function Library({
     setPage(1);
   };
   const reset = () => {
+    if (dashboardFilter) {
+      closeDashboardFilter();
+      return;
+    }
     setFilters({ ...filters, [service]: "" });
     setPage(1);
   };
@@ -199,7 +244,7 @@ export function Library({
       await api("sync", "POST", { service });
       await refresh();
       setNotice(
-        "Synchronisierung vorgemerkt. Dienste werden nacheinander verarbeitet; du kannst weiter filtern.",
+        t("Sync queued. Services run one at a time; you can keep filtering."),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -211,19 +256,20 @@ export function Library({
       const created = await api<Preset>("presets", "POST", {
         name: presetName,
         service,
-        query: filters[service],
+        query: effectiveFilters[service],
       });
       await loadPresets();
       setPresetIds({ ...presetIds, [service]: created.id });
       setSavePreset(false);
       setPresetName("");
-      setNotice("Filteransicht gespeichert.");
+      setNotice(t("Filter view saved."));
     } catch (e) {
       setError((e as Error).message);
     }
   };
-  const exportQuery = new URLSearchParams(filters[service]);
+  const exportQuery = new URLSearchParams(effectiveFilters[service]);
   exportQuery.set("service", service);
+  exportQuery.set("lang", getLocale());
   if (service === "radarr") {
     exportQuery.set("sort", movieSort.field);
     exportQuery.set("dir", movieSort.direction);
@@ -246,7 +292,7 @@ export function Library({
   const matchingPresets = presets.filter(
     (p) =>
       p.service === service &&
-      canonicalQuery(p.query) === canonicalQuery(filters[service]),
+      canonicalQuery(p.query) === canonicalQuery(effectiveFilters[service]),
   );
   const selectedPreset =
     matchingPresets.find((p) => p.id === presetIds[service]) ||
@@ -256,7 +302,7 @@ export function Library({
     try {
       await api("presets?id=" + selectedPreset.id, "DELETE");
       await loadPresets();
-      setNotice("Preset gelöscht.");
+      setNotice(t("Preset deleted."));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -292,16 +338,13 @@ export function Library({
           <button
             class={"column-sort" + (current ? " current" : "")}
             onClick={() => sortColumn(field)}
-            aria-label={label + " sortieren"}
-            title={
-              "Nach " +
-              label +
-              " " +
-              (current && movieSort.direction === "asc"
-                ? "absteigend"
-                : "aufsteigend") +
-              " sortieren"
-            }
+            aria-label={t("Sort by {field}", { field: label })}
+            title={t(
+              current && movieSort.direction === "asc"
+                ? "Sort {field} descending"
+                : "Sort {field} ascending",
+              { field: label },
+            )}
           >
             {label}
             {current ? (
@@ -328,7 +371,7 @@ export function Library({
     <TagColors.Provider value={settings?.tagColors || {}}>
       <div class="shell">
         <header class="header">
-          <a href="/" class="brand" aria-label="ArrScope Startseite">
+          <a href="/" class="brand" aria-label={t("ArrScope home")}>
             <img
               src="/icon-64.png"
               srcSet="/icon-64.png 1x, /icon-256.png 2x"
@@ -339,19 +382,24 @@ export function Library({
             <b>
               ArrScope<span> / </span>
             </b>
-            <span class="brand-caption">LIBRARY EXPLORER</span>
+            <span class="brand-caption">{t("LIBRARY EXPLORER")}</span>
           </a>
-          <nav class="tabs" aria-label="Hauptmenü">
+          <nav class="tabs" aria-label={t("Main navigation")}>
             <button
               class={view === "statistics" ? "active" : ""}
-              onClick={() => setView("statistics")}
+              onClick={() => {
+                closeDashboardFilter();
+                setView("statistics");
+              }}
             >
-              <BarChart3 size={17} /> Dashboard
+              <BarChart3 size={17} />
+              {t("Dashboard")}
             </button>
 
             <button
               class={view === "library" && service === "radarr" ? "active" : ""}
               onClick={() => {
+                closeDashboardFilter();
                 setView("library");
                 if (service === "radarr") return;
                 setService("radarr");
@@ -359,11 +407,12 @@ export function Library({
                 setResults(emptyResults);
               }}
             >
-              <Film size={17} /> Radarr <span>Filme</span>
+              <Film size={17} /> Radarr <span>{t("Movies")}</span>
             </button>
             <button
               class={view === "library" && service === "sonarr" ? "active" : ""}
               onClick={() => {
+                closeDashboardFilter();
                 setView("library");
                 if (service === "sonarr") return;
                 setService("sonarr");
@@ -371,30 +420,32 @@ export function Library({
                 setResults(emptyResults);
               }}
             >
-              <Tv size={17} /> Sonarr <span>Serien</span>
+              <Tv size={17} /> Sonarr <span>{t("TV series")}</span>
             </button>
           </nav>
           <div class="header-actions">
+            <span class="app-version">v{status.version}</span>
             <span class="local-status">
-              <i /> Lokal verbunden
+              <i />
+              {t("Connected locally")}
             </span>
             <button
               class="icon-button"
-              aria-label={theme === "dark" ? "Helles Design" : "Dunkles Design"}
+              aria-label={theme === "dark" ? t("Light theme") : t("Dark theme")}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
               class="icon-button"
-              aria-label="Einstellungen"
+              aria-label={t("Settings")}
               onClick={() => setSettingsOpen(true)}
             >
               <SettingsIcon size={18} />
             </button>
             <button
               class="icon-button"
-              aria-label="Abmelden"
+              aria-label={t("Sign out")}
               onClick={async () => {
                 await api("logout", "POST");
                 await refresh();
@@ -407,22 +458,24 @@ export function Library({
         {status.demo && (
           <div class="demo-bar">
             <span>
-              <Info size={14} /> Demo · Beispieldaten, keine Verbindung zu
-              deinen Diensten
+              <Info size={14} />
+              {t("Demo · sample data, no connection to your services")}
             </span>
             <span>ArrScope {status.version}</span>
           </div>
         )}
         <main class="main">
           {view === "statistics" ? (
-            <StatisticsPage status={status} />
+            <StatisticsPage status={status} onFilter={openDashboardFilter} />
           ) : (
             <>
               <section class="library-intro">
                 <h1>
-                  {service === "radarr" ? "Filmbibliothek" : "Serienbibliothek"}
+                  {service === "radarr" ? t("Movie library") : t("TV library")}
                 </h1>
-                <span>{count(sync?.count || 0)} Dateien im Cache</span>
+                <span>
+                  {count(sync?.count || 0)} {t("files in cache")}
+                </span>
               </section>
               {error && (
                 <div class="notice error" role="alert">
@@ -430,7 +483,7 @@ export function Library({
                   {error}
                   <button
                     class="icon-button"
-                    aria-label="Fehlermeldung schließen"
+                    aria-label={t("Dismiss error")}
                     onClick={() => setError("")}
                   >
                     <X size={16} />
@@ -443,7 +496,7 @@ export function Library({
                   {notice}
                   <button
                     class="icon-button"
-                    aria-label="Meldung schließen"
+                    aria-label={t("Dismiss notification")}
                     onClick={() => setNotice("")}
                   >
                     <X size={16} />
@@ -455,17 +508,47 @@ export function Library({
                   <Database size={24} />
                   <div>
                     <b>
-                      Verbinde deine{" "}
-                      {service === "radarr" ? "Film-" : "Serien-"}
-                      Bibliothek.
+                      {t(
+                        service === "radarr"
+                          ? "Connect your movie library."
+                          : "Connect your TV library.",
+                      )}
                     </b>
                     <p>
-                      Adresse und API-Key genügen. ArrScope liest ausschließlich
-                      vorhandene Daten.
+                      {t(
+                        "An address and API key are enough. ArrScope only reads existing data.",
+                      )}
                     </p>
                   </div>
                   <button class="primary" onClick={() => setSettingsOpen(true)}>
-                    Dienst einrichten <ArrowUpRight size={16} />
+                    {t("Set up service")}
+                    <ArrowUpRight size={16} />
+                  </button>
+                </div>
+              )}
+              {dashboardFilter && (
+                <div class="dashboard-filter-notice" role="status">
+                  <span>
+                    {t("Temporary dashboard filter")}:{" "}
+                    {labels[dashboardFilter.field]} ·{" "}
+                    {dashboardFilter.value || t("Unknown")}
+                  </span>
+                  {dashboardFilter.scope === "all" && (
+                    <select
+                      aria-label={t("Library for dashboard filter")}
+                      value={service}
+                      onChange={(event) => {
+                        setService(event.currentTarget.value as Service);
+                        setPage(1);
+                        setResults(emptyResults);
+                      }}
+                    >
+                      <option value="radarr">{t("Movies")}</option>
+                      <option value="sonarr">{t("TV series")}</option>
+                    </select>
+                  )}
+                  <button class="text-button" onClick={closeDashboardFilter}>
+                    {t("Return to previous filters")}
                   </button>
                 </div>
               )}
@@ -488,16 +571,20 @@ export function Library({
                 <div class="results-heading">
                   <div>
                     <h2>
-                      Deine {service === "radarr" ? "Filme" : "Serien"}{" "}
+                      {t(
+                        service === "radarr" ? "Your movies" : "Your TV series",
+                      )}{" "}
                       <span>{count(results.total)}</span>
                       {busy && <LoaderCircle size={16} class="spin" />}
                     </h2>
                     <p>
                       {active.length
-                        ? "Passende Dateien für deine Filter"
-                        : "Der vollständige Bestand deiner Bibliothek"}
+                        ? t("Files matching your filters")
+                        : t("Your complete library")}
                       {results.displayTotal > results.total &&
-                        ` · ${count(results.displayTotal - results.total)} weitere Dateien als Staffelkontext`}
+                        t(" · {count} additional files as season context", {
+                          count: count(results.displayTotal - results.total),
+                        })}
                     </p>
                   </div>
                   <div class="results-tools">
@@ -510,8 +597,8 @@ export function Library({
                       }
                       title={
                         showAllColumns[service]
-                          ? "Zur gespeicherten Spaltenauswahl zurückkehren"
-                          : "Ausgeblendete Spalten in der gespeicherten Reihenfolge anzeigen"
+                          ? t("Return to saved columns")
+                          : t("Show hidden columns in the saved order")
                       }
                       onClick={() =>
                         setShowAllColumns({
@@ -522,11 +609,12 @@ export function Library({
                     >
                       <Columns3 size={15} />{" "}
                       {showAllColumns[service]
-                        ? "Standardansicht"
-                        : "Alle Spalten"}
+                        ? t("Default view")
+                        : t("All columns")}
                     </button>
                     <a class="button" href={"/api/export?" + exportQuery}>
-                      <Download size={15} /> CSV exportieren
+                      <Download size={15} />
+                      {t("Export CSV")}
                     </a>
                   </div>
                 </div>
@@ -542,8 +630,8 @@ export function Library({
                             field,
                             field === "title"
                               ? service === "radarr"
-                                ? "Titel"
-                                : "Episode"
+                                ? t("Title")
+                                : t("Episode")
                               : columnLabels[field],
                             field === "title",
                           ),
@@ -572,9 +660,10 @@ export function Library({
                                 <b>{f.title}</b>
                                 <button
                                   class="file-button"
-                                  aria-label={
-                                    "Dateiname und Metadaten: " + f.title
-                                  }
+                                  aria-label={t(
+                                    "Filename and metadata: {title}",
+                                    { title: f.title },
+                                  )}
                                   aria-describedby={"filename-" + f.id}
                                   onClick={() => setFilename(f)}
                                 >
@@ -590,8 +679,8 @@ export function Library({
                                 {f.conflict && (
                                   <button
                                     class="conflict-button"
-                                    title="Dateiname und API widersprechen sich"
-                                    aria-label="Widersprüchliche Metadaten anzeigen"
+                                    title={t("Filename and API disagree")}
+                                    aria-label={t("Show conflicting metadata")}
                                     onClick={() => setFilename(f)}
                                   >
                                     <AlertTriangle size={14} />
@@ -605,7 +694,7 @@ export function Library({
                               )}
                               {!f.matched && (
                                 <small class="context-label">
-                                  Staffelkontext · kein Filtertreffer
+                                  {t("Season context · not a filter match")}
                                 </small>
                               )}
                             </td>
@@ -682,26 +771,29 @@ export function Library({
                                   <div class="track-language-list">
                                     {f.audioTracks.map((track) => (
                                       <div key={track.index}>
-                                        <span>
-                                          {track.language || "Unbekannt"}
-                                        </span>
+                                        <LanguageFlag value={track.language} />
                                         <Tag value={track.codec} kind="audio" />
                                       </div>
                                     ))}
                                   </div>
                                 ) : (
-                                  <span>{f.language || "—"}</span>
+                                  <LanguageFlags value={f.language} />
                                 )}
                                 {(f.language || f.audio) && (
                                   <button
                                     class="icon-button"
-                                    aria-label={
-                                      "Tonspurinformationen: " + f.title
-                                    }
+                                    aria-label={t(
+                                      "Audio track information: {title}",
+                                      { title: f.title },
+                                    )}
                                     title={
                                       f.audioTracks?.length
-                                        ? "Tonspuren aus Emby. Dateidetails öffnen."
-                                        : "Zuordnung Sprache → Codec nicht verfügbar. Dateidetails öffnen."
+                                        ? t(
+                                            "Audio tracks from Emby. Open file details.",
+                                          )
+                                        : t(
+                                            "Language → codec mapping unavailable. Open file details.",
+                                          )
                                     }
                                     onClick={() => setFilename(f)}
                                   >
@@ -721,14 +813,18 @@ export function Library({
                                   <strong>
                                     {f.series} <span>—</span>{" "}
                                     {f.season === 0
-                                      ? "Specials"
-                                      : "Season " +
-                                        String(f.season).padStart(2, "0")}
+                                      ? t("Specials")
+                                      : t("Season {number}", {
+                                          number: String(f.season).padStart(
+                                            2,
+                                            "0",
+                                          ),
+                                        })}
                                   </strong>
                                   <span class="season-note">
                                     {settings?.seasonMode === "season"
-                                      ? "Staffelkontext aktiviert"
-                                      : "Passende Dateien"}
+                                      ? t("Season context enabled")
+                                      : t("Matching files")}
                                   </span>
                                 </td>
                               </tr>
@@ -749,13 +845,13 @@ export function Library({
                       <Search size={32} />
                       <h3>
                         {active.length
-                          ? "Keine passenden Dateien."
-                          : "Hier entsteht dein Überblick."}
+                          ? t("No matching files.")
+                          : t("Your overview starts here.")}
                       </h3>
                       <p>
                         {active.length
-                          ? "Passe deine Filter an oder setze sie zurück."
-                          : "Verbinde einen Dienst und starte den ersten Sync."}
+                          ? t("Adjust or reset your filters.")
+                          : t("Connect a service and start the first sync.")}
                       </p>
                       <button
                         class="button"
@@ -764,8 +860,8 @@ export function Library({
                         }
                       >
                         {active.length
-                          ? "Filter zurücksetzen"
-                          : "Einstellungen öffnen"}
+                          ? t("Reset filters")
+                          : t("Open settings")}
                       </button>
                     </div>
                   )}
@@ -773,25 +869,27 @@ export function Library({
                 <div class="pagination">
                   <span>
                     {results.displayTotal
-                      ? `${count((page - 1) * 100 + 1)}–${count(Math.min(page * 100, results.displayTotal))} von ${count(results.displayTotal)} Dateien`
-                      : "0 Dateien"}
-                    {service === "sonarr" && " · nach Serie und Staffel"}
+                      ? t("{from}–{to} of {total} files", {
+                          from: count((page - 1) * 100 + 1),
+                          to: count(Math.min(page * 100, results.displayTotal)),
+                          total: count(results.displayTotal),
+                        })
+                      : t("0 files")}
+                    {service === "sonarr" && t(" · by series and season")}
                   </span>
                   <div>
                     <button
                       class="icon-button"
-                      aria-label="Vorherige Seite"
+                      aria-label={t("Previous page")}
                       disabled={page <= 1}
                       onClick={() => setPage(page - 1)}
                     >
                       <ArrowLeft size={16} />
                     </button>
-                    <span>
-                      Seite {page} / {pages}
-                    </span>
+                    <span>{t("Page {page} / {pages}", { page, pages })}</span>
                     <button
                       class="icon-button"
-                      aria-label="Nächste Seite"
+                      aria-label={t("Next page")}
                       disabled={page >= pages}
                       onClick={() => setPage(page + 1)}
                     >
@@ -811,14 +909,18 @@ export function Library({
                   <span>
                     {sync?.running
                       ? sync.queued
-                        ? "Sync wartet auf freien Platz …"
-                        : "Synchronisierung läuft …"
+                        ? t("Sync waiting for a slot …")
+                        : t("Sync in progress …")
                       : sync?.error
-                        ? "Sync fehlgeschlagen · " + sync.error
-                        : "Letzter Sync: " + date(sync?.lastSuccess)}
+                        ? t("Sync failed · {error}", { error: t(sync.error) })
+                        : t("Last sync: {date}", {
+                            date: date(sync?.lastSuccess),
+                          })}
                   </span>
                   {sync?.error && sync.lastSuccess && (
-                    <span>Cache: {date(sync.lastSuccess)}</span>
+                    <span>
+                      {t("Cache: {date}", { date: date(sync.lastSuccess) })}
+                    </span>
                   )}
                   <button
                     class="text-button"
@@ -826,12 +928,13 @@ export function Library({
                     onClick={runSync}
                   >
                     <RefreshCw size={13} class={sync?.running ? "spin" : ""} />{" "}
-                    Jetzt synchronisieren
+                    {t("Sync now")}
                   </button>
                 </div>
                 <span>
-                  <ShieldCheck size={13} /> Nur vorhandene Daten <i /> ArrScope{" "}
-                  {status.version}
+                  <ShieldCheck size={13} />
+                  {t("Existing data only")}
+                  <i /> ArrScope {status.version}
                 </span>
               </footer>
             </>
@@ -848,33 +951,37 @@ export function Library({
             saved={async () => {
               await loadSettings();
               await refresh();
-              setNotice("Einstellungen gespeichert.");
+              setNotice(t("Settings saved."));
             }}
           />
         )}
         {savePreset && (
           <Modal
-            title="Filteransicht speichern"
+            title={t("Save filter view")}
             close={() => setSavePreset(false)}
           >
             <form onSubmit={doSavePreset}>
               <p class="quiet">
-                Speichert die aktuelle Filterkombination für{" "}
-                {service === "radarr" ? "Filme" : "Serien"}.
+                {t(
+                  service === "radarr"
+                    ? "Save the current filter combination for movies."
+                    : "Save the current filter combination for TV series.",
+                )}
               </p>
               <label>
-                Name
+                {t("Name")}
                 <input
                   autoFocus
                   maxLength={80}
                   required
                   value={presetName}
-                  placeholder="Zum Beispiel: 1080p · x264"
+                  placeholder={t("For example: 1080p · x264")}
                   onInput={(e) => setPresetName(e.currentTarget.value)}
                 />
               </label>
               <button class="primary">
-                <Bookmark size={16} /> Ansicht speichern
+                <Bookmark size={16} />
+                {t("Save view")}
               </button>
             </form>
           </Modal>

@@ -1,3 +1,4 @@
+import { LanguageSelect, t, useI18n } from "../i18n";
 import { ArrowUpRight, LoaderCircle, ShieldCheck } from "lucide-preact";
 import { useState } from "preact/hooks";
 import type { Status } from "../types";
@@ -10,6 +11,7 @@ export function Login({
   status: Status;
   done: () => Promise<void>;
 }) {
+  useI18n();
   const [user, setUser] = useState(status.demo ? "demo" : ""),
     [password, setPassword] = useState(status.demo ? "ArrScope-demo-2026" : ""),
     [token, setToken] = useState(""),
@@ -36,25 +38,27 @@ export function Login({
     <main class="login-page">
       <div class="login-art">
         <div class="login-orbit" />
-        <img src="/icon-1024.png" alt="ArrScope Icon" />
+        <img src="/icon-1024.png" alt={t("ArrScope icon")} />
         <div>
-          <span class="eyebrow">DEINE BIBLIOTHEK. KLAR GEFILTERT.</span>
+          <span class="eyebrow">{t("YOUR LIBRARY. CLEARLY FILTERED.")}</span>
           <h1>
-            Die Details machen
+            {t("The details make")}
             <br />
-            den Unterschied.
+            {t("the difference.")}
           </h1>
           <p>
-            Filme und Serien aus Radarr und Sonarr.
+            {t("Movies and series from Radarr and Sonarr.")}
             <br />
-            Alle Eigenschaften. Ein klarer Überblick.
+            {t("Every attribute. One clear overview.")}
           </p>
         </div>
         <span class="login-foot">
-          <ShieldCheck size={16} /> Lokal gespeichert · Ohne Medien-Scans
+          <ShieldCheck size={16} />
+          {t("Stored locally · No media scans")}
         </span>
       </div>
       <div class="login-form">
+        <LanguageSelect />
         <div class="brand">
           <img
             src="/icon-64.png"
@@ -69,23 +73,23 @@ export function Login({
         </div>
         <h2>
           {status.initialized
-            ? "Willkommen zurück."
-            : "Deine Bibliothek beginnt hier."}
+            ? t("Welcome back.")
+            : t("Your library starts here.")}
         </h2>
         <p>
           {status.initialized
-            ? "Melde dich an, um deine Bibliothek zu entdecken."
-            : "Erstelle dein lokales Admin-Konto. Danach verbindest du deine Dienste."}
+            ? t("Sign in to explore your library.")
+            : t("Create your local admin account, then connect your services.")}
         </p>
         {status.demo && (
           <div class="notice">
-            Interaktive Demo mit Beispieldaten. Zugang ist vorausgefüllt.
+            {t("Interactive demo with sample data. Credentials are prefilled.")}
           </div>
         )}
         <form onSubmit={submit}>
           {!status.initialized && (
             <label>
-              Einrichtungscode
+              {t("Setup code")}
               <input
                 value={token}
                 onInput={(e) => setToken(e.currentTarget.value)}
@@ -93,13 +97,14 @@ export function Login({
                 autoComplete="off"
               />
               <small>
-                Einmalig aus <code>/data/setup-token</code> in der
-                Container-Konsole kopieren.
+                {t(
+                  "Copy the one-time code from /data/setup-token in the container console.",
+                )}
               </small>
             </label>
           )}
           <label>
-            Benutzername
+            {t("Username")}
             <input
               value={user}
               onInput={(e) => setUser(e.currentTarget.value)}
@@ -108,7 +113,7 @@ export function Login({
             />
           </label>
           <label>
-            Passwort
+            {t("Password")}
             <input
               type="password"
               value={password}
@@ -120,7 +125,9 @@ export function Login({
               required
             />
             {!status.initialized && (
-              <small>Mindestens 12 Zeichen, maximal 72 UTF-8-Bytes.</small>
+              <small>
+                {t("At least 12 characters, at most 72 UTF-8 bytes.")}
+              </small>
             )}
           </label>
           {error && (
@@ -134,11 +141,12 @@ export function Login({
             ) : (
               <ArrowUpRight size={18} />
             )}{" "}
-            {status.initialized ? "Anmelden" : "Konto erstellen"}
+            {status.initialized ? t("Sign in") : t("Create account")}
           </button>
         </form>
         <div class="quiet login-version">
-          ArrScope {status.version} · Für deinen eigenen Server
+          ArrScope {status.version}
+          {t("· For your own server")}
         </div>
       </div>
     </main>

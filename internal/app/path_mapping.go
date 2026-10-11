@@ -13,7 +13,7 @@ func cleanMediaPath(value string) string {
 }
 func parsePathMappings(value string) ([]pathMapping, error) {
 	if len(value) > 8192 {
-		return nil, fmt.Errorf("Zu viele Pfadzuordnungen")
+		return nil, fmt.Errorf("Too many path mappings")
 	}
 	out := []pathMapping{}
 	seen := map[string]bool{}
@@ -25,7 +25,7 @@ func parsePathMappings(value string) ([]pathMapping, error) {
 		left, right = cleanMediaPath(left), cleanMediaPath(right)
 		absolute := func(v string) bool { return strings.HasPrefix(v, "/") || (len(v) > 2 && v[1] == ':' && v[2] == '/') }
 		if !ok || left == "" || right == "" || !absolute(left) || !absolute(right) || seen[left] || strings.ContainsAny(left+right, "\r\x00") || strings.Contains(right, "=>") {
-			return nil, fmt.Errorf("Pfadzuordnung benötigt eindeutige absolute Pfade: Arr-Pfad => Emby-Pfad")
+			return nil, fmt.Errorf("Path mappings require unique absolute paths: Arr path => Emby path")
 		}
 		seen[left] = true
 		out = append(out, pathMapping{left, right})

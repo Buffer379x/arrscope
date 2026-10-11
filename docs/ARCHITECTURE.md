@@ -1,91 +1,68 @@
-# Architektur und HTTP-API
+# Architecture and HTTP API
 
-Go bedient die eingebettete Preact-Oberfläche und die JSON-API. SQLite über `modernc.org/sqlite` benötigt kein CGO. `/data` ist die einzige persistente Abbildung. Frontend und Backend laufen unter derselben Origin; keine externen Schriften, Telemetrie oder CDN-Abhängigkeiten.
+Go serves embedded Preact/TypeScript assets and JSON endpoints from one origin. SQLite via `modernc.org/sqlite` requires no CGO. `/data` is the only persistent mount. No external fonts, telemetry, CDN assets, media mounts or separate database server are required.
 
-## Datenmodell
+## Storage and metadata
 
-`files` enthält Dienst-/Datei-ID, Medien-ID, Serien-/Staffelzuordnung, normalisierte Filterspalten und den vollständigen Dateieintrag als JSON. `years` ermöglicht mehrere Episodenjahre pro Datei. `search` ist ein FTS5-Index mit Titel, Serientitel und Dateiname. `kv` enthält Einstellungen, Konto und Sync-Status; `presets` und `sessions` sind eigenständige Tabellen. Schemaversionen werden über `PRAGMA user_version` geführt. Vor bestehenden Migrationen entsteht eine konsistente Sicherung, neuere unbekannte Versionen werden abgewiesen.
+`files` stores service/file IDs, media ID, series/season associations, indexed normalized fields and the full file record as JSON. `years` supports multiple episode years. FTS5 `search` indexes title, series and filename. `kv` holds settings, account and sync status; `presets` and `sessions` are separate tables. `PRAGMA user_version` tracks schema changes; backups precede existing-database migrations and unknown future schemas are rejected.
 
-Für jedes angezeigte Merkmal enthält `evidence` unabhängig normalisierte Dateiname-, Arr-API- und optionale Emby-Werte, verwendete Herkunft (`filename`, `api`, `emby`, `combined`, `unknown`) und Konflikt. Der vollständige ursprüngliche Dateiname bleibt erhalten. Filmjahr und Titel stammen aus Radarr; Episodentitel, Staffel und Erstausstrahlungsjahre aus Sonarr. Nicht jede ursprüngliche API-Antwort wird vollständig archiviert.
+Each attribute’s `evidence` retains normalized filename, Arr API and optional Emby values, selected origin (`filename`, `api`, `emby`, `combined`, `unknown`) and conflict. Original filenames are preserved; not every raw upstream response is archived. Titles/years come from Radarr; episode names, seasons and first-air years from Sonarr. Existing quality and MediaInfo attributes supplement filename tokens; ArrScope never invokes media analysis. Pixel dimensions alone do not establish a quality class.
 
-Die Qualität des Dienstes ergänzt Auflösung und Quelle. `mediaInfo` ergänzt bestehende Video-/Audioangaben. Pixelabmessungen alleine ersetzen keine Qualitätsklasse; ohne passenden Qualitätswert oder ausdrücklichen Auflösungstoken bleibt die Klasse unbekannt. Die API liefert ihre vorhandenen MediaInfo-Daten; ArrScope ruft keine MediaInfo-Analyse auf. [Radarr-Ressource](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/MovieFiles/MediaInfoResource.cs), [Sonarr-Ressource](https://github.com/Sonarr/Sonarr/blob/develop/src/Sonarr.Api.V3/EpisodeFiles/MediaInfoResource.cs).
+Audio, language and HDR attributes are component sets. Codec aliases share a family without collapsing explicit encoder distinctions. Additional explicitly reported languages enrich filename languages without inventing a per-track codec. Unknown track attributes set `unknownTraits`; `metadataIncomplete` considers resolution, codec, source, audio, language and failed configured Emby matching. Missing HDR alone may mean SDR or unknown and does not make metadata incomplete. Negative filters describe missing **reported** attributes, not proven absence.
 
-Explizite Sprachen werden als getrennte Filterwerte angeboten. Eine Datei mit Deutsch und Englisch passt auf beide Sprachfilter. Kombinierte HDR-Angaben können über ihre Komponenten wie Dolby Vision gefiltert werden. `x264` und `AVC` gehören zur selben Familie, ein Unterschied zwischen diesen beiden allein wird nicht als Widerspruch angezeigt.
+## Sync
 
-## Synchronisation
+Radarr loads the movie catalog, then movie files in batches of 100 movie IDs. Sonarr loads the series catalog, then episodes/files per series with at most two concurrent GET requests; series are processed sequentially. One global queue builds one service snapshot at a time. Each HTTP request has a 20-second timeout and up to three attempts for network/5xx errors. Redirects are rejected to prevent key forwarding.
 
-Radarr-Katalogabfrage, danach Dateiabfragen in 100er-Blöcken über Film-IDs. Sonarr-Katalog, anschließend Episoden und Episodendateien je Serie. Eine Mehrfachepisodendatei wird über ihre Datei-ID einmal dargestellt. Eine globale Warteschlange verarbeitet höchstens einen Dienst-Snapshot gleichzeitig. Sonarr lädt Episoden und Dateien einer Serie mit höchstens zwei parallelen GET-Anfragen; Serien werden nacheinander verarbeitet. Der Status unterscheidet `running` und `queued`; wartende und laufende Aufträge sind abbrechbar. Zeitlimit je Anfrage: 20 Sekunden, höchstens drei Versuche bei Netzwerk-/5xx-Fehlern. Redirects werden abgewiesen, damit Keys nicht an andere Ziele weitergegeben werden.
+Data is gathered in memory, validated and committed only after a complete successful fetch. A transaction replaces the service files, search index and year mappings atomically. WAL readers observe a complete state; pagination counts and rows share one read transaction. Settings/dispatch are locked together; changed configuration cancels old generations and prevents stale commits. A multi-request upstream catalog is not a transactional snapshot, so detected identity inconsistencies fail and retain the previous cache.
 
-Neue Dienst-Daten werden im Arbeitsspeicher gesammelt. Erst nach vollständig erfolgreichem Abruf ersetzt eine SQLite-Transaktion den Dienst-Cache, Suchindex und Jahreszuordnungen. Andere Leser sehen über WAL einen vollständigen Stand. Die paginierte Abfrage hält Zähler und Daten in einer gemeinsamen Lesetransaktion. Einstellungen und Sync-Dispatch sind zusammen gesperrt, damit veraltete Konfigurationen keine neuen Aufträge starten. Alte Aufträge werden bei Änderungen abgebrochen und durch Generationen vom Commit ausgeschlossen.
+Facet and dashboard caches are defensively copied immutable snapshots, invalidated after successful commits. Queries carry cancellation contexts to SQLite. Frontend request generations and abort controllers reject stale results. Polling pauses in hidden tabs; intervals are 3 seconds during sync, 30 seconds when idle/authenticated and 60 seconds on login.
 
-Es gibt keine Garantie eines gemeinsamen Snapshots über alle HTTP-Aufrufe des upstream Dienstes. Aus der API erkannte Zuordnungsfehler erhalten den bisherigen Stand; Dateien ohne bekannte Episodenzuordnung zeigen ihren Dateinamen und unbekanntes Jahr.
+## Endpoints
 
-## Interne Endpunkte
-
-| Methode / Pfad | Funktion |
+| Method/path | Purpose |
 | --- | --- |
-| GET `/healthz` | Prozesszustand und Version, ohne Anmeldung |
-| GET `/api/status` | Einrichtung / Anmeldung; angemeldet zusätzlich CSRF und Sync-Status |
-| POST `/api/setup` | Einmaliges Konto mit Einrichtungscode |
-| POST `/api/login`, `/api/logout` | Sitzung erstellen / beenden |
-| GET / PUT `/api/settings` | Maskierte Einstellungen / verschlüsselt speichern |
-| POST `/api/test` | Verbindungstest über lesenden Systemstatus |
-| POST `/api/sync` | Asynchroner Auftrag für `service` |
-| GET `/api/files` | Trefferseite / Staffelkontext |
-| GET `/api/statistics` | Bestandszahlen und Merkmalsverteilungen aus einem Cache-Snapshot |
-| GET `/api/facets` | Verfügbare Merkmalswerte je Dienst |
-| GET / POST / DELETE `/api/presets` | Presets lesen / speichern / per ID löschen |
-| GET `/api/export` | Alle tatsächlichen Treffer als CSV |
-| PUT `/api/password` | Passwort ändern, Sitzungen beenden |
-| POST `/api/backup` | Konsistente lokale Datenbanksicherung |
+| GET `/healthz` | Public process health and version |
+| GET `/api/status` | Setup/auth state; authenticated CSRF and sync status |
+| POST `/api/setup` | One-time admin setup with token |
+| POST `/api/login`, `/api/logout` | Create/revoke session |
+| GET/PUT `/api/settings` | Masked settings / encrypted persistence |
+| POST `/api/test` | Read-only upstream system-status test |
+| POST `/api/sync` | Queue asynchronous service sync |
+| GET `/api/files` | Paginated matches/season context |
+| GET `/api/statistics` | Counts/distributions from one cached snapshot |
+| GET `/api/facets` | Available values in the entire service cache |
+| GET/POST/DELETE `/api/presets` | Read/create/delete named presets |
+| GET `/api/export` | Complete CSV of actual matches |
+| PUT `/api/password` | Change password and revoke sessions |
+| POST `/api/backup` | Consistent local database snapshot |
 
-Außer Einrichtung, Login und öffentlichem Status benötigen APIs eine Sitzung. Mutationen benötigen `X-CSRF-Token`; fremde Origin-Header werden abgewiesen. Cookies: HttpOnly, SameSite Strict, 24 Stunden, bei TLS/HTTPS-Konfiguration Secure. API-Key-Antworten sind immer leer, `hasKey` zeigt nur das Vorhandensein an. Fehler geben keine upstream Antworttexte oder Keys aus.
+Except public status, health, setup and login, endpoints require a session. Mutations require `X-CSRF-Token`; foreign Origin headers are rejected. Cookies are HttpOnly, SameSite Strict, valid for 24 hours, and Secure when TLS/HTTPS is configured. API-key response fields stay empty; only `hasKey` indicates presence. Upstream bodies and keys are never exposed in errors. Password writes and session invalidation are transactional; session creation verifies the authenticated password hash again to prevent delayed old-password sessions after a concurrent reset.
 
-`files` und `export` teilen dieselbe Filterfunktion: `service=radarr|sonarr`, `q`, `yearMin`, `yearMax`, `resolution`, `codec`, `family`, `source`, `processing`, `hdr`, `bitDepth`, `audio`, `channels`, `language`, `sizeMin`, `sizeMax`, `unknownYear=true`, `unknownSize=true`, `conflict=true|false`, `metadata=complete|incomplete`. Mehrfache Parameter eines Merkmals sind ODER, andere Merkmale UND. Für jedes Merkmal ist `<field>Op=eq|not` erlaubt, beispielsweise `sourceOp=not&source=BluRay&source=WEB-DL`. Ohne Operator gilt `eq`. `not` negiert die gesamte Wertemenge, sodass keiner der ausgewählten Werte vorkommen darf. Unbekannte Werte sind intern leere Zeichenfolgen und bleiben erhalten, solange `__unknown__` nicht Teil des Ausschlusses ist. Sprache/HDR/Audio verwenden Komponentenbedingungen. Zusätzlich ist für diese drei Felder `all|notAll` erlaubt: `all` verbindet gewählte Komponenten mit AND, `notAll` negiert diese vollständige AND-Bedingung. Die Bedingungen enthalten ausschließlich parametrische Werte. Für ein einzelwertiges Feld werden diese zwei Operatoren abgewiesen. Ungültige oder mehrfach angegebene Operatoren werden abgewiesen. Ein Operator ohne Werte hat keine Filterwirkung. Leere Werte sind über `__unknown__` wählbar. Größe wird in Bytes übergeben, die Oberfläche verwendet GiB.
+## Queries and CSV
 
-Für `files`: `page` ab 1, feste Seitengröße 100; `mode=matches|season` überschreibt die gespeicherte Ansicht. `total` zählt echte Treffer, `displayTotal` zusätzlich sichtbaren Staffelkontext, `matched` markiert echte Treffer. Sonarr sortiert nach Serie, Staffel und Episodennummer. Radarr erlaubt `sort=title|year|resolution|codec|source|size|hdr|bitDepth|audio|channels|language` und `dir=asc|desc`. Standard: Titel aufsteigend; unbekannte Werte bleiben in beiden Richtungen am Ende. Auflösungen, Bit-Tiefe, Kanäle und Größe werden numerisch geordnet. Die Oberfläche speichert Spalte und Richtung im lokalen Browser unabhängig von Filter-Presets. CSV nutzt UTF-8 BOM und Semikolon, verhindert Formelausführung über Präfixe und enthält keine zusätzlichen Kontextdateien.
+Files/export share parameterized filtering: `service=radarr|sonarr`, `q`, `yearMin`, `yearMax`, `resolution`, `codec`, `family`, `source`, `processing`, `hdr`, `bitDepth`, `audio`, `channels`, `language`, `sizeMin`, `sizeMax`, `unknownYear=true`, `unknownSize=true`, `conflict=true|false`, `metadata=complete|incomplete`.
 
-Textsuche nutzt bereinigte UND-Prefixbegriffe, keine beliebige Teilzeichenfolgensuche und keine Nutzer-FTS-Syntax. Die SQLite-Filter sind parametrisiert; Sortierspalten stammen aus einer festen Liste. Facets beziehen sich auf den gesamten Dienst-Cache, nicht auf den aktuellen Filter.
+Multiple values of an ordinary field use OR; different fields use AND. `<field>Op=eq|not` includes or negates the entire selected set. Audio/HDR/language also allow `all|notAll`, combining component conditions with AND or negating that complete combination. Invalid, repeated or inappropriate operators are rejected; an operator without values has no effect. `__unknown__` selects empty or partially unknown audio/language attributes. Sizes are bytes, displayed as GiB. FTS search uses sanitized AND-prefix terms, not arbitrary substrings or user FTS syntax.
 
-## Quellen
+Files use `page>=1`, 100 rows per page and optional `mode=matches|season`. `total` counts actual matches, `displayTotal` includes context and `matched` identifies real matches. Series sort by title, season and episode. Movie sort allowlist: title/year/resolution/codec/source/size/hdr/bitDepth/audio/channels/language, with `dir=asc|desc`. Default: title ascending. Numeric attributes sort numerically; unknowns stay last.
 
-Lesende Datei-Endpunkte: [Radarr MovieFileController](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/MovieFiles/MovieFileController.cs), [Sonarr EpisodeFileController](https://github.com/Sonarr/Sonarr/blob/develop/src/Sonarr.Api.V3/EpisodeFiles/EpisodeFileController.cs). [FTS5](https://www.sqlite.org/fts5.html) und [WAL / lokale Dateisysteme](https://www.sqlite.org/wal.html).
+CSV applies the same filters/sort, UTF-8 BOM, semicolon separator and spreadsheet-formula safeguards. A protected temporary Appdata file completes before download; SQL/JSON/write errors fail rather than deliver a partial success. Cancellation/success removes temporary files. Context-only rows are excluded. Headers use `Accept-Language` or `lang`; media values stay canonical.
 
-## Statistiken
+## Emby
 
-`GET /api/statistics` zählt eindeutige Film- und Serien-IDs mit vorhandenen Cache-Dateien. Episoden werden über Serie, Staffel und Episodennummer dedupliziert, einschließlich Specials. Jede Episode einer Mehrfachepisodendatei zählt einzeln. Die Verteilungen zählen Dateien nach Auflösung, Codec und Source (Verarbeitungsart wie Remux bleibt davon getrennt), jeweils für Gesamtbestand, Radarr und Sonarr. Unbekannte Werte sind enthalten. Die Aggregation läuft vollständig in SQLite innerhalb einer Lesetransaktion; Listenfilter werden nicht übernommen und keine Dienste abgefragt. Die Statistik aktualisiert sich nach erfolgreichem Sync.
+Emby config has enable/URL/encrypted key and `interval=0`; it joins each Arr service sync. The client permits only GET `System/Info` and paginated `Items` using `X-Emby-Token`, 250 items per page. Subpaths are supported. Totals, page completeness and duplicate IDs are validated; only relevant candidates stay in memory.
 
-## Darstellungseinstellungen
+Identity requires a unique exact basename and positive byte size on both sides. Multiple versions use the matching MediaSource. Item-level streams belong only to the exact matching source path. Optional absolute prefix mappings require the full mapped path too; longest Arr prefix wins. Unmatched/ambiguous identities remain explicit. Metadata paths are never opened and Arr source paths are not returned to browsers.
 
-`settings.visibleColumns` speichert je Dienst (`radarr`, `sonarr`) eine Liste sichtbarer Spalten in `kv`. Fehlende Einstellungen älterer Installationen erhalten die fünf ursprünglichen Spalten. Titel/Episode ist verpflichtend; unbekannte Dienste, doppelte oder unbekannte Spalten werden beim Speichern abgewiesen. `settings.columnOrder` speichert unabhängig von der Sichtbarkeit die vollständige Reihenfolge aller elf Spalten je Dienst. Fehlende Einstellungen erhalten die bisherige Reihenfolge; unvollständige Listen, Duplikate und unbekannte Spalten oder Dienste werden abgewiesen. Tabellenkopf und Zellen werden aus derselben geordneten Liste aufgebaut. Der temporäre Schalter „Alle Spalten“ filtert diese Liste nicht nach Sichtbarkeit und verändert die gespeicherten Defaults nicht. Seriengruppen verwenden die tatsächliche sichtbare Spaltenzahl. Filter, Sortierung und CSV bleiben unabhängig von der Sichtbarkeit.
+Only internal audio streams count: index, explicitly reported language, codec/profile, channels/layout, title and default flag. Languages are never inferred from track titles. Unique Emby tracks provide audio/language sets; if all values of an attribute are unknown, existing filename/Arr data remains without assigning it to tracks. The main Channels column retains filename/Arr data; details show each track. Explicit Emby video HDR supplements reported tags; profile numbers never imply an invented HDR10 fallback. Emby failures abort the enriched service snapshot.
 
-Die Oberfläche öffnet nach dem Login das Dashboard. Der Filterblock besitzt nur die Zustände vollständig sichtbar und minimiert; im minimierten Zustand bleiben Presets und aktive Filter zugänglich.
+## Presentation, translations and versioning
 
-## Optionale Emby-Ergänzung
+Settings store visible columns and the complete eleven-column order independently per service. Title/episode remains visible. Unknown/duplicate/missing columns and invalid services are rejected. Header/cells share one ordered list; temporary “All columns” does not change defaults. Tag colors are validated hex values with readable text contrast. Filter presets remain canonical SQLite data independent of display language.
 
-`settings.emby` speichert Aktivierung, URL und verschlüsselten API-Key; `interval` ist stets 0, weil Emby zum Dienst-Sync gehört. Aktivierung, URL- oder Key-Änderung invalidiert laufende Snapshots und synchronisiert aktivierte Arr-Dienste neu. Anzeigeeinstellungen invalidieren keine Verbindungen. Demoverbindungen bleiben gesperrt.
+The dashboard opens after login. Distribution-tag buttons open a separate temporary filter query, preserving saved/current library queries. Combined statistics offer a movie/TV choice in the drilldown banner. Returning or normal menu navigation restores previous filters. Presets change only when explicitly saved or selected.
 
-Der GET-Client teilt Timeout (20 Sekunden), höchstens drei Versuche, Redirect-Verbot und bereinigte Fehler mit dem Arr-Client, verwendet jedoch `X-Emby-Token` und eine eigene Whitelist für `System/Info` und `Items`. Eine URL mit Unterpfad wird unterstützt; `/emby` wird nur bei Bedarf angehängt. Film- und Episodenmetadaten werden getrennt in Seiten mit höchstens 250 Einträgen gelesen. Seitenanzahl, Totals und doppelte IDs werden geprüft. Nur benötigte Dateikandidaten verbleiben im Speicher.
+JSON catalogs are discovered at build time, including future contributed languages. English keys are stable message identifiers with named placeholders and plain-text values. Go embeds the same catalogs for API errors/CSV. `Accept-Language` negotiation supports regional fallback and quality weights. UI preferences use browser storage; canonical media/filter values are never translated in storage. See [translation guide](TRANSLATING.md).
 
-Identität: genauer Basisdateiname + positive Byte-Größe, eindeutig auf beiden Seiten. Mehrfachversionen verwenden die passenden MediaSources. Item-Streams werden nur für die exakt gleiche Source-Path eingesetzt, nie für eine andere Version. Fehlende/mehrdeutige Zuordnung bleibt `embyMatch`; `audioTracks` enthält einzelne interne Tonspuren mit Index, Sprache, Codec, Kanälen, Layout, Titel und Standardflag. Alle API-Daten werden als Daten behandelt. Keine Sprache wird aus einem Tonspurtitel geschätzt. Subtitle- und externe Audio-Streams werden ausgeschlossen.
-
-Eindeutige, vorhandene Emby-Tonspurangaben bestimmen die Audio-/Sprachmengen für Filter und Anzeige; wenn alle Spuren eines Merkmals unbekannt sind, bleiben vorhandene Dateiname-/Arr-Angaben erhalten, ohne sie einzelnen Spuren zuzuordnen; Herkunft bleibt in Evidence getrennt. Die Hauptspalte Kanäle behält die Dateiname-/Arr-Angabe, während der Dialog pro Tonspur die echte Kanalanzahl beziehungsweise explizites Layout anzeigt. Explizite Emby-HDR-Typen/-Subtypen ergänzen die vorhandenen HDR-Tags; DV-Profilnummern erzeugen keinen angenommenen Fallback. Ein Emby-Fehler bricht den ergänzten Dienst-Snapshot ab, sodass keine partiellen Daten übernommen werden. Es gibt keinen separaten Medienkatalog, keinen Playback-Aufruf und keine Medienanalyse.
-
-Migration auf Schemaversion 4 repariert zwischengespeicherte Audio-/HDR-/Sprachmerkmale aus Dateinamen und bereits gespeicherter API-Evidence, atomar in 500er-Batches mit vorheriger Sicherung. Einstellungen, Presets und Dateizugehörigkeit bleiben erhalten. Die optionalen Emby-Felder leben im bestehenden JSON, ohne weitere SQL-Spalten. Bei einem erfolgreichen neuen Sync stammen sie aus der aktuellen Emby-Antwort.
-
-
-## Korrekturen der Abschlussprüfung
-
-Die JSON-Decodierung verlangt ein nicht-null Objekt beziehungsweise eine Liste, prüft die vollständige Antwort bis EOF und begrenzt die Größe auf 64 MiB. Katalog-/Datei-IDs, Titel, Zuordnungen und Duplikate werden vor der Cache-Übernahme geprüft. Leere gültige Listen bleiben zulässig; ungültige Antworten erhalten den letzten vollständigen Stand.
-
-Sprachen werden als normalisierte, sortierte Menge behandelt. Zusätzliche ausdrücklich gemeldete Arr-Sprachen ergänzen Dateinamen-Sprachen, ohne einer Tonspur einen geratenen Codec zuzuweisen. `unknownTraits` kennzeichnet Audio-/Sprachmerkmale, wenn mindestens eine ergänzte Tonspur dafür keine Angabe besitzt. `__unknown__` findet dadurch sowohl vollständig als auch teilweise unbekannte Audio-/Sprachangaben. `metadataIncomplete` bewertet Auflösung, Codec, Source, Audio, Sprache sowie erfolglose konfigurierte Emby-Zuordnungen. Fehlendes HDR kann SDR oder unbekannt bedeuten und setzt diesen Status alleine nicht. Ein negativer Filter beschreibt fehlende **erkannte Angaben**, keine bestätigte Abwesenheit in der Datei.
-
-`settings.emby.pathMappings` enthält optional Zeilen `Arr-Pfad => Emby-Pfad`. Ist eine Zuordnung eingerichtet, verlangt Emby zusätzlich zum Dateinamen und der Byte-Größe den exakt passenden vollständigen Pfad; die längste passende Arr-Präfixzuordnung gewinnt. Ohne passende Zuordnung wird nichts ergänzt. Pfade kommen ausschließlich aus API-Metadaten; keine Dateisystemzugriffe. Der Arr-Quellpfad bleibt nur während des Syncs im Speicher und wird nicht an den Browser ausgegeben.
-
-Facets und Dashboard-Aggregate sind unveränderliche, defensiv kopierte In-Memory-Snapshots und werden nach einem erfolgreichen Dienst-Commit invalidiert. Ihre SQL-Abfragen laufen in Lesetransaktionen. HTTP-Kontexte werden bis zu SQLite durchgereicht. Browser-Anfragen erhalten Abbruchcontroller und Schutz gegen verspätete Antworten; Filterwerte werden nur in einer Bibliotheksansicht geladen. Das Status-Polling pausiert bei ausgeblendeten Browser-Tabs; Intervalle: aktiver Sync 3 Sekunden, angemeldeter Leerlauf 30 Sekunden, Anmeldung 60 Sekunden.
-
-CSV verwendet dieselbe Sortierfunktion und Filterlogik wie die Liste. Der gesamte Export wird zunächst in einer geschützten temporären Datei unter Appdata erstellt. SQL-, JSON- und Schreibfehler liefern vor dem Download einen Fehler. Erfolgreiche/abgebrochene Exporte entfernen die Datei. `clearKey` ist eine ausdrückliche Löschoption für deaktivierte Verbindungen; ein leeres Eingabefeld alleine behält weiterhin den gespeicherten Key.
-
-Passwortänderung und Sitzungswiderruf erfolgen in einer Datenbanktransaktion. Sitzungsanlage und bestätigte Passwortänderungen prüfen zusätzlich den zuvor verifizierten Passwort-Hash in ihrem SQL-Schreibvorgang. Eine verspätete Anmeldung mit alten Zugangsdaten erzeugt dadurch auch bei einem parallel ausgeführten CLI-Passwortreset keine neue gültige Sitzung.
-
-Das Frontend ist in Bibliothek, Filter, Dashboard, Einstellungen, Metadaten-Dialog, gemeinsame Darstellung und Request-Hooks aufgeteilt. Styles liegen in getrennten Modulen. Einstellungen besitzen die Bereiche Verbindungen, Darstellung und Wartung mit dauerhaft erreichbarer Speichern-Leiste. Auf schmalen Bildschirmen zeigt der Metadatenvergleich Eigenschaftskarten statt kleiner Tabellenbeschriftungen.
+Root `VERSION` is embedded by Go, checked against package/Docker defaults and validated by CI against released tags. Release inputs must match source. Checked-in English notes feed GitHub releases before stable promotion. See [releasing](RELEASING.md).

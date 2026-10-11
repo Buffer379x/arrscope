@@ -84,19 +84,19 @@ func jsonOut(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
 }
-func failure(w http.ResponseWriter, status int, e error) {
-	jsonOut(w, status, map[string]string{"error": e.Error()})
+func failure(w http.ResponseWriter, r *http.Request, status int, e error) {
+	jsonOut(w, status, map[string]string{"error": localizedMessage(requestLocale(r), e.Error())})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if e := d.Decode(v); e != nil {
-		return errors.New("Ungültige Eingabe")
+		return errors.New("Invalid input")
 	}
 	var x any
 	if d.Decode(&x) != io.EOF {
-		return errors.New("Ungültige Eingabe")
+		return errors.New("Invalid input")
 	}
 	return nil
 }
@@ -136,7 +136,7 @@ func (s *Server) Handler() http.Handler {
 			if origin := r.Header.Get("Origin"); origin != "" {
 				u, e := url.Parse(origin)
 				if e != nil || u.Host != r.Host {
-					failure(w, 403, errors.New("Ungültiger Origin"))
+					failure(w, r, 403, errors.New("Invalid origin"))
 					return
 				}
 			}
@@ -146,7 +146,12 @@ func (s *Server) Handler() http.Handler {
 			out := map[string]any{"initialized": s.Security.Initialized(), "authenticated": authenticated, "version": s.Version, "demo": s.Demo}
 			if authenticated {
 				out["csrf"] = csrf
-				out["sync"] = s.Sync.Statuses()
+				states := s.Sync.Statuses()
+				for service, state := range states {
+					state.Error = localizedMessage(requestLocale(r), state.Error)
+					states[service] = state
+				}
+				out["sync"] = states
 			}
 			jsonOut(w, 200, out)
 			return
@@ -158,26 +163,26 @@ func (s *Server) Handler() http.Handler {
 				Token    string `json:"token"`
 			}
 			if e := decode(w, r, &in); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			if r.URL.Path == "/api/setup" {
 				if e := s.Security.Setup(in.Username, in.Password, in.Token); e != nil {
-					failure(w, 400, e)
+					failure(w, r, 400, e)
 					return
 				}
 				if e := s.Security.CreateSession(w, r); e != nil {
-					failure(w, 500, errors.New("Sitzung konnte nicht erstellt werden"))
+					failure(w, r, 500, errors.New("Could not create session"))
 					return
 				}
 			} else {
 				valid, err := s.Security.LoginSession(w, r, in.Username, in.Password, remoteIP(r))
 				if err != nil {
-					failure(w, 500, errors.New("Sitzung konnte nicht erstellt werden"))
+					failure(w, r, 500, errors.New("Could not create session"))
 					return
 				}
 				if !valid {
-					failure(w, 401, errors.New("Anmeldung fehlgeschlagen oder vorübergehend gesperrt"))
+					failure(w, r, 401, errors.New("Login failed or temporarily locked"))
 					return
 				}
 			}
@@ -185,11 +190,11 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		if !authenticated {
-			failure(w, 401, errors.New("Bitte anmelden"))
+			failure(w, r, 401, errors.New("Please sign in"))
 			return
 		}
 		if mutating && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-CSRF-Token")), []byte(csrf)) != 1 {
-			failure(w, 403, errors.New("Ungültiger CSRF-Token"))
+			failure(w, r, 403, errors.New("Invalid CSRF token"))
 			return
 		}
 		switch r.URL.Path {
@@ -214,22 +219,22 @@ func (s *Server) Handler() http.Handler {
 			if r.Method == "PUT" {
 				var cfg Settings
 				if e := decode(w, r, &cfg); e != nil {
-					failure(w, 400, e)
+					failure(w, r, 400, e)
 					return
 				}
 				if e := validateTagColors(cfg.TagColors); e != nil {
-					failure(w, 400, e)
+					failure(w, r, 400, e)
 					return
 				}
 				if e := normalizeVisibleColumns(&cfg); e != nil {
-					failure(w, 400, e)
+					failure(w, r, 400, e)
 					return
 				}
 				if cfg.TagColors == nil {
 					cfg.TagColors = map[string]string{}
 				}
 				if cfg.SeasonMode != "matches" && cfg.SeasonMode != "season" {
-					failure(w, 400, errors.New("Ungültige Serienansicht"))
+					failure(w, r, 400, errors.New("Invalid TV view"))
 					return
 				}
 				s.mu.Lock()
@@ -237,18 +242,18 @@ func (s *Server) Handler() http.Handler {
 				for i, connection := range cfg.Connections() {
 					if err := mergeConnection(connection, *old.Connections()[i]); err != nil {
 						s.mu.Unlock()
-						failure(w, 400, err)
+						failure(w, r, 400, err)
 						return
 					}
 				}
 				if s.Demo && (cfg.Radarr != old.Radarr || cfg.Sonarr != old.Sonarr || cfg.Emby != old.Emby) {
 					s.mu.Unlock()
-					failure(w, 403, errors.New("Demo-Verbindungen können nicht geändert werden"))
+					failure(w, r, 403, errors.New("Demo connections cannot be changed"))
 					return
 				}
 				if cfg.Emby.Interval != 0 {
 					s.mu.Unlock()
-					failure(w, 400, errors.New("Emby wird im Intervall von Radarr/Sonarr synchronisiert"))
+					failure(w, r, 400, errors.New("Emby syncs at the Radarr/Sonarr interval"))
 					return
 				}
 				stored := cfg
@@ -257,7 +262,7 @@ func (s *Server) Handler() http.Handler {
 				}
 				if e := s.Store.Put("settings", stored); e != nil {
 					s.mu.Unlock()
-					failure(w, 500, errors.New("Einstellungen konnten nicht gespeichert werden"))
+					failure(w, r, 500, errors.New("Could not save settings"))
 					return
 				}
 				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
@@ -285,11 +290,11 @@ func (s *Server) Handler() http.Handler {
 				APIKey  string `json:"apiKey"`
 			}
 			if e := decode(w, r, &in); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			if (!serviceOK(in.Service) && in.Service != "emby") || s.Demo {
-				failure(w, 400, errors.New("Ungültiger Dienst oder Demo-Modus"))
+				failure(w, r, 400, errors.New("Invalid service or demo mode"))
 				return
 			}
 			cfg := s.Config().Radarr
@@ -305,7 +310,7 @@ func (s *Server) Handler() http.Handler {
 			cfg.URL = in.URL
 			cfg.Enabled = true
 			if e := ValidateConfig(cfg); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			var version string
@@ -316,7 +321,7 @@ func (s *Server) Handler() http.Handler {
 				version, e = NewArr(cfg).Test(r.Context())
 			}
 			if e != nil {
-				failure(w, 502, e)
+				failure(w, r, 502, e)
 				return
 			}
 			jsonOut(w, 200, map[string]string{"version": version})
@@ -329,11 +334,11 @@ func (s *Server) Handler() http.Handler {
 				Service string `json:"service"`
 			}
 			if e := decode(w, r, &in); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			if s.Demo {
-				failure(w, 400, errors.New("Demo-Daten benötigen keinen Sync"))
+				failure(w, r, 400, errors.New("Demo data does not need syncing"))
 				return
 			}
 			s.mu.Lock()
@@ -344,7 +349,7 @@ func (s *Server) Handler() http.Handler {
 			e := s.Sync.Start(s.ctx, in.Service, cfg, s.settings.Emby)
 			s.mu.Unlock()
 			if e != nil {
-				failure(w, 409, e)
+				failure(w, r, 409, e)
 				return
 			}
 			jsonOut(w, 202, map[string]bool{"ok": true})
@@ -358,12 +363,12 @@ func (s *Server) Handler() http.Handler {
 				mode = s.Config().SeasonMode
 			}
 			if mode != "matches" && mode != "season" {
-				failure(w, 400, errors.New("Ungültiger Ansichtsmodus"))
+				failure(w, r, 400, errors.New("Invalid view mode"))
 				return
 			}
 			out, e := s.Store.QueryContext(r.Context(), r.URL.Query(), mode, false)
 			if e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			jsonOut(w, 200, out)
@@ -374,7 +379,7 @@ func (s *Server) Handler() http.Handler {
 			}
 			out, e := s.Store.StatisticsContext(r.Context())
 			if e != nil {
-				failure(w, 500, errors.New("Statistiken konnten nicht geladen werden"))
+				failure(w, r, 500, errors.New("Could not load statistics"))
 				return
 			}
 			jsonOut(w, 200, out)
@@ -385,7 +390,7 @@ func (s *Server) Handler() http.Handler {
 			}
 			out, e := s.Store.FacetsContext(r.Context(), r.URL.Query().Get("service"))
 			if e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			jsonOut(w, 200, out)
@@ -400,7 +405,7 @@ func (s *Server) Handler() http.Handler {
 			if r.Method == "GET" {
 				out, e := s.Store.Presets()
 				if e != nil {
-					failure(w, 500, errors.New("Presets konnten nicht geladen werden"))
+					failure(w, r, 500, errors.New("Could not load presets"))
 					return
 				}
 				jsonOut(w, 200, out)
@@ -409,24 +414,24 @@ func (s *Server) Handler() http.Handler {
 			if r.Method == "POST" {
 				var p Preset
 				if e := decode(w, r, &p); e != nil {
-					failure(w, 400, e)
+					failure(w, r, 400, e)
 					return
 				}
 				q, e := url.ParseQuery(p.Query)
 				if e != nil {
-					failure(w, 400, errors.New("Ungültiger Filter"))
+					failure(w, r, 400, errors.New("Invalid filter"))
 					return
 				}
 				q.Set("service", p.Service)
 				if _, _, e = where(q); e != nil || strings.TrimSpace(p.Name) == "" || len(p.Name) > 80 {
-					failure(w, 400, errors.New("Ungültiges Preset"))
+					failure(w, r, 400, errors.New("Invalid preset"))
 					return
 				}
 				q.Del("page")
 				p.Query = q.Encode()
 				res, e := s.Store.DB.Exec("INSERT INTO presets(name,service,query) VALUES(?,?,?)", strings.TrimSpace(p.Name), p.Service, p.Query)
 				if e != nil {
-					failure(w, 500, errors.New("Preset konnte nicht gespeichert werden"))
+					failure(w, r, 500, errors.New("Could not save preset"))
 					return
 				}
 				p.ID, _ = res.LastInsertId()
@@ -436,11 +441,11 @@ func (s *Server) Handler() http.Handler {
 			if r.Method == "DELETE" {
 				id, e := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 				if e != nil {
-					failure(w, 400, errors.New("Ungültige ID"))
+					failure(w, r, 400, errors.New("Invalid ID"))
 					return
 				}
 				if _, e = s.Store.DB.Exec("DELETE FROM presets WHERE id=?", id); e != nil {
-					failure(w, 500, errors.New("Preset konnte nicht gelöscht werden"))
+					failure(w, r, 500, errors.New("Could not delete preset"))
 					return
 				}
 				jsonOut(w, 200, map[string]bool{"ok": true})
@@ -455,22 +460,22 @@ func (s *Server) Handler() http.Handler {
 				Password string `json:"password"`
 			}
 			if e := decode(w, r, &in); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			var c credentials
 			s.Store.Get("admin", &c)
 			verifiedHash := s.Security.loginHash(c.Username, in.Current, remoteIP(r))
 			if verifiedHash == "" {
-				failure(w, 401, errors.New("Aktuelles Passwort ist ungültig"))
+				failure(w, r, 401, errors.New("Current password is invalid"))
 				return
 			}
 			if s.Demo {
-				failure(w, 403, errors.New("Demo-Passwort kann nicht geändert werden"))
+				failure(w, r, 403, errors.New("Demo password cannot be changed"))
 				return
 			}
 			if e := s.Security.reset(in.Password, verifiedHash); e != nil {
-				failure(w, 400, e)
+				failure(w, r, 400, e)
 				return
 			}
 			jsonOut(w, 200, map[string]bool{"ok": true})
@@ -480,13 +485,13 @@ func (s *Server) Handler() http.Handler {
 				break
 			}
 			if e := s.Store.Backup(); e != nil {
-				failure(w, 500, errors.New("Sicherung konnte nicht erstellt werden"))
+				failure(w, r, 500, errors.New("Could not create backup"))
 				return
 			}
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
 		}
-		failure(w, 405, errors.New("Endpunkt oder Methode nicht unterstützt"))
+		failure(w, r, 405, errors.New("Endpoint or method not supported"))
 	})
 }
 func safeCell(s string) string {
@@ -499,32 +504,32 @@ func safeCell(s string) string {
 func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 	filter, args, e := where(r.URL.Query())
 	if e != nil {
-		failure(w, 400, e)
+		failure(w, r, 400, e)
 		return
 	}
 	order, e := displayOrder(r.URL.Query())
 	if e != nil {
-		failure(w, 400, e)
+		failure(w, r, 400, e)
 		return
 	}
 	rows, e := s.Store.DB.QueryContext(r.Context(), "SELECT f.data FROM files f WHERE "+filter+" ORDER BY "+order, args...)
 	if e != nil {
-		failure(w, 400, e)
+		failure(w, r, 400, e)
 		return
 	}
 	defer rows.Close()
 	temporary, e := os.CreateTemp(s.Store.Dir, ".export-*.csv")
 	if e != nil {
-		failure(w, 500, errors.New("Export konnte nicht vorbereitet werden"))
+		failure(w, r, 500, errors.New("Could not prepare export"))
 		return
 	}
 	defer func() { temporary.Close(); os.Remove(temporary.Name()) }()
-	if e = s.writeCSV(r.Context(), temporary, rows); e != nil {
-		failure(w, 500, errors.New("Export konnte nicht vollständig erstellt werden"))
+	if e = s.writeCSV(r.Context(), temporary, rows, requestLocale(r)); e != nil {
+		failure(w, r, 500, errors.New("Could not complete export"))
 		return
 	}
 	if _, e = temporary.Seek(0, 0); e != nil {
-		failure(w, 500, errors.New("Export konnte nicht gelesen werden"))
+		failure(w, r, 500, errors.New("Could not read export"))
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -534,13 +539,19 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.Rows) error {
+func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.Rows, locale ...string) error {
 	if _, e := destination.Write([]byte("\xef\xbb\xbf")); e != nil {
 		return e
 	}
 	cw := csv.NewWriter(destination)
 	cw.Comma = ';'
-	cw.Write([]string{"Titel", "Serie", "Staffel", "Jahre", "Dateiname", "Auflösung", "Codec", "Codec-Familie", "Source", "Verarbeitung", "HDR", "Bit-Tiefe", "Audio", "Kanäle", "Sprache", "Bytes", "Konflikt", "Tonspuren", "Emby-Zuordnung"})
+	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Language", "Bytes", "Conflict", "Audio tracks", "Emby matching"}
+	if len(locale) > 0 {
+		for i, header := range headers {
+			headers[i] = localizedMessage(locale[0], header)
+		}
+	}
+	cw.Write(headers)
 	for rows.Next() {
 		var raw string
 		if e := ctx.Err(); e != nil {
