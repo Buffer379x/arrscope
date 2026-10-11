@@ -77,10 +77,15 @@ def req(path, data=None, method=None, timeout=10):
     with opener.open(r, timeout=timeout) as response:
         return json.load(response)
 result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 128MiB under the 256MiB container limit'}
+# Match the host's unprivileged UID/GID so it can clean up private 0700 backup
+# directories on Linux bind mounts. Root callers still run the app as 99:100.
+test_uid = os.getuid() if os.getuid() else 99
+test_gid = os.getgid() if os.getuid() else 100
+result['container_user'] = f'{test_uid}:{test_gid}'
 with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
     os.chmod(data, 511)
     try:
-        docker('run', '-d', '--name', name, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)
+        docker('run', '-d', '--name', name, '--user', result['container_user'], '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)
         result['memory_plus_swap_limit_mib'] = json.loads(docker('inspect', name))[0]['HostConfig']['MemorySwap'] / 1024 ** 2
         for _ in range(100):
             try:
@@ -163,8 +168,8 @@ with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
         result['test_error'] = str(e)
     finally:
         result['container_state'] = json.loads(docker('inspect', name))[0]['State']
+        print(json.dumps(result, indent=2), flush=True)
         docker('rm', '-f', name, check=False)
 fixture.shutdown()
-print(json.dumps(result, indent=2))
 if not result.get('completed') or result.get('test_error'):
     sys.exit(1)
