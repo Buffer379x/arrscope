@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -105,7 +106,9 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		return nil
 	}
 	type candidate struct {
-		source    embySource
+		path      string
+		signature [32]byte
+		metadata  embyMetadata
 		ambiguous bool
 	}
 	matches := map[fileIdentity]candidate{}
@@ -172,14 +175,19 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 				if len(source.MediaStreams) == 0 && source.Path == item.Path {
 					source.MediaStreams = item.MediaStreams
 				}
+				raw, err := json.Marshal(source.MediaStreams)
+				if err != nil {
+					return err
+				}
+				signature := sha256.Sum256(raw)
 				if old, ok := matches[key]; ok {
-					samePath := strings.ReplaceAll(old.source.Path, "\\", "/") == strings.ReplaceAll(source.Path, "\\", "/")
-					if old.ambiguous || !samePath || !reflect.DeepEqual(old.source.MediaStreams, source.MediaStreams) {
+					samePath := strings.ReplaceAll(old.path, "\\", "/") == strings.ReplaceAll(source.Path, "\\", "/")
+					if old.ambiguous || !samePath || old.signature != signature {
 						old.ambiguous = true
 						matches[key] = old
 					}
 				} else {
-					matches[key] = candidate{source: source}
+					matches[key] = candidate{path: source.Path, signature: signature, metadata: parseEmbyMetadata(source.MediaStreams)}
 				}
 			}
 		}
@@ -204,7 +212,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		if !ok {
 			continue
 		}
-		applyEmby(&files[indices[0]], candidate.source.MediaStreams)
+		applyEmbyMetadata(&files[indices[0]], candidate.metadata)
 	}
 	return nil
 }
@@ -220,15 +228,31 @@ func trackCodec(stream embyStream) string {
 	}
 	return codec
 }
-func applyEmby(f *File, streams []embyStream) {
+
+// Retain only normalized traits; raw stream structs are much larger than tracks.
+// A separate raw-data fingerprint still detects conflicting duplicate sources.
+type embyMetadata struct {
+	tracks               []AudioTrack
+	audio, language, hdr string
+	ambiguous            bool
+}
+
+func joinEmbyTraits(set map[string]bool, separator string) string {
+	values := []string{}
+	for v := range set {
+		values = append(values, v)
+	}
+	sort.Strings(values)
+	return strings.Join(values, separator)
+}
+func parseEmbyMetadata(streams []embyStream) embyMetadata {
 	tracks := []AudioTrack{}
 	codecs, languages, hdr := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	indices := map[int]bool{}
 	for _, stream := range streams {
 		if strings.EqualFold(stream.Type, "Audio") && !stream.IsExternal {
 			if indices[stream.Index] {
-				f.EmbyMatch = "ambiguous"
-				return
+				return embyMetadata{ambiguous: true}
 			}
 			indices[stream.Index] = true
 			language := stream.Language
@@ -267,26 +291,29 @@ func applyEmby(f *File, streams []embyStream) {
 			}
 		}
 	}
+	sort.Slice(tracks, func(i, j int) bool { return tracks[i].Index < tracks[j].Index })
+	return embyMetadata{tracks: tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: joinEmbyTraits(hdr, " + ")}
+}
+func applyEmby(f *File, streams []embyStream) {
+	applyEmbyMetadata(f, parseEmbyMetadata(streams))
+}
+func applyEmbyMetadata(f *File, metadata embyMetadata) {
+	if metadata.ambiguous {
+		f.EmbyMatch = "ambiguous"
+		return
+	}
+	tracks := metadata.tracks
 	if len(tracks) == 0 {
 		f.EmbyMatch = "no_tracks"
 	} else {
 		f.EmbyMatch = "matched"
 	}
-	sort.Slice(tracks, func(i, j int) bool { return tracks[i].Index < tracks[j].Index })
 	f.AudioTracks = tracks
 	if len(tracks) > 0 {
 		f.AudioStreamCount = len(tracks)
 	}
 	if f.Evidence == nil {
 		f.Evidence = map[string]Evidence{}
-	}
-	join := func(set map[string]bool, separator string) string {
-		values := []string{}
-		for v := range set {
-			values = append(values, v)
-		}
-		sort.Strings(values)
-		return strings.Join(values, separator)
 	}
 	set := func(field, value, separator, fallback string) string {
 		evidence := f.Evidence[field]
@@ -301,22 +328,21 @@ func applyEmby(f *File, streams []embyStream) {
 		return value
 	}
 	// Verified per-track metadata is more precise than flattened API or filename audio traits.
-	f.Audio = set("audio", join(codecs, " + "), " + ", f.Audio)
-	f.Language = set("language", join(languages, ", "), ", ", f.Language)
-	if len(hdr) > 0 {
-		embyHDR := join(hdr, " + ")
-		// HDR is additive: the API may expose one profile of a backwards-compatible stream.
-		for _, v := range strings.Split(f.HDR, " + ") {
-			if v != "" {
-				hdr[v] = true
-			}
-		}
-		value := join(hdr, " + ")
+	f.Audio = set("audio", metadata.audio, " + ", f.Audio)
+	f.Language = set("language", metadata.language, ", ", f.Language)
+	if metadata.hdr != "" {
+		// Preserve explicit filename/API HDR alongside verified Emby profiles.
 		e := f.Evidence["hdr"]
-		e.Emby = embyHDR
+		e.Emby = metadata.hdr
 		e.Origin = "combined"
 		f.Evidence["hdr"] = e
-		f.HDR = value
+		profiles := map[string]bool{}
+		for _, profile := range strings.Split(f.HDR+" + "+metadata.hdr, " + ") {
+			if profile != "" {
+				profiles[profile] = true
+			}
+		}
+		f.HDR = joinEmbyTraits(profiles, " + ")
 	}
 	f.Conflict = false
 	for _, e := range f.Evidence {

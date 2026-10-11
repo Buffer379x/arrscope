@@ -78,3 +78,7 @@ Files/CSV/presets share `conflict=true|false`, `ruleConflict=true|false` and `em
 Dashboard language distributions count distinct movies or episodes per language, independently of file and track multiplicity. Statistics include `languageTotals` by scope; overlapping multilingual groups must not be interpreted as a partition.
 
 Paged lists materialize sorted row IDs and fetch full evidence/track JSON only for the selected page. Matching is reevaluated only for Sonarr season-context rows. A deterministic outer sort preserves all allowed column orders and tie-breakers while keeping large JSON out of the full-catalog temporary sort. CSV still streams all actual matches with the same sort semantics.
+
+The sync writer owns its completed upstream snapshot and drops each input record while inserting it into the atomic SQLite transaction. Remaining input is cleared on failure; transaction rollback preserves the last complete cache. Ordinary `Store.Replace` callers retain their inputs. This avoids keeping the full live snapshot alongside growing database buffers during large syncs.
+
+Emby matching stores only normalized tracks/HDR for candidate files plus a SHA-256 fingerprint of the decoded raw stream records. Conflicting duplicates remain ambiguous even when their normalized traits agree. Raw page data is discarded rather than retained across the whole Emby catalog.
