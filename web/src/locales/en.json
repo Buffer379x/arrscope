@@ -388,6 +388,17 @@
     "Invalid sort field": "Invalid sort field",
     "Invalid sort direction": "Invalid sort direction",
     "File size from (GiB)": "File size from (GiB)",
-    "File size to (GiB)": "File size to (GiB)"
+    "File size to (GiB)": "File size to (GiB)",
+    "System info": "System info",
+    "Version": "Version",
+    "App connection": "App connection",
+    "Connected to ArrScope": "Connected to ArrScope",
+    "Connection unavailable": "Connection unavailable",
+    "Service sync status": "Service sync status",
+    "Disabled": "Disabled",
+    "Last successful sync": "Last successful sync",
+    "Service status reflects the last sync, not a live connection test.": "Service status reflects the last sync, not a live connection test.",
+    "Emby enriches the Radarr and Sonarr syncs.": "Emby enriches the Radarr and Sonarr syncs.",
+    "Enabled": "Enabled"
   }
 }

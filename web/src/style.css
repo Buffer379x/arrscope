@@ -76,7 +76,8 @@
 }
 .chart-filter:hover .tag,
 .chart-filter:focus-visible .tag {
-  outline: 2px solid currentColor;
+  outline: 2px solid
+    var(--tag-border, color-mix(in srgb, currentColor 70%, #000));
   outline-offset: 2px;
 }
 .dashboard-filter-notice {
@@ -93,15 +94,7 @@
 .dashboard-filter-notice .text-button {
   margin-left: auto;
 }
-.app-version {
-  font-size: 0.7rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
 @media (max-width: 600px) {
-  .app-version {
-    display: none;
-  }
   .dashboard-filter-notice select {
     width: auto;
   }

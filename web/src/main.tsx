@@ -17,7 +17,7 @@ function App() {
       </div>
     );
   if (!status.authenticated) return <Login status={status} done={refresh} />;
-  return <Library status={status} refresh={refresh} />;
+  return <Library status={status} refresh={refresh} connectionError={error} />;
 }
 render(
   <I18nProvider>

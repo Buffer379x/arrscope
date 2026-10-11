@@ -1,4 +1,5 @@
 import { LanguageSelect, t, useI18n } from "../i18n";
+import { SystemInfo } from "./SystemInfo";
 import { Modal } from "./Modal";
 
 import {
@@ -14,7 +15,7 @@ import {
   Tv,
 } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
-import type { Connection, Service, Settings } from "../types";
+import type { Connection, Service, Settings, Status } from "../types";
 
 import { api } from "../api";
 import {
@@ -30,11 +31,15 @@ import {
 } from "../ui";
 export function SettingsDialog({
   settings,
+  status,
+  connectionError,
   demo,
   close,
   saved,
 }: {
   settings: Settings;
+  status: Status;
+  connectionError?: string;
   demo: boolean;
   close: () => void;
   saved: () => Promise<void>;
@@ -108,6 +113,7 @@ export function SettingsDialog({
           ["connections", t("Connections")],
           ["appearance", t("Appearance")],
           ["maintenance", t("Maintenance")],
+          ["system", t("System info")],
         ].map(([value, label]) => (
           <button
             type="button"
@@ -120,10 +126,10 @@ export function SettingsDialog({
         ))}
       </nav>
       <form onSubmit={submit}>
-        <p class="quiet">
+        <p class="quiet" hidden={section === "system"}>
           {t("Your services, your cache. No media directories required.")}
         </p>
-        {demo && (
+        {demo && section !== "system" && (
           <div class="notice">
             {t(
               "Demo connections are locked. Try the TV view, default columns and tag colors.",
@@ -568,6 +574,13 @@ export function SettingsDialog({
             )}
           </fieldset>
         </div>
+        <div class="settings-section" hidden={section !== "system"}>
+          <SystemInfo
+            status={status}
+            settings={settings}
+            connectionError={connectionError}
+          />
+        </div>
         {error && (
           <p class="error" role="alert">
             {error}
@@ -608,7 +621,7 @@ export function SettingsDialog({
           <button type="button" class="button" onClick={close}>
             {t("Close")}
           </button>
-          <button class="primary" disabled={busy}>
+          <button class="primary" disabled={busy} hidden={section === "system"}>
             {busy ? (
               <LoaderCircle class="spin" size={16} />
             ) : (
