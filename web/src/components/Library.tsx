@@ -218,7 +218,6 @@ export function Library({
     if (!dashboardFilter) return;
     setDashboardFilter(null);
     setPage(1);
-    setResults(emptyResults);
   };
   const applyPreset = (p: Preset) => {
     setDashboardFilter(null);
