@@ -40,7 +40,6 @@ export function SettingsDialog({
   status,
   connectionError,
   demo,
-  close,
   saved,
   onDirty,
   refresh,
@@ -50,7 +49,6 @@ export function SettingsDialog({
   status: Status;
   connectionError?: string;
   demo: boolean;
-  close: () => void;
   saved: () => Promise<void>;
   onDirty: (dirty: boolean) => void;
   refresh: () => Promise<void>;
@@ -88,8 +86,6 @@ export function SettingsDialog({
       .catch((e) => setError(e.message));
   }, []);
   const dirty = JSON.stringify(cfg) !== JSON.stringify(settings);
-  const canLeave = () =>
-    (!dirty && !rulesDirty) || confirm(t("Discard unsaved settings changes?"));
   useEffect(() => {
     onDirty(dirty || rulesDirty);
   }, [dirty, rulesDirty]);
@@ -674,60 +670,83 @@ export function SettingsDialog({
                     "Metadata disagreements and conflicting recognition rules use separate icons.",
                   )}
                 </p>
-                {["metadata", "recognition"].map((key) => (
-                  <div class="tag-color-row">
-                    <label style={{ color: cfg.warningColors[key] }}>
-                      {key === "metadata" ? (
-                        <AlertTriangle size={17} />
-                      ) : (
-                        <OctagonAlert size={17} />
-                      )}{" "}
-                      {t(
-                        key === "metadata"
-                          ? "Metadata disagreement"
-                          : "Conflicting recognition rules",
-                      )}
-                    </label>
-                    <input
-                      type="color"
-                      aria-label={t(
-                        key === "metadata"
-                          ? "Metadata warning color"
-                          : "Recognition warning color",
-                      )}
-                      value={cfg.warningColors[key]}
-                      onInput={(e) =>
-                        setCfg({
-                          ...cfg,
-                          warningColors: {
-                            ...cfg.warningColors,
-                            [key]: e.currentTarget.value,
-                          },
-                        })
-                      }
-                    />
-                    <button
-                      type="button"
-                      class="icon-button color-reset"
-                      aria-label={t("Restore defaults")}
-                      title={t("Restore defaults")}
-                      onClick={() => {
-                        if (
-                          confirm(t("Reset this warning color to its default?"))
-                        )
-                          setCfg({
-                            ...cfg,
-                            warningColors: {
-                              ...cfg.warningColors,
-                              [key]: defaultWarningColors[key],
-                            },
-                          });
-                      }}
-                    >
-                      <RotateCcw size={16} />
-                    </button>
-                  </div>
-                ))}
+                <div class="table-wrap color-table-wrap">
+                  <table class="color-settings-table warning-colors-table">
+                    <thead>
+                      <tr>
+                        <th>{t("Tag preview")}</th>
+                        <th>{t("Color")}</th>
+                        <th>{t("Reset column")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["metadata", "recognition"].map((key) => (
+                        <tr>
+                          <td>
+                            <label style={{ color: cfg.warningColors[key] }}>
+                              {key === "metadata" ? (
+                                <AlertTriangle size={17} />
+                              ) : (
+                                <OctagonAlert size={17} />
+                              )}{" "}
+                              {t(
+                                key === "metadata"
+                                  ? "Metadata disagreement"
+                                  : "Conflicting recognition rules",
+                              )}
+                            </label>
+                          </td>
+                          <td>
+                            <input
+                              type="color"
+                              aria-label={t(
+                                key === "metadata"
+                                  ? "Metadata warning color"
+                                  : "Recognition warning color",
+                              )}
+                              value={cfg.warningColors[key]}
+                              onInput={(e) =>
+                                setCfg({
+                                  ...cfg,
+                                  warningColors: {
+                                    ...cfg.warningColors,
+                                    [key]: e.currentTarget.value,
+                                  },
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              class="icon-button color-reset"
+                              aria-label={t("Restore defaults")}
+                              title={t("Restore defaults")}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    t(
+                                      "Reset this warning color to its default?",
+                                    ),
+                                  )
+                                )
+                                  setCfg({
+                                    ...cfg,
+                                    warningColors: {
+                                      ...cfg.warningColors,
+                                      [key]: defaultWarningColors[key],
+                                    },
+                                  });
+                              }}
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </fieldset>
               <fieldset class="connection tag-color-settings">
                 <legend>{t("Tag colors")}</legend>
@@ -748,101 +767,122 @@ export function SettingsDialog({
                     ))}
                   </select>
                 </label>
-                <div class="tag-color-head">
-                  <span>{t("Tag preview")}</span>
-                  <span>{t("Color")}</span>
-                  <span>{t("Text")}</span>
-                  <span>{t("Reset")}</span>
-                </div>
-                <div class="tag-color-grid">
-                  {colorValues.map((value) => {
-                    const key = colorField + ":" + value;
-                    const label =
-                      value === "__unknown__" ? t("Unknown") : value;
-                    return (
-                      <div class="tag-color-row">
-                        <Tag
-                          kind={colorField}
-                          value={value === "__unknown__" ? "" : value}
-                          colors={cfg.tagColors || {}}
-                          textColors={cfg.tagTextColors || {}}
-                        />
-                        <input
-                          type="color"
-                          aria-label={t("Color for {value}", { value: label })}
-                          value={
-                            cfg.tagColors?.[key] ||
-                            defaultColor(colorField, value)
-                          }
-                          onInput={(e) => setColor(key, e.currentTarget.value)}
-                        />
-                        <button
-                          type="button"
-                          class="icon-button tag-text-color color-action"
-                          aria-label={
-                            t("Text color for {value}", { value: label }) +
-                            ": " +
-                            t(
-                              cfg.tagTextColors?.[key] === "#000000"
-                                ? "Black"
-                                : cfg.tagTextColors?.[key] === "#ffffff"
-                                  ? "White"
-                                  : "Automatic",
-                            )
-                          }
-                          title={t(
-                            cfg.tagTextColors?.[key] === "#000000"
-                              ? "Black"
-                              : cfg.tagTextColors?.[key] === "#ffffff"
-                                ? "White"
-                                : "Automatic",
-                          )}
-                          onClick={() =>
-                            setTextColor(
-                              key,
-                              cfg.tagTextColors?.[key] === "#000000"
-                                ? "#ffffff"
-                                : cfg.tagTextColors?.[key] === "#ffffff"
-                                  ? ""
-                                  : "#000000",
-                            )
-                          }
-                        >
-                          <span>A</span>
-                          <span aria-hidden="true">
-                            {cfg.tagTextColors?.[key] === "#000000"
-                              ? "●"
-                              : cfg.tagTextColors?.[key] === "#ffffff"
-                                ? "○"
-                                : "◐"}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          class="icon-button color-action"
-                          disabled={
-                            !cfg.tagColors?.[key] && !cfg.tagTextColors?.[key]
-                          }
-                          onClick={() => {
-                            if (
-                              confirm(
-                                t(
-                                  "Reset background and text colors for {value}?",
-                                  { value: label },
-                                ),
-                              )
-                            )
-                              setColor(key);
-                          }}
-                          aria-label={t("Default color for {value}", {
-                            value: label,
-                          })}
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div class="table-wrap color-table-wrap">
+                  <table class="color-settings-table">
+                    <thead>
+                      <tr>
+                        <th>{t("Tag preview")}</th>
+                        <th>{t("Color")}</th>
+                        <th>{t("Text")}</th>
+                        <th>{t("Reset column")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {colorValues.map((value) => {
+                        const key = colorField + ":" + value;
+                        const label =
+                          value === "__unknown__" ? t("Unknown") : value;
+                        return (
+                          <tr>
+                            <td>
+                              <Tag
+                                kind={colorField}
+                                value={value === "__unknown__" ? "" : value}
+                                colors={cfg.tagColors || {}}
+                                textColors={cfg.tagTextColors || {}}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="color"
+                                aria-label={t("Color for {value}", {
+                                  value: label,
+                                })}
+                                value={
+                                  cfg.tagColors?.[key] ||
+                                  defaultColor(colorField, value)
+                                }
+                                onInput={(e) =>
+                                  setColor(key, e.currentTarget.value)
+                                }
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                class="icon-button tag-text-color color-action"
+                                aria-label={
+                                  t("Text color for {value}", {
+                                    value: label,
+                                  }) +
+                                  ": " +
+                                  t(
+                                    cfg.tagTextColors?.[key] === "#000000"
+                                      ? "Black"
+                                      : cfg.tagTextColors?.[key] === "#ffffff"
+                                        ? "White"
+                                        : "Automatic",
+                                  )
+                                }
+                                title={t(
+                                  cfg.tagTextColors?.[key] === "#000000"
+                                    ? "Black"
+                                    : cfg.tagTextColors?.[key] === "#ffffff"
+                                      ? "White"
+                                      : "Automatic",
+                                )}
+                                onClick={() =>
+                                  setTextColor(
+                                    key,
+                                    cfg.tagTextColors?.[key] === "#000000"
+                                      ? "#ffffff"
+                                      : cfg.tagTextColors?.[key] === "#ffffff"
+                                        ? ""
+                                        : "#000000",
+                                  )
+                                }
+                              >
+                                <span>A</span>
+                                <span aria-hidden="true">
+                                  {cfg.tagTextColors?.[key] === "#000000"
+                                    ? "●"
+                                    : cfg.tagTextColors?.[key] === "#ffffff"
+                                      ? "○"
+                                      : "◐"}
+                                </span>
+                              </button>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                class="icon-button color-action"
+                                disabled={
+                                  !cfg.tagColors?.[key] &&
+                                  !cfg.tagTextColors?.[key]
+                                }
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      t(
+                                        "Reset background and text colors for {value}?",
+                                        { value: label },
+                                      ),
+                                    )
+                                  )
+                                    setColor(key);
+                                }}
+                                aria-label={t("Default color for {value}", {
+                                  value: label,
+                                })}
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
                 {!colorValues.length && (
                   <p class="quiet">
@@ -943,15 +983,6 @@ export function SettingsDialog({
       </div>
       <div class="modal-actions settings-save-bar">
         {test.saved && <span role="status">{test.saved}</span>}
-        <button
-          type="button"
-          class="button"
-          onClick={() => {
-            if (canLeave()) close();
-          }}
-        >
-          {t("Close")}
-        </button>
         <button
           type="submit"
           form={settingsFormId}

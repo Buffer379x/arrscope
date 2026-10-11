@@ -495,12 +495,6 @@ export function Library({
                 status={status}
                 connectionError={connectionError}
                 demo={status.demo}
-                close={() => {
-                  setSettingsOpen(false);
-                  requestAnimationFrame(() =>
-                    window.scrollTo({ top: libraryScroll.current }),
-                  );
-                }}
                 saved={async () => {
                   await loadSettings();
                   await refresh();

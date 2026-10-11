@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.3.3
+
+Consistent tables for tag and warning colors; bordered icon controls; uniform dropdown sizing; simplified settings footer; permanently visible filename-preview results with a wider input above. No database schema migration. See [release notes](docs/releases/0.3.3.md).
+
 ## 0.3.2
 
 Grouped filters with persistent search and checkbox multi-selects; compact operator icons; full-page settings; compact color controls with confirmed resets; equivalent-preset rejection; manual service synchronization; removal of the audio info icon. No database schema migration. See [release notes](docs/releases/0.3.2.md).
