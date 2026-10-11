@@ -24,19 +24,19 @@ Local prerelease candidate on macOS/arm64; Go runtime reports 15 CPUs and uses `
 | 50k-file filter p95 | 96.91 ms |
 | Initial statistics across 100k files | 2.79 s |
 
-Isolated arm64 Docker test before the pagination optimization (the final CI reruns it): 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, `GOMEMLIMIT=192MiB`, 256 MiB memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped.
+Isolated arm64 Docker test of the final memory/pagination candidate: 100,000 synthetic files, two matched Emby audio tracks per file, `GOMAXPROCS=2`, Go memory target at most 128 MiB under the detected 256 MiB container limit, equal memory and memory-plus-swap limits, non-root, read-only root filesystem and all capabilities dropped. The runtime clamps existing higher Unraid targets too; smaller user targets remain respected.
 
 | Measurement | Result |
 | --- | --- |
-| Successful complete sync | 16.09 s |
-| Sampled application RSS peak during sync | 243.02 MiB |
-| Application RSS after queries and reprocessing | 42.49 MiB |
-| HTTP filter p95 | 63.60 ms |
-| Cold statistics request | 4.46 s |
-| Cached statistics p95 | 0.67 ms |
-| Cold facets request | 0.75 s |
-| Cached facets p95 | 0.82 ms |
-| Reprocess 100k cached filenames | 14.74 s |
+| Successful complete sync | 21.68 s |
+| Sampled application RSS peak during sync | 234.05 MiB |
+| Application RSS after queries and reprocessing | 40.06 MiB |
+| HTTP filter p95 | 89.58 ms |
+| Cold statistics request | 4.87 s |
+| Cached statistics p95 | 1.54 ms |
+| Cold facets request | 1.09 s |
+| Cached facets p95 | 0.72 ms |
+| Reprocess 100k cached filenames | 15.04 s |
 | Upstream requests caused by rule save | 0 |
 
 The cgroup peak reached its 256 MiB limit, including filesystem/database page cache; the process remained healthy and was not OOM-killed. Sampled RSS can miss transient peaks. Cold aggregate requests are slower than indexed library filters and are cached until sync or rule changes. These measurements are environment-specific, not universal latency guarantees. The final CI and release workflow rerun the synthetic container checks on the published candidate.

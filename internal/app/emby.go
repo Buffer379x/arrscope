@@ -193,6 +193,8 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	}
 	for key, indices := range wanted {
 		candidate, ok := matches[key]
+		// Release raw stream records as verified tracks replace them.
+		delete(matches, key)
 		if len(indices) != 1 || (ok && candidate.ambiguous) {
 			for _, i := range indices {
 				files[i].EmbyMatch = "ambiguous"

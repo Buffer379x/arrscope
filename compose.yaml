@@ -9,7 +9,7 @@ services:
     environment:
       ARRSCOPE_DATA_DIR: /data
       ARRSCOPE_HTTPS: "${ARRSCOPE_HTTPS:-false}"
-      GOMEMLIMIT: 192MiB
+      GOMEMLIMIT: 128MiB
       GOMAXPROCS: "2"
     volumes:
       - "${ARRSCOPE_APPDATA:-./appdata}:/data"

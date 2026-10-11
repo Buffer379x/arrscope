@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -33,9 +32,7 @@ func main() {
 		}
 		return
 	}
-	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(192 << 20)
-	}
+	configureMemoryLimit()
 	dir := os.Getenv("ARRSCOPE_DATA_DIR")
 	if dir == "" {
 		dir = "/data"
