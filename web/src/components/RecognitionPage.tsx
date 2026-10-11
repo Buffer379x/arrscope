@@ -1,0 +1,640 @@
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowDownUp,
+  ArrowLeft,
+  Check,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  OctagonAlert,
+} from "lucide-preact";
+import { useEffect, useState } from "preact/hooks";
+import { api } from "../api";
+import { t, useI18n } from "../i18n";
+import type {
+  RecognitionConfig,
+  RecognitionRule,
+  RecognitionResult,
+} from "../types";
+import { labels } from "../ui";
+import { Modal } from "./Modal";
+const fields = [
+  "resolution",
+  "codec",
+  "source",
+  "processing",
+  "hdr",
+  "bitDepth",
+  "audio",
+  "channels",
+  "language",
+];
+const modes = {
+  direct: "Direct recognition",
+  fallback: "Only if missing",
+  override: "Explicit override",
+};
+const columns: [keyof RecognitionRule, string][] = [
+  ["priority", "Priority"],
+  ["enabled", "Enabled"],
+  ["name", "Name"],
+  ["field", "Attribute"],
+  ["match", "Match type"],
+  ["pattern", "Pattern"],
+  ["value", "Result"],
+  ["mode", "Mode"],
+];
+export function RecognitionPage({
+  back,
+  saved,
+  onDirty,
+}: {
+  back: () => void;
+  saved: () => Promise<void>;
+  onDirty: (dirty: boolean) => void;
+}) {
+  useI18n();
+  const [config, setConfig] = useState<RecognitionConfig | null>(null),
+    [defaults, setDefaults] = useState<RecognitionConfig | null>(null),
+    [rules, setRules] = useState<RecognitionRule[]>([]),
+    [sort, setSort] = useState<{ field: keyof RecognitionRule; desc: boolean }>(
+      { field: "priority", desc: false },
+    ),
+    [editing, setEditing] = useState<RecognitionRule | null>(null),
+    [filename, setFilename] = useState(""),
+    [preview, setPreview] = useState<RecognitionResult | null>(null),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false),
+    [previewBusy, setPreviewBusy] = useState(false);
+  const dirty =
+    !!config && JSON.stringify(rules) !== JSON.stringify(config.rules);
+  useEffect(() => {
+    onDirty(dirty);
+    const warn = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  useEffect(() => () => onDirty(false), []);
+  const load = async () => {
+    try {
+      const [current, base] = await Promise.all([
+        api<RecognitionConfig>("recognition"),
+        api<RecognitionConfig>("recognition/defaults"),
+      ]);
+      setConfig(current);
+      setDefaults(base);
+      setRules(current.rules);
+      setError("");
+      setPreview(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  const change = (next: RecognitionRule[]) => {
+    setRules(next);
+    setPreview(null);
+    setNotice("");
+  };
+  const sorted = [...rules].sort((a, b) => {
+    const x = a[sort.field],
+      y = b[sort.field];
+    const cmp =
+      typeof x === "number" && typeof y === "number"
+        ? x - y
+        : String(x).localeCompare(String(y));
+    return (sort.desc ? -cmp : cmp) || a.id.localeCompare(b.id);
+  });
+  const leave = () => {
+    if (!busy && (!dirty || confirm(t("Discard unsaved rule changes?"))))
+      back();
+  };
+  return (
+    <section class="recognition-page">
+      <div class="recognition-heading">
+        <h1>{t("Filename recognition")}</h1>
+        <button class="button" onClick={leave} disabled={busy}>
+          <ArrowLeft size={15} />
+          {t("Back to settings")}
+        </button>
+      </div>
+      <p class="quiet">
+        {t(
+          "Rules only read filenames. API metadata fills remaining gaps; Emby audio tracks stay separate. No media scans are triggered.",
+        )}
+      </p>
+      <div class="recognition-guide">
+        {Object.entries(modes).map(([mode, label]) => (
+          <div>
+            <b>{t(label)}</b>
+            <p>
+              {t(
+                mode === "direct"
+                  ? "Recognizes explicit filename values."
+                  : mode === "fallback"
+                    ? "Fills a field only when direct recognition found no value."
+                    : "Intentionally replaces direct and fallback values.",
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p class="quiet">
+        {t(
+          "Lower priority numbers run first; ties use the rule ID. Table sorting does not change priority. Different scalar values create a warning; HDR, audio codecs and languages are additive.",
+        )}
+      </p>
+      {error && (
+        <div class="notice error" role="alert">
+          {error}
+          <button
+            class="text-button"
+            disabled={busy}
+            onClick={() => {
+              if (!dirty || confirm(t("Discard unsaved rule changes?")))
+                void load();
+            }}
+          >
+            {t("Reload rules")}
+          </button>
+        </div>
+      )}
+      {notice && (
+        <p class="notice success" role="status">
+          {notice}
+        </p>
+      )}
+      {!config && !error && (
+        <p class="quiet">
+          <LoaderCircle class="spin" size={16} />
+          {t("Loading rules …")}
+        </p>
+      )}
+      {config && (
+        <>
+          <div class="recognition-actions">
+            <span>
+              {t("{count} rules", { count: rules.length })}
+              {dirty && " · " + t("Unsaved changes")}
+            </span>
+            <div>
+              <button
+                class="button"
+                disabled={busy || rules.length >= 256}
+                onClick={() =>
+                  setEditing({
+                    id: crypto.randomUUID(),
+                    name: "",
+                    field: "resolution",
+                    match: "token",
+                    pattern: "",
+                    value: "",
+                    mode: "fallback",
+                    priority: 100,
+                    enabled: true,
+                    consume: false,
+                  })
+                }
+              >
+                <Plus size={15} />
+                {t("Add rule")}
+              </button>
+              <button
+                class="button"
+                disabled={busy || !defaults}
+                onClick={() => change(structuredClone(defaults!.rules))}
+              >
+                <RotateCcw size={15} />
+                {t("Restore defaults")}
+              </button>
+              <button
+                class="primary"
+                disabled={busy || !dirty}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const current = await api<RecognitionConfig>(
+                      "recognition",
+                      "PUT",
+                      { rules, revision: config.revision },
+                    );
+                    setConfig(current);
+                    setRules(current.rules);
+                    setPreview(null);
+                    onDirty(false);
+                    setNotice(
+                      t("Rules saved. Cached filenames have been reprocessed."),
+                    );
+                    await saved();
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {busy ? (
+                  <LoaderCircle class="spin" size={15} />
+                ) : (
+                  <Check size={15} />
+                )}{" "}
+                {t(busy ? "Reprocessing cache …" : "Save and reprocess cache")}
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="recognition-table">
+              <thead>
+                <tr>
+                  {columns.map(([field, label]) => (
+                    <th
+                      aria-sort={
+                        sort.field === field
+                          ? sort.desc
+                            ? "descending"
+                            : "ascending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        class="column-sort"
+                        onClick={() =>
+                          setSort({
+                            field,
+                            desc: sort.field === field ? !sort.desc : false,
+                          })
+                        }
+                      >
+                        {t(label)}
+                        {sort.field === field ? (
+                          sort.desc ? (
+                            <ArrowDown size={13} />
+                          ) : (
+                            <ArrowUp size={13} />
+                          )
+                        ) : (
+                          <ArrowDownUp size={13} />
+                        )}
+                      </button>
+                    </th>
+                  ))}
+                  <th>{t("Actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((rule) => (
+                  <tr
+                    key={rule.id}
+                    class={!rule.enabled ? "rule-disabled" : ""}
+                  >
+                    <td>{rule.priority}</td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={t("Enable rule: {name}", {
+                          name: rule.name,
+                        })}
+                        checked={rule.enabled}
+                        disabled={busy}
+                        onChange={(e) =>
+                          change(
+                            rules.map((r) =>
+                              r.id === rule.id
+                                ? { ...r, enabled: e.currentTarget.checked }
+                                : r,
+                            ),
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <b>{rule.name}</b>
+                      {rule.id.startsWith("default-") && (
+                        <small class="quiet">{t("Default rule")}</small>
+                      )}
+                    </td>
+                    <td>{labels[rule.field]}</td>
+                    <td>
+                      {t(
+                        rule.match === "token" ? "Token" : "Regular expression",
+                      )}
+                    </td>
+                    <td>
+                      <code>{rule.pattern}</code>
+                    </td>
+                    <td>{rule.value}</td>
+                    <td>{t(modes[rule.mode])}</td>
+                    <td>
+                      <div class="row-actions">
+                        <button
+                          class="icon-button"
+                          disabled={busy}
+                          aria-label={t("Edit rule: {name}", {
+                            name: rule.name,
+                          })}
+                          onClick={() => setEditing({ ...rule })}
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          class="icon-button"
+                          disabled={busy}
+                          aria-label={t("Delete rule: {name}", {
+                            name: rule.name,
+                          })}
+                          onClick={() =>
+                            change(rules.filter((r) => r.id !== rule.id))
+                          }
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!rules.length && (
+              <p class="quiet empty-rules">
+                {t(
+                  "No filename rules. Only API and Emby metadata will be used after saving.",
+                )}
+              </p>
+            )}
+          </div>
+          <section class="recognition-preview">
+            <h2>{t("Preview filename")}</h2>
+            <p class="quiet">
+              {t(
+                "Preview uses unsaved rules and the filename only. API and Emby enrichment is not included.",
+              )}
+            </p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setPreviewBusy(true);
+                setError("");
+                try {
+                  setPreview(
+                    await api<RecognitionResult>(
+                      "recognition/preview",
+                      "POST",
+                      { rules, filename },
+                    ),
+                  );
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setPreviewBusy(false);
+                }
+              }}
+            >
+              <label>
+                {t("Filename")}
+                <input
+                  required
+                  maxLength={2048}
+                  value={filename}
+                  placeholder="Movie.UHDBD.x265.mkv"
+                  onInput={(e) => {
+                    setFilename(e.currentTarget.value);
+                    setPreview(null);
+                  }}
+                />
+              </label>
+              <button class="button" disabled={busy || previewBusy}>
+                {previewBusy ? (
+                  <LoaderCircle class="spin" size={15} />
+                ) : (
+                  <Search size={15} />
+                )}{" "}
+                {t("Preview")}
+              </button>
+            </form>
+            {preview && (
+              <>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t("Attribute")}</th>
+                        <th>{t("Result")}</th>
+                        <th>{t("Matching rules")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fields.map((field) => (
+                        <tr>
+                          <td>{labels[field]}</td>
+                          <td>{preview.values[field] || t("Unknown")}</td>
+                          <td>
+                            {(preview.matches[field] || [])
+                              .map(
+                                (id) =>
+                                  rules.find((r) => r.id === id)?.name || id,
+                              )
+                              .join(" · ") || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!!preview.conflicts.length && (
+                  <div class="notice recognition-conflict-details">
+                    <OctagonAlert size={18} />
+                    <div>
+                      <b>{t("Conflicting recognition rules")}</b>
+                      {preview.conflicts.map((c) => (
+                        <p>
+                          {labels[c.field]}: {c.values.join(" / ")} ·{" "}
+                          {c.ruleNames.join(" · ")}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </>
+      )}
+      {editing && (
+        <RuleEditor
+          rule={editing}
+          close={() => setEditing(null)}
+          save={(rule) => {
+            change(
+              rules.some((r) => r.id === rule.id)
+                ? rules.map((r) => (r.id === rule.id ? rule : r))
+                : [...rules, rule],
+            );
+            setEditing(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+function RuleEditor({
+  rule,
+  close,
+  save,
+}: {
+  rule: RecognitionRule;
+  close: () => void;
+  save: (rule: RecognitionRule) => void;
+}) {
+  useI18n();
+  const [draft, setDraft] = useState(rule);
+  const patch = (value: Partial<RecognitionRule>) =>
+    setDraft({ ...draft, ...value });
+  return (
+    <Modal title={t("Edit recognition rule")} close={close} wide>
+      <form
+        class="rule-editor"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save(draft);
+        }}
+      >
+        <label>
+          {t("Name")}
+          <input
+            required
+            maxLength={80}
+            value={draft.name}
+            onInput={(e) => patch({ name: e.currentTarget.value })}
+          />
+        </label>
+        <label>
+          {t("Attribute")}
+          <select
+            value={draft.field}
+            onChange={(e) => patch({ field: e.currentTarget.value })}
+          >
+            {fields.map((field) => (
+              <option value={field}>{labels[field]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t("Match type")}
+          <select
+            value={draft.match}
+            onChange={(e) =>
+              patch({
+                match: e.currentTarget.value as RecognitionRule["match"],
+              })
+            }
+          >
+            <option value="token">{t("Token")}</option>
+            <option value="regex">{t("Regular expression")}</option>
+          </select>
+        </label>
+        <label>
+          {t("Pattern")}
+          <input
+            required
+            maxLength={500}
+            value={draft.pattern}
+            onInput={(e) => patch({ pattern: e.currentTarget.value })}
+          />
+        </label>
+        <label>
+          {t("Result")}
+          <input
+            required
+            maxLength={80}
+            value={draft.value}
+            onInput={(e) => patch({ value: e.currentTarget.value })}
+          />
+        </label>
+        <label>
+          {t("Mode")}
+          <select
+            value={draft.mode}
+            onChange={(e) =>
+              patch({ mode: e.currentTarget.value as RecognitionRule["mode"] })
+            }
+          >
+            {Object.entries(modes).map(([mode, label]) => (
+              <option value={mode}>{t(label)}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t("Priority")}
+          <input
+            required
+            type="number"
+            min={0}
+            max={10000}
+            step={1}
+            value={draft.priority}
+            onInput={(e) => patch({ priority: Number(e.currentTarget.value) })}
+          />
+        </label>
+        <label class="check-field">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={(e) => patch({ enabled: e.currentTarget.checked })}
+          />
+          {t("Enabled")}
+        </label>
+        <p class="quiet rule-editor-help">
+          {t(
+            "Matching is case-insensitive. Tokens require separators. Regular expressions use Go RE2 syntax; capture groups can be referenced with $1 in the result.",
+          )}
+        </p>
+        <details class="rule-advanced">
+          <summary>{t("Advanced matching")}</summary>
+          <label>
+            {t("Skip when filename matches this expression")}
+            <input
+              maxLength={500}
+              value={draft.unless || ""}
+              onInput={(e) => patch({ unless: e.currentTarget.value })}
+            />
+          </label>
+          <label class="check-field">
+            <input
+              type="checkbox"
+              checked={draft.consume}
+              onChange={(e) => patch({ consume: e.currentTarget.checked })}
+            />
+            {t("Consume matched text before subsequent rules")}
+          </label>
+          <p class="quiet">
+            {t(
+              "Useful for audio variants such as DTS-HD before DTS. Applies within the same attribute and mode.",
+            )}
+          </p>
+        </details>
+        <div class="modal-actions">
+          <button type="button" class="button" onClick={close}>
+            {t("Cancel")}
+          </button>
+          <button class="primary">
+            <Check size={15} />
+            {t("Apply to draft")}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

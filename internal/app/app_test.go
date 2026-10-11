@@ -924,7 +924,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 func TestColumnOrderLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.ColumnOrder = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 11 || cfg.ColumnOrder["radarr"][0] != "title" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 10 || cfg.ColumnOrder["radarr"][0] != "title" {
 		t.Fatal("missing legacy column order", err)
 	}
 	duplicate := defaultColumnOrder()["radarr"]
@@ -956,7 +956,7 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().ColumnOrder["sonarr"]) != 11 {
+	if len(server.Config().ColumnOrder["sonarr"]) != 10 {
 		t.Fatal("legacy server order missing")
 	}
 }

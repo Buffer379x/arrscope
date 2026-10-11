@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.3.0
+
+Configurable filename recognition with previews and atomic cache reprocessing; separate, customizable recognition warnings; conflict and Emby matching filters; unified Audio column; clickable language distribution; consistent Dashboard heading and title-icon details. SQLite migration to schema 5 retains settings, presets and cached Emby tracks. See [release notes](docs/releases/0.3.0.md).
+
 ## [0.2.3] — 2026-10-11
 
 See [0.2.3 release notes](docs/releases/0.2.3.md): full-canvas icons, consistent default tag outlines, unified responsive System settings and corrected screenshot sources.

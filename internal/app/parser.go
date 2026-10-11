@@ -189,6 +189,18 @@ func normLanguage(s string) string {
 			v = "Englisch"
 		case "french", "französisch", "fr", "fra", "fre":
 			v = "Französisch"
+		case "spanish", "spanisch", "español", "es", "spa":
+			v = "Spanisch"
+		case "italian", "italienisch", "italiano", "it", "ita":
+			v = "Italienisch"
+		case "portuguese", "portugiesisch", "pt", "por":
+			v = "Portugiesisch"
+		case "dutch", "niederländisch", "nl", "nld", "dut":
+			v = "Niederländisch"
+		case "russian", "russisch", "ru", "rus":
+			v = "Russisch"
+		case "polish", "polnisch", "pl", "pol":
+			v = "Polnisch"
 		case "japanese", "japanisch", "ja", "jpn":
 			v = "Japanisch"
 		}
@@ -213,10 +225,16 @@ type APIInfo struct {
 	AudioStreamCount      int
 }
 
-func Enrich(f *File, api APIInfo) {
+func Enrich(f *File, api APIInfo) { EnrichWithRules(f, api, defaultRecognitionEngine) }
+func EnrichWithRules(f *File, api APIInfo, engine *RecognitionEngine) {
+	f.APIInfo = &api
+	result := engine.Recognize(f.Filename)
+	f.RecognitionRevision = engine.config.Revision
+	f.RecognitionConflicts = result.Conflicts
+	f.RuleConflict = len(result.Conflicts) > 0
 	f.Evidence = map[string]Evidence{}
 	f.Conflict = false
-	r, s, p := qualityParts(f.Filename)
+	r, s, p := result.Values["resolution"], result.Values["source"], result.Values["processing"]
 	ar, as, ap := qualityParts(api.Quality)
 	if api.Resolution != "" {
 		if v := normResolution(match(resolutionRE, " "+api.Resolution+" ")); v != "" {
@@ -224,10 +242,10 @@ func Enrich(f *File, api APIInfo) {
 		}
 	}
 	set := func(k, n, a string) string {
-		e := Evidence{Filename: n, API: a}
+		e := Evidence{Filename: n, API: a, Rules: result.Matches[k]}
 		v := n
 		if v != "" {
-			e.Origin = "filename"
+			e.Origin = result.Origins[k]
 		} else if a != "" {
 			v = a
 			e.Origin = "api"
@@ -241,7 +259,7 @@ func Enrich(f *File, api APIInfo) {
 		if k == "hdr" && n != "" && a != "" {
 			// Profiles are additive. A filename naming DV must not hide an
 			// explicitly reported HDR10 fallback from existing API metadata.
-			v = hdrToken(n + " " + a)
+			v = mergeHDR(n, a)
 			e.Conflict = false
 			if v != n {
 				e.Origin = "combined"
@@ -254,21 +272,21 @@ func Enrich(f *File, api APIInfo) {
 	f.Resolution = set("resolution", r, ar)
 	f.Source = set("source", s, as)
 	f.Processing = set("processing", p, ap)
-	f.Codec = set("codec", normCodec(match(codecRE, f.Filename)), normCodec(api.VideoCodec))
+	f.Codec = set("codec", result.Values["codec"], normCodec(api.VideoCodec))
 	f.Family = family(f.Codec)
 	ad := ""
 	if api.VideoBitDepth > 0 {
 		ad = strconv.Itoa(api.VideoBitDepth)
 	}
-	f.BitDepth = set("bitDepth", match(depthRE, f.Filename), ad)
-	f.HDR = set("hdr", hdrToken(f.Filename), hdrToken(api.VideoDynamicRange+" "+api.VideoDynamicRangeType))
-	f.Audio = set("audio", audioToken(f.Filename), normAudio(api.AudioCodec))
+	f.BitDepth = set("bitDepth", result.Values["bitDepth"], ad)
+	f.HDR = set("hdr", result.Values["hdr"], hdrToken(api.VideoDynamicRange+" "+api.VideoDynamicRangeType))
+	f.Audio = set("audio", result.Values["audio"], normAudio(api.AudioCodec))
 	ac := ""
 	if api.AudioChannels > 0 {
 		ac = strconv.FormatFloat(api.AudioChannels, 'f', 1, 64)
 	}
-	f.Channels = set("channels", match(channelRE, f.Filename), ac)
-	f.Language = set("language", languageToken(f.Filename), normLanguage(api.AudioLanguages))
+	f.Channels = set("channels", result.Values["channels"], ac)
+	f.Language = set("language", result.Values["language"], normLanguage(api.AudioLanguages))
 	if e := f.Evidence["language"]; e.Filename != "" && e.API != "" {
 		f.Language = normLanguage(e.Filename + " / " + e.API)
 		e.Conflict = !containsAllTraits(e.API, e.Filename, ", ")
@@ -321,4 +339,20 @@ func containsAllTraits(value, selected, separator string) bool {
 		}
 	}
 	return true
+}
+
+// Combine already normalized profiles without discarding user-defined HDR values.
+func mergeHDR(values ...string) string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		for _, part := range strings.Split(value, " + ") {
+			part = strings.TrimSpace(part)
+			if part != "" && !seen[part] {
+				seen[part] = true
+				out = append(out, part)
+			}
+		}
+	}
+	return strings.Join(out, " + ")
 }

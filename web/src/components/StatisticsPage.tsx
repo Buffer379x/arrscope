@@ -11,6 +11,8 @@ import {
 import { useContext, useEffect, useState } from "preact/hooks";
 import type { Statistics, Status } from "../types";
 
+import { LanguageFlag } from "./LanguageFlag";
+import { audioLanguageKey } from "../languages";
 import { api } from "../api";
 import { count, labels, Tag, TagColors } from "../ui";
 const chartPalette = [
@@ -49,13 +51,16 @@ export function StatisticsPage({
       current = false;
       controller.abort();
     };
-  }, [status.sync?.radarr.lastSuccess, status.sync?.sonarr.lastSuccess]);
+  }, [
+    status.sync?.radarr.lastSuccess,
+    status.sync?.sonarr.lastSuccess,
+    status.recognitionRevision,
+  ]);
   return (
     <section class="statistics-page" aria-label={t("Dashboard")}>
       <div class="statistics-heading">
         <div>
           <h1>{t("Dashboard")}</h1>
-          <p>{t("Your cached library at a glance.")}</p>
         </div>
         <span class="quiet">
           <Database size={14} />
@@ -178,6 +183,11 @@ export function StatisticsPage({
               />
             ))}
           </div>
+          <LanguageDistribution
+            buckets={data.distributions[scope]?.language || []}
+            total={data.languageTotals[scope] || 0}
+            onFilter={(value) => onFilter("language", value, scope)}
+          />
           <p class="statistics-footnote">
             {t(
               "Counts include movies and series with cached files. Each unique episode counts once; one file may contain multiple episodes. Unknown values remain visible in charts.",
@@ -284,6 +294,70 @@ function DistributionChart({
           <BarChart3 size={28} />
           <p>{t("No files in cache yet")}</p>
         </div>
+      )}
+    </article>
+  );
+}
+
+function LanguageDistribution({
+  buckets,
+  total,
+  onFilter,
+}: {
+  buckets: { value: string; count: number }[];
+  total: number;
+  onFilter: (value: string) => void;
+}) {
+  useI18n();
+  return (
+    <article class="distribution-card language-distribution">
+      <div class="distribution-title">
+        <h3>{t("Language distribution")}</h3>
+        <span>
+          {count(total)} {t("titles")}
+        </span>
+      </div>
+      <p class="quiet">
+        {t(
+          "Each movie and episode counts once per language. Multilingual titles appear in multiple groups; percentages can overlap.",
+        )}
+      </p>
+      {total ? (
+        <ul class="distribution-list">
+          {buckets.map((bucket, i) => {
+            const label = t(audioLanguageKey(bucket.value)),
+              percentage = (bucket.count / total) * 100;
+            return (
+              <li>
+                <button
+                  class="distribution-label chart-filter language-chart-filter"
+                  onClick={() => onFilter(bucket.value)}
+                  aria-label={t("Filter language: {value}", { value: label })}
+                >
+                  <LanguageFlag value={bucket.value} focusable={false} />
+                  <span>{label}</span>
+                  <b>{count(bucket.count)}</b>
+                  <span>
+                    {new Intl.NumberFormat(getLocale(), {
+                      maximumFractionDigits: 1,
+                    }).format(percentage)}{" "}
+                    %
+                  </span>
+                </button>
+                <div class="distribution-track">
+                  <span
+                    style={{
+                      width: percentage + "%",
+                      backgroundColor: chartPalette[i % chartPalette.length],
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p class="quiet">{t("No files in cache yet")}</p>
       )}
     </article>
   );

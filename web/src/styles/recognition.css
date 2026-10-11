@@ -1,0 +1,261 @@
+.statistics-heading h1,
+.recognition-heading h1 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  margin: 0;
+  font-weight: 700;
+}
+.statistics-heading {
+  margin: 8px 0 20px;
+}
+.recognition-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 18px;
+}
+.recognition-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.recognition-guide > div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 14px;
+}
+.recognition-guide b {
+  font-size: 13px;
+}
+.recognition-guide p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+.recognition-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 12px;
+  flex-wrap: wrap;
+}
+.recognition-actions > div,
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.recognition-actions > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.recognition-table {
+  min-width: 1050px;
+}
+.recognition-table code {
+  display: block;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.recognition-table td small {
+  display: block;
+  margin-top: 5px;
+}
+.recognition-table td {
+  font-size: 12px;
+}
+.rule-disabled td {
+  color: var(--muted);
+}
+.recognition-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+.recognition-preview {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 20px;
+  margin: 24px 0 30px;
+}
+.recognition-preview h2 {
+  font-size: 16px;
+  margin-top: 0;
+}
+.recognition-preview form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin: 16px 0;
+}
+.recognition-preview label {
+  flex: 1;
+}
+.recognition-preview .table-wrap {
+  margin-top: 18px;
+}
+.recognition-preview table {
+  min-width: 560px;
+}
+.recognition-preview td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.recognition-preview .notice {
+  margin-top: 16px;
+}
+.rule-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+.rule-editor-help,
+.rule-advanced,
+.rule-editor .modal-actions {
+  grid-column: 1/-1;
+}
+.rule-advanced summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.rule-advanced label {
+  margin-top: 12px;
+}
+.empty-rules {
+  padding: 20px;
+}
+.recognition-conflict-details h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recognition-conflict-details p {
+  overflow-wrap: anywhere;
+}
+.audio-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 120px;
+}
+.audio-cell .audio-mapping {
+  align-self: start;
+  gap: 5px;
+}
+.audio-mapping small {
+  font-size: 10px;
+  white-space: normal;
+  max-width: 170px;
+  text-align: left;
+  line-height: 1.4;
+}
+.warning-color-settings .tag-color-row {
+  grid-template-columns: minmax(0, 1fr) 42px auto;
+}
+.warning-color-settings label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.language-distribution {
+  margin-top: 20px;
+}
+.language-distribution .distribution-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 30px;
+}
+.language-chart-filter .language-flag {
+  flex-shrink: 0;
+}
+.language-chart-filter:hover .language-flag,
+.language-chart-filter:focus-visible .language-flag {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.row-icon.file-button {
+  flex-shrink: 0;
+  position: relative;
+}
+.file-button:focus .filename-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+@media (max-width: 600px) {
+  .statistics-heading h1,
+  .recognition-heading h1 {
+    font-size: 16px;
+  }
+  .recognition-guide {
+    grid-template-columns: 1fr;
+  }
+  .recognition-heading {
+    flex-wrap: wrap;
+  }
+  .recognition-actions > div {
+    width: 100%;
+  }
+  .recognition-actions button {
+    flex: 1;
+  }
+  .recognition-preview {
+    padding: 14px;
+  }
+  .recognition-preview form {
+    flex-wrap: wrap;
+  }
+  .recognition-preview label {
+    flex-basis: 100%;
+  }
+  .rule-editor {
+    grid-template-columns: 1fr;
+  }
+  .language-distribution .distribution-list {
+    grid-template-columns: 1fr;
+  }
+  .warning-color-settings .tag-color-row {
+    gap: 7px;
+    font-size: 11px;
+  }
+}
+
+.recognition-page > .table-wrap {
+  max-height: 520px;
+  overflow: auto;
+}
+.recognition-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+.row-icon.file-button {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.file-button:focus .filename-tooltip {
+  display: block;
+}
+
+.unassigned-audio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 190px;
+  white-space: normal;
+}
+.unassigned-audio small {
+  font-size: 10px;
+  line-height: 1.4;
+}

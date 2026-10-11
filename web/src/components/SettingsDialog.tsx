@@ -3,6 +3,9 @@ import { SystemInfo } from "./SystemInfo";
 import { Modal } from "./Modal";
 
 import {
+  AlertTriangle,
+  OctagonAlert,
+  SlidersHorizontal,
   ArrowDown,
   ArrowUp,
   ArrowUpRight,
@@ -19,6 +22,7 @@ import type { Connection, Service, Settings, Status } from "../types";
 
 import { api } from "../api";
 import {
+  defaultWarningColors,
   colorFields,
   columnLabels,
   ConnectionService,
@@ -36,6 +40,8 @@ export function SettingsDialog({
   demo,
   close,
   saved,
+  onRecognition,
+  initialSection = "connections",
 }: {
   settings: Settings;
   status: Status;
@@ -43,6 +49,8 @@ export function SettingsDialog({
   demo: boolean;
   close: () => void;
   saved: () => Promise<void>;
+  onRecognition: () => void;
+  initialSection?: string;
 }) {
   useI18n();
   const settingsFormId = useId();
@@ -54,7 +62,7 @@ export function SettingsDialog({
     [testing, setTesting] = useState<Record<string, boolean>>({}),
     [current, setCurrent] = useState(""),
     [password, setPassword] = useState(""),
-    [section, setSection] = useState("connections"),
+    [section, setSection] = useState(initialSection),
     [colorField, setColorField] = useState("resolution"),
     [recognized, setRecognized] = useState<Record<string, string[]>>({});
   useEffect(() => {
@@ -528,6 +536,63 @@ export function SettingsDialog({
                 ))}
               </div>
             </fieldset>
+            <fieldset class="connection warning-color-settings">
+              <legend>{t("Warning colors")}</legend>
+              <p class="quiet">
+                {t(
+                  "Metadata disagreements and conflicting recognition rules use separate icons.",
+                )}
+              </p>
+              {["metadata", "recognition"].map((key) => (
+                <div class="tag-color-row">
+                  <label style={{ color: cfg.warningColors[key] }}>
+                    {key === "metadata" ? (
+                      <AlertTriangle size={17} />
+                    ) : (
+                      <OctagonAlert size={17} />
+                    )}{" "}
+                    {t(
+                      key === "metadata"
+                        ? "Metadata disagreement"
+                        : "Conflicting recognition rules",
+                    )}
+                  </label>
+                  <input
+                    type="color"
+                    aria-label={t(
+                      key === "metadata"
+                        ? "Metadata warning color"
+                        : "Recognition warning color",
+                    )}
+                    value={cfg.warningColors[key]}
+                    onInput={(e) =>
+                      setCfg({
+                        ...cfg,
+                        warningColors: {
+                          ...cfg.warningColors,
+                          [key]: e.currentTarget.value,
+                        },
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    class="text-button"
+                    onClick={() =>
+                      setCfg({
+                        ...cfg,
+                        warningColors: {
+                          ...cfg.warningColors,
+                          [key]: defaultWarningColors[key],
+                        },
+                      })
+                    }
+                  >
+                    {t("Default")}
+                  </button>
+                </div>
+              ))}
+            </fieldset>
             <fieldset class="connection tag-color-settings">
               <legend>{t("Tag colors")}</legend>
               <p class="quiet">
@@ -590,6 +655,28 @@ export function SettingsDialog({
             </fieldset>
           </div>
           <div class="settings-section" hidden={section !== "system"}>
+            <fieldset class="connection">
+              <legend>{t("Filename recognition")}</legend>
+              <p class="quiet">
+                {t(
+                  "Manage filename rules and preview results. Saving recalculates the cache without scanning media or contacting your services.",
+                )}
+              </p>
+              <button
+                type="button"
+                class="button"
+                onClick={() => {
+                  if (
+                    JSON.stringify(cfg) === JSON.stringify(settings) ||
+                    confirm(t("Discard unsaved settings changes?"))
+                  )
+                    onRecognition();
+                }}
+              >
+                <SlidersHorizontal size={15} />
+                {t("Manage recognition rules")}
+              </button>
+            </fieldset>
             <SystemInfo
               status={status}
               settings={settings}

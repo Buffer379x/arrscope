@@ -54,6 +54,9 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		if cfg.TagColors == nil {
 			cfg.TagColors = map[string]string{}
 		}
+		if e := normalizeWarningColors(&cfg); e != nil {
+			return nil, e
+		}
 		if e := normalizeVisibleColumns(&cfg); e != nil {
 			return nil, e
 		}
@@ -87,8 +90,9 @@ func jsonOut(w http.ResponseWriter, status int, v any) {
 func failure(w http.ResponseWriter, r *http.Request, status int, e error) {
 	jsonOut(w, status, map[string]string{"error": localizedMessage(requestLocale(r), e.Error())})
 }
-func decode(w http.ResponseWriter, r *http.Request, v any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+func decode(w http.ResponseWriter, r *http.Request, v any) error { return decodeLimit(w, r, v, 64<<10) }
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if e := d.Decode(v); e != nil {
@@ -152,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 					states[service] = state
 				}
 				out["sync"] = states
+				out["recognitionRevision"] = s.Store.Recognition().Revision
 			}
 			jsonOut(w, 200, out)
 			return
@@ -206,6 +211,52 @@ func (s *Server) Handler() http.Handler {
 			http.SetCookie(w, &http.Cookie{Name: "arrscope_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
+		case "/api/recognition", "/api/recognition/defaults", "/api/recognition/preview":
+			if r.Method == "GET" && r.URL.Path == "/api/recognition" {
+				jsonOut(w, 200, s.Store.Recognition())
+				return
+			}
+			if r.Method == "GET" && r.URL.Path == "/api/recognition/defaults" {
+				jsonOut(w, 200, defaultRecognitionEngine.Config())
+				return
+			}
+			if (r.Method == "PUT" && r.URL.Path == "/api/recognition") || (r.Method == "POST" && r.URL.Path == "/api/recognition/preview") {
+				var in struct {
+					Rules    []RecognitionRule `json:"rules"`
+					Revision string            `json:"revision"`
+					Filename string            `json:"filename"`
+				}
+				if err := decodeLimit(w, r, &in, 256<<10); err != nil {
+					failure(w, r, 400, err)
+					return
+				}
+				engine, err := CompileRecognition(in.Rules)
+				if err != nil {
+					failure(w, r, 400, err)
+					return
+				}
+				if r.Method == "POST" {
+					if len(in.Filename) == 0 || len(in.Filename) > 2048 {
+						failure(w, r, 400, errors.New("Enter a filename up to 2048 characters"))
+						return
+					}
+					jsonOut(w, 200, engine.Recognize(in.Filename))
+					return
+				}
+				ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
+				defer cancel()
+				out, err := s.Store.SaveRecognition(ctx, in.Rules, in.Revision)
+				if err != nil {
+					status := 500
+					if errors.Is(err, ErrRecognitionRevision) {
+						status = 409
+					}
+					failure(w, r, status, err)
+					return
+				}
+				jsonOut(w, 200, out)
+				return
+			}
 		case "/api/settings":
 			if r.Method == "GET" {
 				cfg := s.Config()
@@ -219,6 +270,10 @@ func (s *Server) Handler() http.Handler {
 			if r.Method == "PUT" {
 				var cfg Settings
 				if e := decode(w, r, &cfg); e != nil {
+					failure(w, r, 400, e)
+					return
+				}
+				if e := normalizeWarningColors(&cfg); e != nil {
 					failure(w, r, 400, e)
 					return
 				}
@@ -545,7 +600,7 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 	}
 	cw := csv.NewWriter(destination)
 	cw.Comma = ';'
-	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Language", "Bytes", "Conflict", "Audio tracks", "Emby matching"}
+	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Bytes", "Metadata disagreement", "Recognition conflicts", "Emby matching"}
 	if len(locale) > 0 {
 		for i, header := range headers {
 			headers[i] = localizedMessage(locale[0], header)
@@ -568,7 +623,7 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 		for _, y := range f.Years {
 			years = append(years, strconv.Itoa(y))
 		}
-		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, f.Audio, f.Channels, f.Language, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), audioTrackSummary(f.AudioTracks), f.EmbyMatch}
+		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, combinedAudioSummary(f, locale...), f.Channels, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), strconv.FormatBool(f.RuleConflict), f.EmbyMatch}
 		for i, v := range record {
 			record[i] = safeCell(v)
 		}
@@ -581,4 +636,37 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func combinedAudioSummary(f File, locale ...string) string {
+	language := "en"
+	if len(locale) > 0 {
+		language = locale[0]
+	}
+	languages, codecs := f.Language, f.Audio
+	summary := ""
+	if len(f.AudioTracks) > 0 {
+		summary = audioTrackSummary(f.AudioTracks, locale...)
+		knownLanguages, knownCodecs := map[string]bool{}, map[string]bool{}
+		for _, track := range f.AudioTracks {
+			knownLanguages[track.Language] = true
+			knownCodecs[track.Codec] = true
+		}
+		extras := func(value, separator string, known map[string]bool) string {
+			out := []string{}
+			for _, v := range strings.Split(value, separator) {
+				if v != "" && !known[v] {
+					out = append(out, v)
+				}
+			}
+			return strings.Join(out, separator)
+		}
+		languages = extras(languages, ", ", knownLanguages)
+		codecs = extras(codecs, " + ", knownCodecs)
+		if languages == "" && codecs == "" {
+			return summary
+		}
+		summary += " | "
+	}
+	return summary + localizedMessage(language, "Languages:") + " " + languages + " | " + localizedMessage(language, "Codecs:") + " " + codecs + " | " + localizedMessage(language, "Track mapping unavailable")
 }

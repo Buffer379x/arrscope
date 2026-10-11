@@ -1,6 +1,7 @@
 import { t, useI18n } from "../i18n";
 import {
   AlertTriangle,
+  OctagonAlert,
   ArrowDown,
   ArrowDownUp,
   ArrowLeft,
@@ -62,6 +63,9 @@ import {
   Tag,
   TagColors,
 } from "../ui";
+import { RecognitionPage } from "./RecognitionPage";
+import { AudioCell } from "./AudioCell";
+import { defaultWarningColors } from "../ui";
 import { FileDialog } from "./FileDialog";
 import { FilterPanel } from "./FilterPanel";
 import { Modal } from "./Modal";
@@ -78,13 +82,13 @@ const movieSortFields = [
   "bitDepth",
   "audio",
   "channels",
-  "language",
 ];
 function initialMovieSort(): FilmSort {
   try {
     const saved = JSON.parse(
       localStorage.getItem("arrscope-film-sort") || "null",
     );
+    if (saved?.field === "language") saved.field = "audio";
     if (
       saved &&
       movieSortFields.includes(saved.field) &&
@@ -105,7 +109,9 @@ export function Library({
 }) {
   useI18n();
   const [service, setService] = useState<Service>("radarr"),
-    [view, setView] = useState<"library" | "statistics">("statistics"),
+    [view, setView] = useState<"library" | "statistics" | "recognition">(
+      "statistics",
+    ),
     [movieSort, setMovieSort] = useState<FilmSort>(initialMovieSort),
     [filters, setFilters] = useState<Record<Service, string>>({
       radarr: "",
@@ -124,7 +130,9 @@ export function Library({
       radarr: false,
       sonarr: false,
     }),
+    [rulesDirty, setRulesDirty] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
+    [settingsSection, setSettingsSection] = useState("connections"),
     [collapsed, setCollapsed] = useState(
       localStorage.getItem("arrscope-filter-collapsed") === "true",
     ),
@@ -169,7 +177,7 @@ export function Library({
   useFacets(
     view === "library",
     service,
-    sync?.lastSuccess,
+    `${sync?.lastSuccess}:${status.recognitionRevision}`,
     setFacets,
     setError,
   );
@@ -179,12 +187,20 @@ export function Library({
     filters: effectiveFilters,
     page,
     movieSort,
-    lastSuccess: sync?.lastSuccess,
+    lastSuccess: `${sync?.lastSuccess}:${status.recognitionRevision}`,
     seasonMode: settings?.seasonMode,
     setResults,
     setBusy,
     setError,
   });
+  const openSettings = (section = "connections") => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  };
+  const canLeaveRules = () =>
+    view !== "recognition" ||
+    !rulesDirty ||
+    confirm(t("Discard unsaved rule changes?"));
   const change = (key: string, values: FilterUpdate) => {
     const updateFilters = (current: Record<Service, string>) => {
       const n = new URLSearchParams(current[service]);
@@ -390,6 +406,7 @@ export function Library({
             <button
               class={view === "statistics" ? "active" : ""}
               onClick={() => {
+                if (!canLeaveRules()) return;
                 closeDashboardFilter();
                 setView("statistics");
               }}
@@ -401,6 +418,7 @@ export function Library({
             <button
               class={view === "library" && service === "radarr" ? "active" : ""}
               onClick={() => {
+                if (!canLeaveRules()) return;
                 closeDashboardFilter();
                 setView("library");
                 if (service === "radarr") return;
@@ -414,6 +432,7 @@ export function Library({
             <button
               class={view === "library" && service === "sonarr" ? "active" : ""}
               onClick={() => {
+                if (!canLeaveRules()) return;
                 closeDashboardFilter();
                 setView("library");
                 if (service === "sonarr") return;
@@ -436,7 +455,9 @@ export function Library({
             <button
               class="icon-button"
               aria-label={t("Settings")}
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => {
+                if (canLeaveRules()) openSettings();
+              }}
             >
               <SettingsIcon size={18} />
             </button>
@@ -461,7 +482,16 @@ export function Library({
           </div>
         )}
         <main class="main">
-          {view === "statistics" ? (
+          {view === "recognition" ? (
+            <RecognitionPage
+              onDirty={setRulesDirty}
+              saved={refresh}
+              back={() => {
+                setView("statistics");
+                openSettings("system");
+              }}
+            />
+          ) : view === "statistics" ? (
             <StatisticsPage status={status} onFilter={openDashboardFilter} />
           ) : (
             <>
@@ -516,7 +546,12 @@ export function Library({
                       )}
                     </p>
                   </div>
-                  <button class="primary" onClick={() => setSettingsOpen(true)}>
+                  <button
+                    class="primary"
+                    onClick={() => {
+                      if (canLeaveRules()) openSettings();
+                    }}
+                  >
                     {t("Set up service")}
                     <ArrowUpRight size={16} />
                   </button>
@@ -646,16 +681,8 @@ export function Library({
                           title: (
                             <td key="title" class="title-cell">
                               <div class="title-line">
-                                <span class="row-icon">
-                                  {service === "radarr" ? (
-                                    <Film size={15} />
-                                  ) : (
-                                    <FileVideo2 size={15} />
-                                  )}
-                                </span>
-                                <b>{f.title}</b>
                                 <button
-                                  class="file-button"
+                                  class="row-icon file-button"
                                   aria-label={t(
                                     "Filename and metadata: {title}",
                                     { title: f.title },
@@ -663,7 +690,11 @@ export function Library({
                                   aria-describedby={"filename-" + f.id}
                                   onClick={() => setFilename(f)}
                                 >
-                                  <FileVideo2 size={14} />
+                                  {service === "radarr" ? (
+                                    <Film size={15} />
+                                  ) : (
+                                    <FileVideo2 size={15} />
+                                  )}
                                   <span
                                     class="filename-tooltip"
                                     role="tooltip"
@@ -672,14 +703,35 @@ export function Library({
                                     {f.filename}
                                   </span>
                                 </button>
+                                <b>{f.title}</b>
                                 {f.conflict && (
                                   <button
                                     class="conflict-button"
-                                    title={t("Filename and API disagree")}
+                                    title={t("Metadata disagreement")}
+                                    style={{
+                                      color:
+                                        settings?.warningColors.metadata ||
+                                        defaultWarningColors.metadata,
+                                    }}
                                     aria-label={t("Show conflicting metadata")}
                                     onClick={() => setFilename(f)}
                                   >
                                     <AlertTriangle size={14} />
+                                  </button>
+                                )}
+                                {f.ruleConflict && (
+                                  <button
+                                    class="conflict-button"
+                                    style={{
+                                      color:
+                                        settings?.warningColors.recognition ||
+                                        defaultWarningColors.recognition,
+                                    }}
+                                    title={t("Conflicting recognition rules")}
+                                    aria-label={t("Show recognition conflicts")}
+                                    onClick={() => setFilename(f)}
+                                  >
+                                    <OctagonAlert size={14} />
                                   </button>
                                 )}
                               </div>
@@ -746,59 +798,10 @@ export function Library({
                           bitDepth: <td key="bitDepth">{f.bitDepth || "—"}</td>,
                           audio: (
                             <td key="audio">
-                              <div class="source-tags">
-                                {(f.audio ? f.audio.split(" + ") : [""]).map(
-                                  (value) => (
-                                    <Tag
-                                      key={value}
-                                      value={value}
-                                      kind="audio"
-                                    />
-                                  ),
-                                )}
-                              </div>
+                              <AudioCell file={f} open={() => setFilename(f)} />
                             </td>
                           ),
                           channels: <td key="channels">{f.channels || "—"}</td>,
-                          language: (
-                            <td key="language">
-                              <div class="language-details">
-                                {f.audioTracks?.length ? (
-                                  <div class="track-language-list">
-                                    {f.audioTracks.map((track) => (
-                                      <div key={track.index}>
-                                        <LanguageFlag value={track.language} />
-                                        <Tag value={track.codec} kind="audio" />
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <LanguageFlags value={f.language} />
-                                )}
-                                {(f.language || f.audio) && (
-                                  <button
-                                    class="icon-button"
-                                    aria-label={t(
-                                      "Audio track information: {title}",
-                                      { title: f.title },
-                                    )}
-                                    title={
-                                      f.audioTracks?.length
-                                        ? t(
-                                            "Audio tracks from Emby. Open file details.",
-                                          )
-                                        : t(
-                                            "Language → codec mapping unavailable. Open file details.",
-                                          )
-                                    }
-                                    onClick={() => setFilename(f)}
-                                  >
-                                    <Info size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          ),
                         };
                         return (
                           <>
@@ -851,9 +854,7 @@ export function Library({
                       </p>
                       <button
                         class="button"
-                        onClick={
-                          active.length ? reset : () => setSettingsOpen(true)
-                        }
+                        onClick={active.length ? reset : () => openSettings()}
                       >
                         {active.length
                           ? t("Reset filters")
@@ -936,11 +937,20 @@ export function Library({
           )}
         </main>
         {filename && (
-          <FileDialog file={filename} close={() => setFilename(null)} />
+          <FileDialog
+            warningColors={settings?.warningColors || defaultWarningColors}
+            file={filename}
+            close={() => setFilename(null)}
+          />
         )}{" "}
         {settingsOpen && settings && (
           <SettingsDialog
             settings={settings}
+            initialSection={settingsSection}
+            onRecognition={() => {
+              setSettingsOpen(false);
+              setView("recognition");
+            }}
             status={status}
             connectionError={connectionError}
             demo={status.demo}

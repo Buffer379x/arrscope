@@ -12,7 +12,7 @@ The `/tmp` tmpfs is limited to 32 MiB. `SQLITE_TMPDIR=/data` allows large SQLite
 
 ## Backup
 
-Settings → Maintenance → Back up cache uses SQLite `VACUUM INTO` to create a consistent copy under `/data/backups/`. The last three snapshots remain. Required schema migrations create a snapshot automatically.
+Settings → System → Back up cache uses SQLite `VACUUM INTO` to create a consistent copy under `/data/backups/`. The last three snapshots remain. Required schema migrations create a snapshot automatically.
 
 For a complete backup:
 
@@ -30,7 +30,7 @@ A database snapshot alone is insufficient for recovering encrypted keys. Other l
 3. Restore matching complete Appdata, or restore a consistent database snapshot of the matching schema as `arrscope.db` while retaining its corresponding key. After separately backing them up, remove stale target WAL/SHM files while the app remains stopped.
 4. Verify UID/GID and permissions, then start. Check login, connections and cache.
 
-An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.2.0 retains schema 4 and requires no migration. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
+An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.3.0 upgrades schema 4 to schema 5, with a pre-migration database snapshot. Rolling back to 0.2.3 requires restoring the matching schema-4 snapshot. Recognition rule edits create a backup and atomically reprocess the cache; custom rules remain in SQLite across updates. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
 
 ## Forgotten password
 

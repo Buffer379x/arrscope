@@ -2,15 +2,17 @@ import { t, useI18n } from "../i18n";
 import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
 import { Modal } from "./Modal";
 
-import { AlertTriangle, FileVideo2, Info } from "lucide-preact";
+import { AlertTriangle, OctagonAlert, FileVideo2, Info } from "lucide-preact";
 import type { MediaFile } from "../types";
 
 import { embyMatchLabels, labels, Tag } from "../ui";
 export function FileDialog({
   file,
+  warningColors,
   close,
 }: {
   file: MediaFile;
+  warningColors: Record<string, string>;
   close: () => void;
 }) {
   useI18n();
@@ -98,6 +100,31 @@ export function FileDialog({
           )}
         </p>
       </section>
+      {!!file.recognitionConflicts?.length && (
+        <section
+          class="recognition-conflict-details"
+          aria-label={t("Conflicting recognition rules")}
+        >
+          <h4 style={{ color: warningColors.recognition }}>
+            <OctagonAlert size={16} /> {t("Conflicting recognition rules")}
+          </h4>
+          <ul>
+            {file.recognitionConflicts.map((c) => (
+              <li>
+                <b>
+                  {labels[c.field] || c.field}: {c.values.join(" / ")}
+                </b>
+                <p class="quiet">{c.ruleNames.join(" · ")}</p>
+              </li>
+            ))}
+          </ul>
+          <p class="quiet">
+            {t(
+              "The first matching rule wins by priority, then rule ID. Edit rules to resolve the conflict.",
+            )}
+          </p>
+        </section>
+      )}
       <div class="evidence-table">
         <div class="evidence-head">
           <span>{t("Attribute")}</span>
@@ -113,16 +140,23 @@ export function FileDialog({
             <span data-label="Radarr / Sonarr">{e.api || "—"}</span>
             <span data-label="Emby">{e.emby || "—"}</span>
             <span data-label={t("Used")}>
-              {e.origin === "filename"
-                ? t("Filename")
-                : e.origin === "api"
-                  ? "API"
-                  : e.origin === "emby"
-                    ? "Emby"
-                    : e.origin === "combined"
-                      ? t("Enriched")
-                      : t("Unknown")}
-              {e.conflict && <AlertTriangle size={14} />}
+              {e.origin === "rule"
+                ? t("Recognition rule")
+                : e.origin === "filename"
+                  ? t("Filename")
+                  : e.origin === "api"
+                    ? "API"
+                    : e.origin === "emby"
+                      ? "Emby"
+                      : e.origin === "combined"
+                        ? t("Enriched")
+                        : t("Unknown")}
+              {e.conflict && (
+                <AlertTriangle
+                  size={14}
+                  style={{ color: warningColors.metadata }}
+                />
+              )}
             </span>
           </div>
         ))}

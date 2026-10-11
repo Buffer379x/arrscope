@@ -17,6 +17,7 @@ type ServiceConfig struct {
 	Interval     int    `json:"interval"`
 }
 type Settings struct {
+	WarningColors  map[string]string   `json:"warningColors"`
 	ColumnOrder    map[string][]string `json:"columnOrder"`
 	VisibleColumns map[string][]string `json:"visibleColumns"`
 	TagColors      map[string]string   `json:"tagColors"`
@@ -26,11 +27,12 @@ type Settings struct {
 	SeasonMode     string              `json:"seasonMode"`
 }
 type Evidence struct {
-	Filename string `json:"filename"`
-	API      string `json:"api"`
-	Emby     string `json:"emby,omitempty"`
-	Origin   string `json:"origin"`
-	Conflict bool   `json:"conflict"`
+	Rules    []string `json:"rules,omitempty"`
+	Filename string   `json:"filename"`
+	API      string   `json:"api"`
+	Emby     string   `json:"emby,omitempty"`
+	Origin   string   `json:"origin"`
+	Conflict bool     `json:"conflict"`
 }
 type Episode struct {
 	ID     int    `json:"id"`
@@ -48,35 +50,39 @@ type AudioTrack struct {
 	Default       bool   `json:"default"`
 }
 type File struct {
-	ID                 int                 `json:"id"`
-	Service            string              `json:"service"`
-	MediaID            int                 `json:"mediaId"`
-	Title              string              `json:"title"`
-	Series             string              `json:"series"`
-	Season             int                 `json:"season"`
-	Episodes           []Episode           `json:"episodes"`
-	Years              []int               `json:"years"`
-	Filename           string              `json:"filename"`
-	SourcePath         string              `json:"-"`
-	Resolution         string              `json:"resolution"`
-	Codec              string              `json:"codec"`
-	Family             string              `json:"family"`
-	Source             string              `json:"source"`
-	Processing         string              `json:"processing"`
-	HDR                string              `json:"hdr"`
-	BitDepth           string              `json:"bitDepth"`
-	Audio              string              `json:"audio"`
-	AudioStreamCount   int                 `json:"audioStreamCount"`
-	AudioTracks        []AudioTrack        `json:"audioTracks,omitempty"`
-	EmbyMatch          string              `json:"embyMatch,omitempty"`
-	Channels           string              `json:"channels"`
-	Language           string              `json:"language"`
-	Size               int64               `json:"size"`
-	Conflict           bool                `json:"conflict"`
-	Evidence           map[string]Evidence `json:"evidence"`
-	Matched            bool                `json:"matched"`
-	UnknownTraits      []string            `json:"unknownTraits,omitempty"`
-	MetadataIncomplete bool                `json:"metadataIncomplete"`
+	APIInfo              *APIInfo              `json:"apiInfo,omitempty"`
+	RecognitionRevision  string                `json:"recognitionRevision,omitempty"`
+	RuleConflict         bool                  `json:"ruleConflict"`
+	RecognitionConflicts []RecognitionConflict `json:"recognitionConflicts,omitempty"`
+	ID                   int                   `json:"id"`
+	Service              string                `json:"service"`
+	MediaID              int                   `json:"mediaId"`
+	Title                string                `json:"title"`
+	Series               string                `json:"series"`
+	Season               int                   `json:"season"`
+	Episodes             []Episode             `json:"episodes"`
+	Years                []int                 `json:"years"`
+	Filename             string                `json:"filename"`
+	SourcePath           string                `json:"-"`
+	Resolution           string                `json:"resolution"`
+	Codec                string                `json:"codec"`
+	Family               string                `json:"family"`
+	Source               string                `json:"source"`
+	Processing           string                `json:"processing"`
+	HDR                  string                `json:"hdr"`
+	BitDepth             string                `json:"bitDepth"`
+	Audio                string                `json:"audio"`
+	AudioStreamCount     int                   `json:"audioStreamCount"`
+	AudioTracks          []AudioTrack          `json:"audioTracks,omitempty"`
+	EmbyMatch            string                `json:"embyMatch,omitempty"`
+	Channels             string                `json:"channels"`
+	Language             string                `json:"language"`
+	Size                 int64                 `json:"size"`
+	Conflict             bool                  `json:"conflict"`
+	Evidence             map[string]Evidence   `json:"evidence"`
+	Matched              bool                  `json:"matched"`
+	UnknownTraits        []string              `json:"unknownTraits,omitempty"`
+	MetadataIncomplete   bool                  `json:"metadataIncomplete"`
 }
 type SyncStatus struct {
 	Running     bool       `json:"running"`
@@ -94,7 +100,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
@@ -115,8 +121,8 @@ func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 
 func defaultColumnOrder() map[string][]string {
 	return map[string][]string{
-		"radarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "language"},
-		"sonarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "language"},
+		"radarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels"},
+		"sonarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels"},
 	}
 }
 
@@ -129,10 +135,11 @@ func defaultVisibleColumns() map[string][]string {
 
 // Missing selections preserve the original layout for existing installations.
 func normalizeVisibleColumns(cfg *Settings) error {
+	migrateAudioColumns(cfg)
 	if cfg.VisibleColumns == nil {
 		cfg.VisibleColumns = defaultVisibleColumns()
 	}
-	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "language": true}
+	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true}
 	for service, columns := range cfg.VisibleColumns {
 		if service != "radarr" && service != "sonarr" {
 			return fmt.Errorf("Invalid service for column selection")
@@ -190,6 +197,54 @@ func validateTagColors(colors map[string]string) error {
 		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio"
 		if !ok || !valid || value == "" || len(key) > 200 || !tagColorPattern.MatchString(color) {
 			return fmt.Errorf("Invalid tag color")
+		}
+	}
+	return nil
+}
+
+func migrateAudioColumns(cfg *Settings) {
+	for _, layout := range []map[string][]string{cfg.VisibleColumns, cfg.ColumnOrder} {
+		for service, columns := range layout {
+			if !containsColumn(columns, "language") {
+				continue
+			}
+			next := []string{}
+			for _, column := range columns {
+				if column == "audio" {
+					continue
+				}
+				if column == "language" {
+					column = "audio"
+				}
+				next = append(next, column)
+			}
+			layout[service] = next
+		}
+	}
+}
+func containsColumn(columns []string, value string) bool {
+	for _, column := range columns {
+		if column == value {
+			return true
+		}
+	}
+	return false
+}
+func defaultWarningColors() map[string]string {
+	return map[string]string{"metadata": "#d9a870", "recognition": "#b994f0"}
+}
+func normalizeWarningColors(cfg *Settings) error {
+	if cfg.WarningColors == nil {
+		cfg.WarningColors = defaultWarningColors()
+	}
+	for key, color := range cfg.WarningColors {
+		if (key != "metadata" && key != "recognition") || !tagColorPattern.MatchString(color) {
+			return fmt.Errorf("Invalid warning color")
+		}
+	}
+	for key, color := range defaultWarningColors() {
+		if cfg.WarningColors[key] == "" {
+			cfg.WarningColors[key] = color
 		}
 	}
 	return nil
