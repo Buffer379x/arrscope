@@ -13,7 +13,7 @@ export function Login({
 }) {
   useI18n();
   const [user, setUser] = useState(status.demo ? "demo" : ""),
-    [password, setPassword] = useState(status.demo ? "ArrScope-demo-2026" : ""),
+    [password, setPassword] = useState(status.demo ? "Scopearr-demo-2026" : ""),
     [token, setToken] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export function Login({
     <main class="login-page">
       <div class="login-art">
         <div class="login-orbit" />
-        <img src="/icon-1024.png" alt={t("ArrScope icon")} />
+        <img src="/icon-1024.png" alt={t("Scopearr icon")} />
         <div>
           <span class="eyebrow">{t("YOUR LIBRARY. CLEARLY FILTERED.")}</span>
           <h1>
@@ -68,7 +68,7 @@ export function Login({
             alt=""
           />
           <b>
-            ArrScope<span> / </span>
+            Scopearr<span> / </span>
           </b>
         </div>
         <h2>
@@ -145,7 +145,7 @@ export function Login({
           </button>
         </form>
         <div class="quiet login-version">
-          ArrScope {status.version}
+          Scopearr {status.version}
           {t("· For your own server")}
         </div>
       </div>

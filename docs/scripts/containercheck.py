@@ -1,6 +1,6 @@
 import argparse, json, os, re, socket, subprocess, sys, tempfile, threading, time, urllib.request, urllib.parse, http.cookiejar, uuid
-parser = argparse.ArgumentParser(description='Isolated ArrScope container test with synthetic Arr/Emby APIs; no real service access.')
-parser.add_argument('--image', default='arrscope:test')
+parser = argparse.ArgumentParser(description='Isolated Scopearr container test with synthetic Arr/Emby APIs; no real service access.')
+parser.add_argument('--image', default='scopearr:test')
 parser.add_argument('--files-per-service', type=int, default=50000)
 args = parser.parse_args()
 if not 1 <= args.files_per_service <= 100000:
@@ -67,7 +67,7 @@ threading.Thread(target=fixture.serve_forever, daemon=True).start()
 with socket.socket() as sock:
     sock.bind(('127.0.0.1', 0))
     port = sock.getsockname()[1]
-name = 'arrscope-review-' + uuid.uuid4().hex[:10]
+name = 'scopearr-review-' + uuid.uuid4().hex[:10]
 base = f'http://127.0.0.1:{port}'
 csrf = ''
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -82,7 +82,7 @@ result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256,
 test_uid = os.getuid() if os.getuid() else 99
 test_gid = os.getgid() if os.getuid() else 100
 result['container_user'] = f'{test_uid}:{test_gid}'
-with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
+with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
     os.chmod(data, 511)
     try:
         docker('run', '-d', '--name', name, '--user', result['container_user'], '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '256m', '--memory-swap', '256m', *(['--add-host', 'host.docker.internal:host-gateway'] if sys.platform.startswith('linux') else []), '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=32m', '-p', f'127.0.0.1:{port}:8080', '-v', f'{data}:/data', args.image)

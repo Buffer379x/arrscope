@@ -10,6 +10,7 @@ const fields = [
   "audio",
   "channels",
   "language",
+  "custom",
 ];
 export function canonicalPresetQuery(query: string): string {
   const input = new URLSearchParams(query),

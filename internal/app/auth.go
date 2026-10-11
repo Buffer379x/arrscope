@@ -91,7 +91,7 @@ func (s *Security) Seal(v string) string {
 	}
 	n := make([]byte, s.aead.NonceSize())
 	rand.Read(n)
-	return "enc:" + base64.StdEncoding.EncodeToString(s.aead.Seal(n, n, []byte(v), []byte("arrscope-api-key-v1")))
+	return "enc:" + base64.StdEncoding.EncodeToString(s.aead.Seal(n, n, []byte(v), []byte("scopearr-api-key-v1")))
 }
 func (s *Security) Open(v string) (string, error) {
 	if v == "" {
@@ -105,7 +105,10 @@ func (s *Security) Open(v string) (string, error) {
 		return "", fmt.Errorf("Could not decrypt API key")
 	}
 	n := s.aead.NonceSize()
-	p, e := s.aead.Open(nil, b[:n], b[n:], []byte("arrscope-api-key-v1"))
+	p, e := s.aead.Open(nil, b[:n], b[n:], []byte("scopearr-api-key-v1"))
+	if e != nil {
+		p, e = s.aead.Open(nil, b[:n], b[n:], []byte("arrscope-api-key-v1"))
+	}
 	return string(p), e
 }
 func validPassword(p string) bool { return len(p) >= 12 && len(p) <= 72 }
@@ -181,7 +184,10 @@ func remoteIP(r *http.Request) string {
 	return h
 }
 func (s *Security) Session(r *http.Request) (string, string, bool) {
-	c, e := r.Cookie("arrscope_session")
+	c, e := r.Cookie("scopearr_session")
+	if e != nil {
+		c, e = r.Cookie("arrscope_session")
+	}
 	if e != nil {
 		return "", "", false
 	}
@@ -224,7 +230,7 @@ func (s *Security) createSession(w http.ResponseWriter, r *http.Request, verifie
 	} else if n != 1 {
 		return errCredentialsChanged
 	}
-	http.SetCookie(w, &http.Cookie{Name: "arrscope_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil || os.Getenv("ARRSCOPE_HTTPS") == "true", MaxAge: 86400})
+	http.SetCookie(w, &http.Cookie{Name: "scopearr_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil || (os.Getenv("SCOPEARR_HTTPS") == "true" || (os.Getenv("SCOPEARR_HTTPS") == "" && os.Getenv("ARRSCOPE_HTTPS") == "true")), MaxAge: 86400})
 	return nil
 }
 func (s *Security) Reset(password string) error { return s.reset(password, "") }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -50,7 +51,7 @@ type RecognitionResult struct {
 	Conflicts []RecognitionConflict `json:"conflicts"`
 }
 
-var recognitionFields = []string{"resolution", "codec", "source", "processing", "hdr", "bitDepth", "audio", "channels", "language"}
+var recognitionFields = []string{"resolution", "codec", "source", "processing", "hdr", "bitDepth", "audio", "channels", "language", "custom"}
 var ruleIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
 
 func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
@@ -73,6 +74,12 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		}
 		if !ruleIDPattern.MatchString(r.ID) || ids[r.ID] || !validField || strings.TrimSpace(r.Name) == "" || len(r.Name) > 80 || r.Pattern == "" || len(r.Pattern) > 500 || strings.TrimSpace(r.Value) == "" || len(r.Value) > 80 || len(r.Unless) > 500 || r.Priority < 0 || r.Priority > 10000 {
 			return nil, fmt.Errorf("Invalid recognition rule")
+		}
+		if r.Field == "custom" {
+			id, err := strconv.ParseInt(r.Value, 10, 64)
+			if err != nil || id <= 0 {
+				return nil, fmt.Errorf("Invalid custom tag")
+			}
 		}
 		ids[r.ID] = true
 		if r.Mode != "direct" && r.Mode != "fallback" && r.Mode != "override" {
@@ -126,7 +133,37 @@ func normalizeRuleValue(field, value string) string {
 func (e *RecognitionEngine) Recognize(filename string) RecognitionResult {
 	result := RecognitionResult{Values: map[string]string{}, Matches: map[string][]string{}, Origins: map[string]string{}, Conflicts: []RecognitionConflict{}}
 	for _, field := range recognitionFields {
-		compound := field == "hdr" || field == "audio" || field == "language"
+		if field == "custom" {
+			seen := map[string]bool{}
+			values, ids := []string{}, []string{}
+			for _, mode := range []string{"direct", "fallback", "override"} {
+				for _, r := range e.groups[field+":"+mode] {
+					matched := false
+					for _, match := range r.re.FindAllStringIndex(filename, -1) {
+						if match[0] != match[1] {
+							matched = true
+							break
+						}
+					}
+					if (r.unless == nil || !r.unless.MatchString(filename)) && matched {
+						if !seen[r.Value] {
+							values = append(values, r.Value)
+							seen[r.Value] = true
+						}
+						ids = append(ids, r.ID)
+					}
+				}
+			}
+			if len(values) == 0 {
+				continue
+			}
+			sort.Strings(values)
+			result.Values[field] = strings.Join(values, " + ")
+			result.Matches[field] = ids
+			result.Origins[field] = "filename"
+			continue
+		}
+		compound := field == "hdr" || field == "audio" || field == "language" || field == "custom"
 		for _, mode := range []string{"direct", "fallback", "override"} {
 			if mode == "fallback" && result.Values[field] != "" {
 				continue

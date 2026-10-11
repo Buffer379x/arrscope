@@ -2,13 +2,13 @@
 
 ## Files and resource limits
 
-`ARRSCOPE_DATA_DIR` defaults to `/data`. `arrscope.db` and `secret.key` are created with mode 0600; new directories use 0700. An existing mounted directory must be accessible to the configured UID/GID. Never replace the local key: existing API keys cannot be decrypted without the matching `secret.key`.
+`SCOPEARR_DATA_DIR` defaults to `/data`. `scopearr.db` and `secret.key` are created with mode 0600; new directories use 0700. An existing mounted directory must be accessible to the configured UID/GID. Never replace the local key: existing API keys cannot be decrypted without the matching `secret.key`.
 
 The container sets `GOMAXPROCS=2` and a soft Go memory target `GOMEMLIMIT=64MiB`. The runtime also clamps this target to at most one quarter of a detected container memory limit, leaving room for page cache and other process allocations. This protects existing Unraid templates with a higher target without requiring a configuration change. Docker separately limits RAM to 256 MiB and requests an equal RAM-plus-swap limit to prohibit additional swap. Host kernel support is required for enforcing the swap limit. Large API responses and metadata can require more memory; monitor the target host before tightening limits.
 
 The `/tmp` tmpfs is limited to 32 MiB. `SQLITE_TMPDIR=/data` allows large SQLite sorts to spill onto local Appdata storage. CSV exports also use protected temporary files there. Keep enough free local disk space; do not use SMB/NFS for SQLite WAL.
 
-`ARRSCOPE_LISTEN` defaults to `:8080`, and the container healthcheck reads `127.0.0.1:8080/healthz`. Set `ARRSCOPE_HTTPS=true` when browser access uses HTTPS, so cookies require secure transport. Use `ARRSCOPE_DEMO=true` only for a separate fresh synthetic dataset.
+`SCOPEARR_LISTEN` defaults to `:8080`, and the container healthcheck reads `127.0.0.1:8080/healthz`. Set `SCOPEARR_HTTPS=true` when browser access uses HTTPS, so cookies require secure transport. Use `SCOPEARR_DEMO=true` only for a separate fresh synthetic dataset.
 
 ## Backup
 
@@ -17,32 +17,32 @@ Settings → System → Back up cache uses SQLite `VACUUM INTO` to create a cons
 For a complete backup:
 
 1. Create a cache backup.
-2. Stop ArrScope.
+2. Stop Scopearr.
 3. Back up the entire Appdata directory, including database, `secret.key`, WAL/SHM files and snapshots.
-4. Start ArrScope.
+4. Start Scopearr.
 
 A database snapshot alone is insufficient for recovering encrypted keys. Other library/account information is stored locally in SQLite.
 
 ## Restore or rollback
 
-1. Stop ArrScope and separately preserve the complete current Appdata directory.
-2. Select the required versioned image, for example `ghcr.io/buffer379x/arrscope:0.1.0`.
-3. Restore matching complete Appdata, or restore a consistent database snapshot of the matching schema as `arrscope.db` while retaining its corresponding key. After separately backing them up, remove stale target WAL/SHM files while the app remains stopped.
+1. Stop Scopearr and separately preserve the complete current Appdata directory.
+2. Select the required versioned image, for example `ghcr.io/buffer379x/scopearr:0.1.0`.
+3. Restore matching complete Appdata, or restore a consistent database snapshot of the matching schema as `scopearr.db` while retaining its corresponding key. After separately backing them up, remove stale target WAL/SHM files while the app remains stopped.
 4. Verify UID/GID and permissions, then start. Check login, connections and cache.
 
 An older application rejects a newer unknown database schema; changing only the image may be insufficient after migrations. Upstream API compatibility still applies. Version 0.3.0 upgrades schema 4 to schema 5, with a pre-migration database snapshot. Rolling back to 0.2.3 requires restoring the matching schema-4 snapshot. Recognition rule edits create a backup and atomically reprocess the cache; custom rules remain in SQLite across updates. Language preferences are stored per browser; server presets and connection settings remain in SQLite.
 
 ## Forgotten password
 
-Pass the new password on stdin to `arrscope reset-password`. It must contain 12–72 UTF-8 bytes. Use hidden terminal input, never a command-line argument or a chat message:
+Pass the new password on stdin to `scopearr reset-password`. It must contain 12–72 UTF-8 bytes. Use hidden terminal input, never a command-line argument or a chat message:
 
 ```sh
 stty -echo
-IFS= read -r arrscope_password
+IFS= read -r scopearr_password
 stty echo
 printf '\n'
-printf '%s\n' "$arrscope_password" | arrscope reset-password
-unset arrscope_password
+printf '%s\n' "$scopearr_password" | scopearr reset-password
+unset scopearr_password
 ```
 
 The account remains and existing sessions are revoked. New credentials are entered by the operator.

@@ -561,7 +561,7 @@ func TestPaginationAndRestart(t *testing.T) {
 	}
 }
 func TestPerformance50K(t *testing.T) {
-	if os.Getenv("ARRSCOPE_PERF") != "1" {
+	if os.Getenv("SCOPEARR_PERF") != "1" {
 		t.Skip("opt-in 50,000 file benchmark")
 	}
 	s := testStore(t)
@@ -670,7 +670,7 @@ func TestMigrationBackupRestoreAndFutureVersion(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = os.WriteFile(filepath.Join(restore, "arrscope.db"), raw, 0600); e != nil {
+	if e = os.WriteFile(filepath.Join(restore, "scopearr.db"), raw, 0600); e != nil {
 		t.Fatal(e)
 	}
 	restored, e := OpenStore(restore)
@@ -917,7 +917,7 @@ func TestStatisticsUniqueMediaAndEpisodes(t *testing.T) {
 func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.VisibleColumns = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "title,year,resolution,codec,source" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "title,year,resolution,codec,source,custom" {
 		t.Fatal("legacy defaults missing", err)
 	}
 	for _, columns := range []map[string][]string{
@@ -930,7 +930,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		}
 	}
 	cfg.VisibleColumns = map[string][]string{"sonarr": {"title"}}
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 5 || len(cfg.VisibleColumns["sonarr"]) != 1 {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 6 || len(cfg.VisibleColumns["sonarr"]) != 1 {
 		t.Fatal("partial choices not normalized", err)
 	}
 	s := testStore(t)
@@ -945,7 +945,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().VisibleColumns["radarr"]) != 5 {
+	if len(server.Config().VisibleColumns["radarr"]) != 6 {
 		t.Fatal("legacy server layout missing")
 	}
 }
@@ -953,7 +953,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 func TestColumnOrderLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.ColumnOrder = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 10 || cfg.ColumnOrder["radarr"][0] != "title" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 11 || cfg.ColumnOrder["radarr"][0] != "title" {
 		t.Fatal("missing legacy column order", err)
 	}
 	duplicate := defaultColumnOrder()["radarr"]
@@ -985,7 +985,7 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().ColumnOrder["sonarr"]) != 10 {
+	if len(server.Config().ColumnOrder["sonarr"]) != 11 {
 		t.Fatal("legacy server order missing")
 	}
 }

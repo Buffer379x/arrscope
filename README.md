@@ -1,10 +1,10 @@
-# ArrScope
+# Scopearr
 
 Explore and filter your Radarr and Sonarr libraries using existing filenames and API metadata. A lightweight, self-hosted web app with a local SQLite cache — no media scans, media mounts or external database server.
 
-![ArrScope dashboard](docs/screenshots/dashboard-0.2.1-en.png)
+![Scopearr dashboard](docs/screenshots/dashboard-0.4.0-en.png)
 
-![ArrScope movie library](docs/screenshots/library-0.2.3-en.png)
+![Scopearr movie library](docs/screenshots/library-0.4.0-en.png)
 
 Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. Real metadata detection remains unchanged.
 
@@ -29,15 +29,15 @@ See [Unraid installation](docs/UNRAID.md). For other Docker hosts:
 
 ```sh
 cp .env.example .env
-# Set ARRSCOPE_APPDATA, ARRSCOPE_PORT and UID/GID in .env.
-mkdir -p /local/pool/appdata/arrscope
-sudo chown 99:100 /local/pool/appdata/arrscope
-sudo chmod 700 /local/pool/appdata/arrscope
+# Set SCOPEARR_APPDATA, SCOPEARR_PORT and UID/GID in .env.
+mkdir -p /local/pool/appdata/scopearr
+sudo chown 99:100 /local/pool/appdata/scopearr
+sudo chmod 700 /local/pool/appdata/scopearr
 docker compose pull
 docker compose up -d
 ```
 
-Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/arrscope:stable`. Open port 8080, obtain the one-time setup code with `docker exec arrscope cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Services, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
+Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/scopearr:stable`. Open port 8080, obtain the one-time setup code with `docker exec scopearr cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Services, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
 
 Connect exactly one instance per service. URL subpaths are supported, for example `http://radarr:7878/radarr`; do not append `/api/v3` or put credentials/query parameters in the URL. TLS certificates are verified and redirects are rejected. Sync intervals: manual only, 15, 30, 60 (default), 360 or 1440 minutes. Emby follows the corresponding Radarr/Sonarr sync.
 
@@ -57,9 +57,9 @@ Flags are representative language symbols, not claims about a file’s country o
 
 Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-ArrScope reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile`. Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download, rename or other upstream write requests are made. Independent tasks performed by those services remain outside ArrScope’s control.
+Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile`. Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download, rename or other upstream write requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
 
-Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `ARRSCOPE_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
+Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 
 ## Filename recognition
 
@@ -79,18 +79,30 @@ pnpm --dir web build
 pnpm --dir web audit --audit-level=moderate
 go test -race ./...
 go vet ./...
-go build -o work/arrscope ./cmd/arrscope
-ARRSCOPE_DATA_DIR=./work/appdata ./work/arrscope
+go build -o work/scopearr ./cmd/scopearr
+SCOPEARR_DATA_DIR=./work/appdata ./work/scopearr
 ```
 
-Build `web/dist` before compiling Go. For a separate synthetic demo, set `ARRSCOPE_DEMO=true` and a fresh `ARRSCOPE_DATA_DIR=./work/demo`. Demo credentials: `demo` / `ArrScope-demo-2026`. Existing real accounts are rejected; upstream connections are locked. Never enable demo mode for a production installation.
+Build `web/dist` before compiling Go. For a separate synthetic demo, set `SCOPEARR_DEMO=true` and a fresh `SCOPEARR_DATA_DIR=./work/demo`. Demo credentials: `demo` / `Scopearr-demo-2026`. Existing real accounts are rejected; upstream connections are locked. Never enable demo mode for a production installation.
 
 `VERSION` is the project version. Local Go builds embed it; package and Docker defaults must agree. Changes after a published release require a higher version, an English changelog entry and `docs/releases/<version>.md`. See [release workflow](docs/RELEASING.md) and [validation](docs/VALIDATION.md).
 
-Pull requests and `main` changes run tests and container checks. Only the manually approved release workflow promotes `stable`. Unraid updates are user-triggered; ArrScope does not access a Docker socket or run an updater.
+Pull requests and `main` changes run tests and container checks. Only the manually approved release workflow promotes `stable`. Unraid updates are user-triggered; Scopearr does not access a Docker socket or run an updater.
 
 ## Contributing
 
 [Add or improve translations](docs/TRANSLATING.md), report an issue, or open a pull request. Write public issue/PR descriptions, release notes and documentation in English. Keep credentials, Appdata and private library data out of contributions. [Architecture and API](docs/ARCHITECTURE.md).
 
-The generated ArrScope PNG icon, favicons and Apple touch icon are included under `web/public`. UI icons are Lucide (ISC); dependencies retain their own licenses. Project license: [MIT](LICENSE). [Changelog](CHANGELOG.md).
+The generated Scopearr PNG icon, favicons and Apple touch icon are included under `web/public`. UI icons are Lucide (ISC); dependencies retain their own licenses. Project license: [MIT](LICENSE). [Changelog](CHANGELOG.md).
+
+## Custom tags
+
+Create and rename tags under Settings → Custom tags. In Movies or TV series, use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
+
+Custom filters support OR, exclusion, contains-all and does-not-contain-all. Colors and filters list tags in use; the administration catalog also keeps unused tags available for future assignment. Filename rules can select Custom and an existing tag. All matching Custom rules add their tags; multiple tags are not conflicts. Manual additions survive synchronization and rule edits. Removed automatic tags may reappear after the next successful service sync.
+
+## Upgrading existing installations
+
+Keep the existing appdata mount and `secret.key`. Schema 6 migration makes a backup; Scopearr consistently clones the legacy database to `scopearr.db` while retaining the original for rollback. Accounts, encrypted API keys, presets, recognition rules and cached media remain available. The previous image's `arrscope:stable` channel is also promoted to the approved Scopearr image so existing Unraid containers can update normally. New deployments use `scopearr:stable` and `deploy/scopearr.xml`. See [0.4.0 upgrade notes](docs/releases/0.4.0.md).
+
+Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=true` and `SCOPEARR_DEMO_DISCS=true`; the latter fixture presents BluRay, DVD and UHD sources consistent with displayed resolutions. It does not change production recognition defaults.

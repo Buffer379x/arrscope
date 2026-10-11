@@ -1,4 +1,4 @@
-# ArrScope 0.3.1 validation
+# Scopearr 0.3.1 validation
 
 ## Scope
 

@@ -13,7 +13,7 @@ function App() {
       <div class="loading-screen">
         <img src="/icon-256.png" alt="" />
         <LoaderCircle class="spin" />
-        <p>{error || t("Loading ArrScope …")}</p>
+        <p>{error || t("Loading Scopearr …")}</p>
       </div>
     );
   if (!status.authenticated) return <Login status={status} done={refresh} />;

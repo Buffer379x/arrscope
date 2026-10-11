@@ -12,7 +12,7 @@ import {
   Trash2,
   OctagonAlert,
 } from "lucide-preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useState, useContext } from "preact/hooks";
 import { api } from "../api";
 import { t, useI18n } from "../i18n";
 import type {
@@ -20,7 +20,7 @@ import type {
   RecognitionRule,
   RecognitionResult,
 } from "../types";
-import { labels } from "../ui";
+import { labels, CustomTagNames } from "../ui";
 import { Modal } from "./Modal";
 const fields = [
   "resolution",
@@ -32,6 +32,7 @@ const fields = [
   "audio",
   "channels",
   "language",
+  "custom",
 ];
 const modes = {
   direct: "Direct recognition",
@@ -58,6 +59,7 @@ export function RecognitionPage({
   onDirty: (dirty: boolean) => void;
 }) {
   useI18n();
+  const customNames = useContext(CustomTagNames);
   const [config, setConfig] = useState<RecognitionConfig | null>(null),
     [defaults, setDefaults] = useState<RecognitionConfig | null>(null),
     [rules, setRules] = useState<RecognitionRule[]>([]),
@@ -109,8 +111,14 @@ export function RecognitionPage({
     setNotice("");
   };
   const sorted = [...rules].sort((a, b) => {
-    const x = a[sort.field],
-      y = b[sort.field];
+    const x =
+        sort.field === "value" && a.field === "custom"
+          ? customNames[a.value] || a.value
+          : a[sort.field],
+      y =
+        sort.field === "value" && b.field === "custom"
+          ? customNames[b.value] || b.value
+          : b[sort.field];
     const cmp =
       typeof x === "number" && typeof y === "number"
         ? x - y
@@ -184,6 +192,11 @@ export function RecognitionPage({
       )}
       {config && (
         <>
+          <p class="quiet">
+            {t(
+              "Custom rules add all matching tags; different tags are not conflicts.",
+            )}
+          </p>
           <div class="recognition-actions">
             <span>
               {t("{count} rules", { count: rules.length })}
@@ -335,7 +348,11 @@ export function RecognitionPage({
                     <td>
                       <code>{rule.pattern}</code>
                     </td>
-                    <td>{rule.value}</td>
+                    <td>
+                      {rule.field === "custom"
+                        ? customNames[rule.value] || rule.value
+                        : rule.value}
+                    </td>
                     <td>{t(modes[rule.mode])}</td>
                     <td>
                       <div class="row-actions">
@@ -440,7 +457,13 @@ export function RecognitionPage({
                         <td>{labels[field]}</td>
                         <td>
                           {preview
-                            ? preview.values[field] || t("Unknown")
+                            ? (field === "custom"
+                                ? (preview.values[field] || "")
+                                    .split(" + ")
+                                    .map((id) => customNames[id] || id)
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : preview.values[field]) || t("Unknown")
                             : "—"}
                         </td>
                         <td>
@@ -501,6 +524,7 @@ function RuleEditor({
   save: (rule: RecognitionRule) => void;
 }) {
   useI18n();
+  const customNames = useContext(CustomTagNames);
   const [draft, setDraft] = useState(rule);
   const patch = (value: Partial<RecognitionRule>) =>
     setDraft({ ...draft, ...value });
@@ -526,7 +550,17 @@ function RuleEditor({
           {t("Attribute")}
           <select
             value={draft.field}
-            onChange={(e) => patch({ field: e.currentTarget.value })}
+            onChange={(e) =>
+              patch({
+                field: e.currentTarget.value,
+                mode:
+                  e.currentTarget.value === "custom" ? "direct" : draft.mode,
+                value:
+                  e.currentTarget.value === "custom"
+                    ? Object.keys(customNames)[0] || ""
+                    : draft.value,
+              })
+            }
           >
             {fields.map((field) => (
               <option value={field}>{labels[field]}</option>
@@ -558,17 +592,31 @@ function RuleEditor({
         </label>
         <label>
           {t("Result")}
-          <input
-            required
-            maxLength={80}
-            value={draft.value}
-            onInput={(e) => patch({ value: e.currentTarget.value })}
-          />
+          {draft.field === "custom" ? (
+            <select
+              required
+              value={draft.value}
+              onChange={(e) => patch({ value: e.currentTarget.value })}
+            >
+              <option value="">{t("Select a custom tag")}</option>
+              {Object.entries(customNames).map(([id, name]) => (
+                <option value={id}>{name}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              required
+              maxLength={80}
+              value={draft.value}
+              onInput={(e) => patch({ value: e.currentTarget.value })}
+            />
+          )}
         </label>
         <label>
           {t("Mode")}
           <select
             value={draft.mode}
+            disabled={draft.field === "custom"}
             onChange={(e) =>
               patch({ mode: e.currentTarget.value as RecognitionRule["mode"] })
             }

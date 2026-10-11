@@ -229,6 +229,12 @@ func Enrich(f *File, api APIInfo) { EnrichWithRules(f, api, defaultRecognitionEn
 func EnrichWithRules(f *File, api APIInfo, engine *RecognitionEngine) {
 	f.APIInfo = &api
 	result := engine.Recognize(f.Filename)
+	f.RecognizedCustom = nil
+	for _, v := range strings.Split(result.Values["custom"], " + ") {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
+			f.RecognizedCustom = append(f.RecognizedCustom, id)
+		}
+	}
 	f.RecognitionRevision = engine.config.Revision
 	f.RecognitionConflicts = result.Conflicts
 	f.RuleConflict = len(result.Conflicts) > 0

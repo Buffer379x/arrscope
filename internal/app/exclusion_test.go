@@ -62,6 +62,9 @@ func TestExclusionExampleAndSeasonContext(t *testing.T) {
 
 func TestExclusionEveryTraitAndCompoundValues(t *testing.T) {
 	for _, field := range fields {
+		if field == "custom" {
+			continue
+		} // Indexed multi-valued tags are covered by custom_test.go.
 		t.Run(field, func(t *testing.T) {
 			store := testStore(t)
 			known, other, unknown := sample(1, "A.mkv"), sample(2, "B.mkv"), sample(3, "C.mkv")

@@ -149,6 +149,7 @@ export function FilterPanel({
                 "audio",
                 "language",
                 "channels",
+                "custom",
               ].map((k) => (
                 <MultiFilter
                   key={k}

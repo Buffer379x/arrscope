@@ -22,7 +22,7 @@ export const getLocale = () => active.locale;
 function initialLocale() {
   let saved: string | null = null;
   try {
-    saved = localStorage.getItem("arrscope-language");
+    saved = localStorage.getItem("scopearr-language") || localStorage.getItem("arrscope-language");
   } catch {}
   return resolveLocale(
     saved ? [saved] : navigator.languages,
@@ -38,7 +38,7 @@ export function I18nProvider({ children }: { children: ComponentChildren }) {
   active = catalogs.find((catalog) => catalog.locale === locale) || fallback;
   useEffect(() => {
     document.documentElement.lang = active.locale;
-    document.title = t("ArrScope · Your library at a glance");
+    document.title = t("Scopearr · Your library at a glance");
     document
       .querySelector('meta[name="description"]')
       ?.setAttribute(
@@ -46,7 +46,7 @@ export function I18nProvider({ children }: { children: ComponentChildren }) {
         t("Your movie and TV library. Clearly filtered."),
       );
     try {
-      localStorage.setItem("arrscope-language", locale);
+      localStorage.setItem("scopearr-language", locale);
     } catch {}
   }, [locale]);
   return (

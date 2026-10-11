@@ -50,7 +50,13 @@ type AudioTrack struct {
 	Title         string `json:"title"`
 	Default       bool   `json:"default"`
 }
+type CustomTag struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
 type File struct {
+	Custom               []CustomTag           `json:"custom"`
+	RecognizedCustom     []int64               `json:"recognizedCustom,omitempty"`
 	APIInfo              *APIInfo              `json:"apiInfo,omitempty"`
 	RecognitionRevision  string                `json:"recognitionRevision,omitempty"`
 	RuleConflict         bool                  `json:"ruleConflict"`
@@ -122,25 +128,30 @@ func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 
 func defaultColumnOrder() map[string][]string {
 	return map[string][]string{
-		"radarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels"},
-		"sonarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels"},
+		"radarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
+		"sonarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
 	}
 }
 
 func defaultVisibleColumns() map[string][]string {
 	return map[string][]string{
-		"radarr": {"title", "year", "resolution", "codec", "source"},
-		"sonarr": {"title", "year", "resolution", "codec", "source"},
+		"radarr": {"title", "year", "resolution", "codec", "source", "custom"},
+		"sonarr": {"title", "year", "resolution", "codec", "source", "custom"},
 	}
 }
 
 // Missing selections preserve the original layout for existing installations.
 func normalizeVisibleColumns(cfg *Settings) error {
 	migrateAudioColumns(cfg)
+	for service, order := range cfg.ColumnOrder {
+		if !containsColumn(order, "custom") {
+			cfg.ColumnOrder[service] = append(order, "custom")
+		}
+	}
 	if cfg.VisibleColumns == nil {
 		cfg.VisibleColumns = defaultVisibleColumns()
 	}
-	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true}
+	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "custom": true}
 	for service, columns := range cfg.VisibleColumns {
 		if service != "radarr" && service != "sonarr" {
 			return fmt.Errorf("Invalid service for column selection")
@@ -195,7 +206,7 @@ func validateTagColors(colors map[string]string) error {
 	}
 	for key, color := range colors {
 		field, value, ok := strings.Cut(key, ":")
-		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio"
+		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio" || field == "custom"
 		if !ok || !valid || value == "" || len(key) > 200 || !tagColorPattern.MatchString(color) {
 			return fmt.Errorf("Invalid tag color")
 		}

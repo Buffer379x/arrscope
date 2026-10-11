@@ -46,7 +46,7 @@ func TestManualEmbySyncQueuesLibrariesWithoutWrites(t *testing.T) {
 	server.mu.Unlock()
 	request := func(csrf bool) int {
 		r := httptest.NewRequest(http.MethodPost, "/api/sync", strings.NewReader(`{"service":"emby"}`))
-		r.AddCookie(&http.Cookie{Name: "arrscope_session", Value: "test-session"})
+		r.AddCookie(&http.Cookie{Name: "scopearr_session", Value: "test-session"})
 		if csrf {
 			r.Header.Set("X-CSRF-Token", "test-csrf")
 		}

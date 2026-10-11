@@ -1,14 +1,14 @@
 package main
 
 import (
-	"arrscope"
-	"arrscope/internal/app"
 	"bufio"
 	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"scopearr"
+	"scopearr/internal/app"
 	"strings"
 	"syscall"
 	"time"
@@ -18,7 +18,7 @@ var version = ""
 
 func main() {
 	if version == "" {
-		version = arrscope.Version()
+		version = scopearr.Version()
 	}
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		client := &http.Client{Timeout: 3 * time.Second}
@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 	configureMemoryLimit()
-	dir := os.Getenv("ARRSCOPE_DATA_DIR")
+	dir := settingEnv("SCOPEARR_DATA_DIR")
 	if dir == "" {
 		dir = "/data"
 	}
@@ -57,19 +57,19 @@ func main() {
 		log.Print("Password changed; all sessions ended")
 		return
 	}
-	if os.Getenv("ARRSCOPE_DEMO") == "true" {
+	if settingEnv("SCOPEARR_DEMO") == "true" {
 		if err := app.SeedDemo(store); err != nil {
 			log.Fatal(err)
 		}
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	server, err := app.NewServer(ctx, store, arrscope.Assets(), version)
+	server, err := app.NewServer(ctx, store, scopearr.Assets(), version)
 	if err != nil {
 		log.Fatal(err)
 	}
-	server.Demo = os.Getenv("ARRSCOPE_DEMO") == "true"
-	addr := os.Getenv("ARRSCOPE_LISTEN")
+	server.Demo = settingEnv("SCOPEARR_DEMO") == "true"
+	addr := settingEnv("SCOPEARR_LISTEN")
 	if addr == "" {
 		addr = ":8080"
 	}
@@ -80,12 +80,19 @@ func main() {
 		defer done()
 		httpServer.Shutdown(shutdownCtx)
 	}()
-	log.Printf("ArrScope %s listening on %s · no media mounts or scans", version, addr)
+	log.Printf("Scopearr %s listening on %s · no media mounts or scans", version, addr)
 	if !server.Security.Initialized() {
-		log.Print("Ersteinrichtung: Code aus /data/setup-token (ARRSCOPE_DATA_DIR/setup-token) verwenden")
+		log.Print("Ersteinrichtung: Code aus /data/setup-token (SCOPEARR_DATA_DIR/setup-token) verwenden")
 	}
 	if err = httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 	server.Sync.Shutdown()
+}
+
+func settingEnv(key string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return os.Getenv(strings.Replace(key, "SCOPEARR_", "ARRSCOPE_", 1))
 }

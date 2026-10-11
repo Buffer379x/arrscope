@@ -11,7 +11,7 @@ permissions:
   contents: write
   packages: write
 concurrency:
-  group: arrscope-release
+  group: scopearr-release
   cancel-in-progress: false
 jobs:
   release:
@@ -52,7 +52,7 @@ jobs:
       - run: pnpm --dir web audit --audit-level=moderate
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - run: go test -race ./... && go vet ./...
-      - run: GOMAXPROCS=2 ARRSCOPE_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
+      - run: GOMAXPROCS=2 SCOPEARR_PERF=1 go test -run TestPerformance50K -count=1 -v ./internal/app
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -74,24 +74,38 @@ jobs:
         run: |
           for arch in amd64 arm64; do
             docker pull --platform "linux/$arch" "$IMAGE:$VERSION"
-            docker run -d --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --memory-swap 256m --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m --platform "linux/$arch" --name "arrscope-$arch" -e ARRSCOPE_DEMO=true "$IMAGE:$VERSION"
+            docker run -d --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --memory-swap 256m --tmpfs /tmp:rw,noexec,nosuid,nodev,size=32m --platform "linux/$arch" --name "scopearr-$arch" -e SCOPEARR_DEMO=true "$IMAGE:$VERSION"
             for n in $(seq 1 60); do
-              if docker exec "arrscope-$arch" arrscope healthcheck; then break; fi
+              if docker exec "scopearr-$arch" scopearr healthcheck; then break; fi
               sleep 1
             done
-            docker exec "arrscope-$arch" arrscope healthcheck
-            docker rm -f "arrscope-$arch"
-            docker save "$IMAGE:$VERSION" -o "$RUNNER_TEMP/arrscope-$arch.tar"
-            docker run --rm -v "$RUNNER_TEMP/arrscope-$arch.tar:/scan/image.tar:ro" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1
+            docker exec "scopearr-$arch" scopearr healthcheck
+            docker rm -f "scopearr-$arch"
+            docker save "$IMAGE:$VERSION" -o "$RUNNER_TEMP/scopearr-$arch.tar"
+            docker run --rm -v "$RUNNER_TEMP/scopearr-$arch.tar:/scan/image.tar:ro" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa image --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 1
           done
       - name: 100k synthetic files with Emby without swap
         run: |
           docker pull --platform linux/amd64 "$IMAGE:$VERSION"
           python3 docs/scripts/containercheck.py --image "$IMAGE:$VERSION"
+      - name: Verify the legacy package update path after validation
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: docker buildx imagetools create --tag "ghcr.io/buffer379x/arrscope:$VERSION" "$IMAGE@$DIGEST"
+      - name: Copy unchanged historic version aliases after validation
+        run: |
+          for version in 0.1.0 0.2.0 0.2.1 0.2.3 0.3.0 0.3.1 0.3.2 0.3.3; do
+            docker buildx imagetools create --tag "$IMAGE:$version" "ghcr.io/buffer379x/arrscope:$version"
+          done
       - name: Publish version and release notes
         run: |
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "ArrScope $VERSION" --notes-file "docs/releases/$VERSION.md"
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Scopearr $VERSION" --notes-file "docs/releases/$VERSION.md"
       - name: Promote approved image to stable
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: docker buildx imagetools create --tag "$IMAGE:stable" "$IMAGE@$DIGEST"
+
+      - name: Keep the existing installation update channel compatible
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: docker buildx imagetools create --tag ghcr.io/buffer379x/arrscope:stable "$IMAGE@$DIGEST"

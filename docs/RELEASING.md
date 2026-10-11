@@ -1,6 +1,6 @@
 # Releases and versioning
 
-Public source: `Buffer379x/arrscope`. Public images: `ghcr.io/buffer379x/arrscope`. Version 0.1.0 is published. The stable channel changes only after an approved release succeeds; normal pushes do not deploy an update.
+Public source: `Buffer379x/scopearr`. Public images: `ghcr.io/buffer379x/scopearr`. Version 0.1.0 is published. The stable channel changes only after an approved release succeeds; normal pushes do not deploy an update.
 
 ## Prepare every change batch
 
@@ -26,4 +26,4 @@ If a run fails before promotion, stable remains unchanged. Inspect the failed st
 
 ## Install updates
 
-Unraid: Docker → Check for Updates → ArrScope → Update. Compose: `docker compose pull` then `docker compose up -d`. Keep `/data` and its local key. See [operations](OPERATIONS.md) for backup and rollback. ArrScope does not perform automatic background pulls or access the Docker socket.
+Unraid: Docker → Check for Updates → Scopearr → Update. Compose: `docker compose pull` then `docker compose up -d`. Keep `/data` and its local key. See [operations](OPERATIONS.md) for backup and rollback. Scopearr does not perform automatic background pulls or access the Docker socket.

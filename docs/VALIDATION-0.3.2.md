@@ -1,4 +1,4 @@
-# ArrScope 0.3.2 validation
+# Scopearr 0.3.2 validation
 
 - Full Go race suite and `go vet ./...`: passed. Additional manual Emby synchronization test passed with CSRF enforcement, both enabled library jobs, overlap rejection and GET-only requests.
 - Frontend: 11 tests passed, TypeScript check and production Vite build passed. Four locale dictionaries have identical keys and compatible placeholders.

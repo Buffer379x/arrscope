@@ -1,0 +1,317 @@
+package app
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+	"unicode"
+)
+
+const customSchema = `
+CREATE TABLE IF NOT EXISTS custom_tags(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,name_key TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS custom_overrides(service TEXT NOT NULL,file_id INTEGER NOT NULL,tag_id INTEGER NOT NULL REFERENCES custom_tags(id) ON DELETE CASCADE,state INTEGER NOT NULL CHECK(state IN (-1,1)),PRIMARY KEY(service,file_id,tag_id));
+CREATE TABLE IF NOT EXISTS file_custom_auto(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,tag_id INTEGER REFERENCES custom_tags(id) ON DELETE CASCADE,PRIMARY KEY(file_rowid,tag_id));
+CREATE TABLE IF NOT EXISTS file_custom(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,tag_id INTEGER REFERENCES custom_tags(id) ON DELETE CASCADE,PRIMARY KEY(file_rowid,tag_id));
+CREATE INDEX IF NOT EXISTS file_custom_value ON file_custom(tag_id,file_rowid);
+PRAGMA user_version=6;`
+const customJSON = `coalesce((SELECT json_group_array(json_object('id',id,'name',name)) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id)),'[]')`
+
+func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
+	out := []CustomTag{}
+	rows, err := s.DB.QueryContext(ctx, "SELECT id,name FROM custom_tags ORDER BY name_key,id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t CustomTag
+		if err = rows.Scan(&t.ID, &t.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+func (s *Store) SaveCustomTag(ctx context.Context, tag CustomTag) (CustomTag, error) {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	tag.Name = strings.TrimSpace(tag.Name)
+	if tag.Name == "" || len([]rune(tag.Name)) > 80 || strings.ContainsFunc(tag.Name, unicode.IsControl) {
+		return tag, fmt.Errorf("Enter a tag name between 1 and 80 characters")
+	}
+	key := strings.ToLower(tag.Name)
+	var duplicate int64
+	if err := s.DB.QueryRowContext(ctx, "SELECT id FROM custom_tags WHERE name_key=? AND id<>?", key, tag.ID).Scan(&duplicate); err == nil {
+		return tag, fmt.Errorf("A custom tag with this name already exists")
+	} else if err != sql.ErrNoRows {
+		return tag, err
+	}
+	if tag.ID == 0 {
+		var count int
+		if err := s.DB.QueryRowContext(ctx, "SELECT count(*) FROM custom_tags").Scan(&count); err != nil {
+			return tag, err
+		}
+		if count >= 128 {
+			return tag, fmt.Errorf("At most 128 custom tags are allowed")
+		}
+		result, err := s.DB.ExecContext(ctx, "INSERT INTO custom_tags(name,name_key) VALUES(?,?)", tag.Name, key)
+		if err != nil {
+			return tag, err
+		}
+		tag.ID, _ = result.LastInsertId()
+	} else {
+		result, err := s.DB.ExecContext(ctx, "UPDATE custom_tags SET name=?,name_key=? WHERE id=?", tag.Name, key, tag.ID)
+		if err != nil {
+			return tag, err
+		}
+		n, _ := result.RowsAffected()
+		if n != 1 {
+			return tag, fmt.Errorf("Custom tag no longer exists")
+		}
+	}
+	s.invalidateCustomFacets()
+	return tag, nil
+}
+func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	rules := []RecognitionRule{}
+	for _, r := range s.recognition.config.Rules {
+		if r.Field != "custom" || r.Value != strconv.FormatInt(id, 10) {
+			rules = append(rules, r)
+		}
+	}
+	engine, err := CompileRecognition(rules)
+	if err != nil {
+		return err
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM custom_tags WHERE id=?", id); err != nil {
+		return err
+	}
+	raw, _ := json.Marshal(engine.Config())
+	if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(raw)); err != nil {
+		return err
+	}
+	var rawSettings string
+	if err = tx.QueryRowContext(ctx, "SELECT value FROM kv WHERE key='settings'").Scan(&rawSettings); err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil {
+		var cfg Settings
+		if err = json.Unmarshal([]byte(rawSettings), &cfg); err != nil {
+			return err
+		}
+		key := "custom:" + strconv.FormatInt(id, 10)
+		delete(cfg.TagColors, key)
+		delete(cfg.TagTextColors, key)
+		raw, _ := json.Marshal(cfg)
+		if _, err = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(raw)); err != nil {
+			return err
+		}
+	}
+	rows, err := tx.QueryContext(ctx, "SELECT id,query FROM presets")
+	if err != nil {
+		return err
+	}
+	type presetQuery struct {
+		id    int64
+		query string
+	}
+	updates := []presetQuery{}
+	for rows.Next() {
+		var item presetQuery
+		if err = rows.Scan(&item.id, &item.query); err != nil {
+			rows.Close()
+			return err
+		}
+		q, e := url.ParseQuery(item.query)
+		if e != nil {
+			continue
+		}
+		values := q["custom"]
+		kept := []string{}
+		for _, v := range values {
+			if v != strconv.FormatInt(id, 10) {
+				kept = append(kept, v)
+			}
+		}
+		if len(kept) != len(values) {
+			q.Del("custom")
+			for _, v := range kept {
+				q.Add("custom", v)
+			}
+			if len(kept) == 0 {
+				q.Del("customOp")
+			}
+			item.query = q.Encode()
+			updates = append(updates, item)
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for _, item := range updates {
+		if _, err = tx.ExecContext(ctx, "UPDATE presets SET query=? WHERE id=?", item.query, item.id); err != nil {
+			return err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	s.recognition = engine
+	s.invalidateCustomFacets()
+	return nil
+}
+func (s *Store) validateCustomRules(ctx context.Context, rules []RecognitionRule) error {
+	for _, r := range rules {
+		if r.Field != "custom" {
+			continue
+		}
+		var exists bool
+		if err := s.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM custom_tags WHERE id=?)", r.Value).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("Custom tag no longer exists")
+		}
+	}
+	return nil
+}
+func replaceFileCustom(ctx context.Context, tx *sql.Tx, rowid int64, f File, sync bool) error {
+	if sync {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM custom_overrides WHERE service=? AND file_id=? AND state=-1", f.Service, f.ID); err != nil {
+			return err
+		}
+	}
+	for _, table := range []string{"file_custom_auto", "file_custom"} {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE file_rowid=?", rowid); err != nil {
+			return err
+		}
+	}
+	for _, id := range f.RecognizedCustom {
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO file_custom_auto SELECT ?,id FROM custom_tags WHERE id=?", rowid, id); err != nil {
+			return err
+		}
+	}
+	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO file_custom SELECT a.file_rowid,a.tag_id FROM file_custom_auto a WHERE a.file_rowid=? AND NOT EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=? AND o.file_id=? AND o.tag_id=a.tag_id AND o.state=-1) UNION SELECT ?,tag_id FROM custom_overrides WHERE service=? AND file_id=? AND state=1`, rowid, f.Service, f.ID, rowid, f.Service, f.ID)
+	return err
+}
+
+type CustomSelection struct {
+	Total  int            `json:"total"`
+	Counts map[string]int `json:"counts"`
+	Tags   []CustomTag    `json:"tags"`
+}
+
+func (s *Store) CustomSelection(ctx context.Context, q url.Values) (CustomSelection, error) {
+	out := CustomSelection{Counts: map[string]int{}}
+	filter, args, err := where(q)
+	if err != nil {
+		return out, err
+	}
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback()
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM files f WHERE "+filter, args...).Scan(&out.Total); err != nil {
+		return out, err
+	}
+	rows, err := tx.QueryContext(ctx, "SELECT c.tag_id,count(*) FROM file_custom c JOIN files f ON f.rowid=c.file_rowid WHERE "+filter+" GROUP BY c.tag_id", args...)
+	if err != nil {
+		return out, err
+	}
+	for rows.Next() {
+		var id string
+		var n int
+		if err = rows.Scan(&id, &n); err != nil {
+			rows.Close()
+			return out, err
+		}
+		out.Counts[id] = n
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return out, err
+	}
+	if err = tx.Commit(); err != nil {
+		return out, err
+	}
+	out.Tags, err = s.CustomTags(ctx)
+	return out, err
+}
+func (s *Store) ApplyCustom(ctx context.Context, q url.Values, changes map[string]bool) (int, error) {
+	if len(changes) == 0 || len(changes) > 128 {
+		return 0, fmt.Errorf("Select at least one custom tag change")
+	}
+	filter, args, err := where(q)
+	if err != nil {
+		return 0, err
+	}
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "CREATE TEMP TABLE custom_targets(rowid INTEGER PRIMARY KEY)"); err != nil {
+		return 0, err
+	}
+	// Freeze actual matches before modifying any tag used by the filter. Never include season context.
+	if _, err = tx.ExecContext(ctx, "INSERT INTO custom_targets SELECT f.rowid FROM files f WHERE "+filter, args...); err != nil {
+		return 0, err
+	}
+	var total int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM custom_targets").Scan(&total); err != nil {
+		return 0, err
+	}
+	for value, add := range changes {
+		id, e := strconv.ParseInt(value, 10, 64)
+		if e != nil || id <= 0 {
+			return 0, fmt.Errorf("Invalid custom tag")
+		}
+		var exists bool
+		if err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM custom_tags WHERE id=?)", id).Scan(&exists); err != nil {
+			return 0, err
+		}
+		if !exists {
+			return 0, fmt.Errorf("Custom tag no longer exists")
+		}
+		state := -1
+		if add {
+			state = 1
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO custom_overrides(service,file_id,tag_id,state) SELECT f.service,f.id,?,? FROM files f JOIN custom_targets t ON t.rowid=f.rowid WHERE true ON CONFLICT(service,file_id,tag_id) DO UPDATE SET state=excluded.state`, id, state); err != nil {
+			return 0, err
+		}
+		if add {
+			_, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO file_custom SELECT rowid,? FROM custom_targets", id)
+		} else {
+			_, err = tx.ExecContext(ctx, "DELETE FROM file_custom WHERE tag_id=? AND file_rowid IN (SELECT rowid FROM custom_targets)", id)
+		}
+		if err != nil {
+			return 0, err
+		}
+	}
+	if _, err = tx.ExecContext(ctx, "DROP TABLE custom_targets"); err != nil {
+		return 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	s.invalidateCustomFacets()
+	return total, nil
+}
