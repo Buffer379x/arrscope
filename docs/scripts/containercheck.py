@@ -168,8 +168,9 @@ with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
         result['test_error'] = str(e)
     finally:
         result['container_state'] = json.loads(docker('inspect', name))[0]['State']
+        result['oom_killed'] = result.get('oom_killed', False) or result['container_state']['OOMKilled']
         print(json.dumps(result, indent=2), flush=True)
         docker('rm', '-f', name, check=False)
 fixture.shutdown()
-if not result.get('completed') or result.get('test_error'):
+if not result.get('completed') or result.get('test_error') or result.get('oom_killed'):
     sys.exit(1)
