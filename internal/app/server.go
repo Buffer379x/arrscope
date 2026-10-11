@@ -246,7 +246,10 @@ func (s *Server) Handler() http.Handler {
 					jsonOut(w, 200, engine.Recognize(in.Filename))
 					return
 				}
-				ctx, cancel := context.WithTimeout(r.Context(), 80*time.Second)
+				// Reprocessing is an authenticated, atomic bulk operation. Give it
+				// a bounded budget on slower hosts without changing query timeouts.
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(190 * time.Second))
+				ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 				defer cancel()
 				out, err := s.Store.SaveRecognition(ctx, in.Rules, in.Revision)
 				if err != nil {

@@ -150,7 +150,7 @@ with tempfile.TemporaryDirectory(prefix='arrscope-review-data-') as data:
             rule = {'id':'stress-source','name':'Synthetic source override','field':'source','match':'token','pattern':'WEB-DL','value':'UHD','mode':'override','priority':1,'enabled':True,'consume':False}
             before_calls = Fixture.calls
             t = time.perf_counter()
-            updated = req('/api/recognition', {'rules':current['rules']+[rule], 'revision':current['revision']}, 'PUT', timeout=85)
+            updated = req('/api/recognition', {'rules':current['rules']+[rule], 'revision':current['revision']}, 'PUT', timeout=195)
             result['recognition_reprocess_ms'] = round((time.perf_counter()-t)*1000,3)
             assert updated['revision'] != current['revision']
             assert Fixture.calls == before_calls, 'Rule save contacted an upstream service'
