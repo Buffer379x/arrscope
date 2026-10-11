@@ -127,7 +127,7 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 			st.LastSuccess = &now
 			st.Count = len(files)
 			st.Error = ""
-			if err = m.store.Replace(service, files, st); err != nil {
+			if err = m.store.replaceSyncSnapshot(service, files, st); err != nil {
 				st = m.status[service]
 				st.Running = false
 				st.Error = "Cache konnte nicht gespeichert werden"

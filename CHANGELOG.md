@@ -4,7 +4,7 @@ All project versions follow semantic versioning. Every release has an English en
 
 ## 0.3.1
 
-Consistent Dashboard/library heading and card positions; Dashboard clicks select existing unsaved filters; removal of the Dashboard footer; persistent black/white/automatic tag text colors. No database schema migration. See [release notes](docs/releases/0.3.1.md).
+Consistent Dashboard/library heading and card positions; Dashboard clicks select existing unsaved filters; removal of the Dashboard footer; persistent black/white/automatic tag text colors; reduced memory overlap during large syncs. No database schema migration. See [release notes](docs/releases/0.3.1.md).
 
 ## 0.3.0
 
