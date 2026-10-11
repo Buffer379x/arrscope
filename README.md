@@ -4,7 +4,7 @@ Explore and filter your Radarr and Sonarr libraries using existing filenames and
 
 ![ArrScope dashboard](docs/screenshots/dashboard-0.2.1-en.png)
 
-![ArrScope movie library](docs/screenshots/library-0.2.1-en.png)
+![ArrScope movie library](docs/screenshots/library-0.2.3-en.png)
 
 Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. Real metadata detection remains unchanged.
 

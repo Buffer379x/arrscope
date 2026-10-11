@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## [0.2.3] — 2026-10-11
+
+See [0.2.3 release notes](docs/releases/0.2.3.md): full-canvas icons, consistent default tag outlines, unified responsive System settings and corrected screenshot sources.
+
 ## [0.2.1] — 2026-10-11
 
 See [0.2.1 release notes](docs/releases/0.2.1.md): system information in settings, movie/series navigation, full-size icons and consistent custom tag borders.
@@ -17,3 +21,4 @@ See [initial release notes](docs/releases/0.1.0.md).
 [0.2.0]: https://github.com/Buffer379x/arrscope/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Buffer379x/arrscope/releases/tag/v0.1.0
 [0.2.1]: https://github.com/Buffer379x/arrscope/compare/v0.2.0...v0.2.1
+[0.2.3]: https://github.com/Buffer379x/arrscope/compare/v0.2.1...v0.2.3

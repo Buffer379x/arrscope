@@ -399,6 +399,7 @@
     "Last successful sync": "Last successful sync",
     "Service status reflects the last sync, not a live connection test.": "Service status reflects the last sync, not a live connection test.",
     "Emby enriches the Radarr and Sonarr syncs.": "Emby enriches the Radarr and Sonarr syncs.",
-    "Enabled": "Enabled"
+    "Enabled": "Enabled",
+    "System": "System"
   }
 }

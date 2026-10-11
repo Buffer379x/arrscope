@@ -76,8 +76,7 @@
 }
 .chart-filter:hover .tag,
 .chart-filter:focus-visible .tag {
-  outline: 2px solid
-    var(--tag-border, color-mix(in srgb, currentColor 70%, #000));
+  outline: 2px solid var(--tag-border);
   outline-offset: 2px;
 }
 .dashboard-filter-notice {

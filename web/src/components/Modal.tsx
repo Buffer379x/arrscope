@@ -7,11 +7,13 @@ export function Modal({
   close,
   children,
   wide = false,
+  className = "",
 }: {
   title: string;
   close: () => void;
   children: preact.ComponentChildren;
   wide?: boolean;
+  className?: string;
 }) {
   useI18n();
   const ref = useRef<HTMLDialogElement>(null);
@@ -22,7 +24,7 @@ export function Modal({
   }, []);
   return (
     <dialog
-      class={"modal" + (wide ? " wide" : "")}
+      class={["modal", wide && "wide", className].filter(Boolean).join(" ")}
       ref={ref}
       aria-labelledby={headingId}
       onCancel={(e) => {
