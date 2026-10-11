@@ -219,6 +219,7 @@
   padding: 16px 0;
   border: 0;
   justify-content: flex-end;
+  background: transparent;
 }
 .settings-save-bar > span {
   margin-right: auto;
@@ -303,6 +304,7 @@ select {
 }
 .color-table-wrap {
   margin-top: 16px;
+  min-height: 0;
 }
 .color-settings-table {
   width: 100%;
