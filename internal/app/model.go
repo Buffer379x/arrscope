@@ -19,18 +19,25 @@ type TagGroups struct {
 	Custom     bool `json:"custom"`
 }
 
-func (g TagGroups) Active() bool               { return g != (TagGroups{}) }
-func dataConfig(c ServiceConfig) ServiceConfig { c.TagSync = TagGroups{}; return c }
+func (g TagGroups) Active() bool { return g != (TagGroups{}) }
+func dataConfig(c ServiceConfig) ServiceConfig {
+	c.TagSync = TagGroups{}
+	c.TagSyncMode = ""
+	c.TagSyncDisable = ""
+	return c
+}
 
 type ServiceConfig struct {
-	TagSync      TagGroups `json:"tagSync"`
-	Enabled      bool      `json:"enabled"`
-	URL          string    `json:"url"`
-	APIKey       string    `json:"apiKey,omitempty"`
-	HasKey       bool      `json:"hasKey"`
-	ClearKey     bool      `json:"clearKey,omitempty"`
-	PathMappings string    `json:"pathMappings,omitempty"`
-	Interval     int       `json:"interval"`
+	TagSyncMode    string    `json:"tagSyncMode,omitempty"`
+	TagSyncDisable string    `json:"tagSyncDisable,omitempty"`
+	TagSync        TagGroups `json:"tagSync"`
+	Enabled        bool      `json:"enabled"`
+	URL            string    `json:"url"`
+	APIKey         string    `json:"apiKey,omitempty"`
+	HasKey         bool      `json:"hasKey"`
+	ClearKey       bool      `json:"clearKey,omitempty"`
+	PathMappings   string    `json:"pathMappings,omitempty"`
+	Interval       int       `json:"interval"`
 }
 type Settings struct {
 	WarningColors  map[string]string   `json:"warningColors"`

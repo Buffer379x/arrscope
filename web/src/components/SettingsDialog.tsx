@@ -1,3 +1,10 @@
+import { confirmDeletion } from "../confirmation";
+import { TagPolicyDialog } from "./TagPolicyDialog";
+import {
+  tagTransition,
+  type TagTransition,
+  type TagDecision,
+} from "../tag-policy";
 import { notify } from "../notifications";
 import { CustomTagsSettings } from "./CustomTagsSettings";
 import type { CustomTag } from "../types";
@@ -62,6 +69,7 @@ export function SettingsDialog({
 }) {
   const { locale, setLocale } = useI18n();
   const [draftLocale, setDraftLocale] = useState(locale);
+  const [tagChanges, setTagChanges] = useState<TagTransition[] | null>(null);
   const settingsFormId = useId();
   const [customDirty, setCustomDirty] = useState(false);
   const [rulesDirty, setRulesDirty] = useState(false);
@@ -192,11 +200,11 @@ export function SettingsDialog({
       ...current,
       [service]: { ...current[service], ...patch },
     }));
-  const submit = async (e: Event) => {
-    e.preventDefault();
+  const saveSettings = async (next: Settings) => {
     setBusy(true);
     try {
-      await api("settings", "PUT", cfg);
+      await api("settings", "PUT", next);
+      setTagChanges(null);
       setCfg(await api<Settings>("settings"));
       await saved();
       setLocale(draftLocale);
@@ -206,8 +214,38 @@ export function SettingsDialog({
       setBusy(false);
     }
   };
+  const submit = async (e: Event) => {
+    e.preventDefault();
+    const changes = (["radarr", "sonarr"] as Service[])
+      .map((service) => tagTransition(service, settings[service], cfg[service]))
+      .filter((c) => c.needsMode || c.disabled.length);
+    if (changes.length) {
+      setTagChanges(changes);
+      return;
+    }
+    await saveSettings(cfg);
+  };
+  const confirmTags = async (choices: Record<string, TagDecision>) => {
+    const next = structuredClone(cfg);
+    for (const service of ["radarr", "sonarr"] as Service[]) {
+      const choice = choices[service];
+      if (choice?.mode) next[service].tagSyncMode = choice.mode;
+      if (choice?.disable) next[service].tagSyncDisable = choice.disable;
+    }
+    setCfg(next);
+    await saveSettings(next);
+  };
+
   return (
     <section class="settings-page" aria-label={t("Settings")}>
+      {tagChanges && (
+        <TagPolicyDialog
+          changes={tagChanges}
+          busy={busy}
+          close={() => setTagChanges(null)}
+          save={confirmTags}
+        />
+      )}
       <div class="library-intro">
         <h1>{t("Settings")}</h1>
       </div>
@@ -388,14 +426,25 @@ export function SettingsDialog({
                           type="checkbox"
                           disabled={demo}
                           checked={!!cfg[service].clearKey}
-                          onChange={(e) =>
+                          onChange={async (e) => {
+                            const input = e.currentTarget,
+                              checked = input.checked;
+                            if (
+                              checked &&
+                              !(await confirmDeletion(
+                                t("Delete the saved API key when saving?"),
+                              ))
+                            ) {
+                              input.checked = false;
+                              return;
+                            }
                             update(service, {
-                              clearKey: e.currentTarget.checked,
-                              ...(e.currentTarget.checked
+                              clearKey: checked,
+                              ...(checked
                                 ? { enabled: false, apiKey: "" }
                                 : {}),
-                            })
-                          }
+                            });
+                          }}
                         />
                         {t("Delete saved API key on save")}
                       </label>
@@ -462,9 +511,34 @@ export function SettingsDialog({
                           </h4>
                           <p class="quiet">
                             {t(
-                              "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.",
+                              "Disabled by default. When saving changes, choose whether existing tags should be kept or overwritten, and whether disabled groups should be kept or deleted.",
                             )}
                           </p>
+                          <label>
+                            {t("Existing tag handling")}
+                            <select
+                              disabled={
+                                demo ||
+                                !Object.values(cfg[service].tagSync || {}).some(
+                                  Boolean,
+                                )
+                              }
+                              value={cfg[service].tagSyncMode || "replace"}
+                              onChange={(e) =>
+                                update(service, {
+                                  tagSyncMode: e.currentTarget.value as
+                                    "add" | "replace",
+                                })
+                              }
+                            >
+                              <option value="add">
+                                {t("Keep and only add")}
+                              </option>
+                              <option value="replace">
+                                {t("Overwrite assignments")}
+                              </option>
+                            </select>
+                          </label>
                           <div class="tag-group-options">
                             {[
                               "resolution",

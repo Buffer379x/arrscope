@@ -1,3 +1,4 @@
+import { ConfirmationDialog } from "./components/ConfirmationDialog";
 import { Notifications } from "./components/Notifications";
 import { I18nProvider, t, useI18n } from "./i18n";
 import { LoaderCircle } from "lucide-preact";
@@ -23,6 +24,7 @@ function App() {
 render(
   <I18nProvider>
     <Notifications />
+    <ConfirmationDialog />
     <App />
   </I18nProvider>,
   document.getElementById("app")!,

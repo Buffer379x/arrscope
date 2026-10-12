@@ -20,11 +20,12 @@ import (
 const tagSyncSchema = `CREATE TABLE IF NOT EXISTS tag_sync_managed(service TEXT NOT NULL,endpoint TEXT NOT NULL,media_id INTEGER NOT NULL,PRIMARY KEY(service,endpoint,media_id));PRAGMA user_version=7;`
 
 type TagSyncStatus struct {
-	Running     bool       `json:"running"`
-	Pending     bool       `json:"pending"`
-	LastSuccess *time.Time `json:"lastSuccess"`
-	Error       string     `json:"error"`
-	Changed     int        `json:"changed"`
+	Running             bool       `json:"running"`
+	Pending             bool       `json:"pending"`
+	LastSuccess         *time.Time `json:"lastSuccess"`
+	Error               string     `json:"error"`
+	Changed             int        `json:"changed"`
+	RetainedDefinitions int        `json:"retainedDefinitions"`
 }
 type TagWriter struct {
 	store       *Store
@@ -42,6 +43,12 @@ type TagWriter struct {
 func NewTagWriter(ctx context.Context, store *Store, config func() Settings, gate chan struct{}) *TagWriter {
 	ctx, cancel := context.WithCancel(ctx)
 	w := &TagWriter{store: store, config: config, gate: gate, ctx: ctx, cancel: cancel, events: make(chan string, 2), done: make(chan struct{}), generations: map[string]int{}, status: map[string]TagSyncStatus{}}
+	for _, service := range []string{"radarr", "sonarr"} {
+		var retained int
+		if store.Get("tagSyncRetained:"+service, &retained) == nil && retained > 0 {
+			w.status[service] = TagSyncStatus{RetainedDefinitions: retained}
+		}
+	}
 	go w.run()
 	return w
 }
@@ -135,6 +142,7 @@ func (w *TagWriter) apply(service string) {
 	st = w.status[service]
 	st.Running = false
 	st.Changed = changed
+	_ = w.store.Get("tagSyncRetained:"+service, &st.RetainedDefinitions)
 	if err != nil {
 		st.Error = err.Error()
 	} else if !waiting && gen == w.generations[service] {
@@ -191,7 +199,7 @@ type taggedMedia struct {
 }
 
 func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, out any) error {
-	if !(path == "tag" && method == "POST" || (path == "movie/editor" || path == "series/editor") && method == "PUT") {
+	if !(path == "tag" && method == "POST" || (path == "movie/editor" || path == "series/editor") && method == "PUT" || method == "DELETE" && positiveTagPath(path, "tag/")) {
 		return errors.New("Tag write endpoint is not allowed")
 	}
 	raw, err := json.Marshal(body)
@@ -213,6 +221,9 @@ func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, ou
 		return errors.New("Tag write request failed")
 	}
 	defer res.Body.Close()
+	if method == "DELETE" && res.StatusCode == 404 {
+		return nil
+	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return fmt.Errorf("Tag API returned HTTP %d", res.StatusCode)
 	}
@@ -223,55 +234,8 @@ func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, ou
 	return err
 }
 func (s *Store) desiredTags(ctx context.Context, service string, g TagGroups) (map[int]map[string]bool, error) {
-	custom := "'[]'"
-	if g.Custom {
-		custom = customJSON
-	}
-	rows, err := s.DB.QueryContext(ctx, "SELECT f.media_id,f.resolution,f.codec,f.source,f.processing,f.hdr,f.bitDepth,f.audio,f.channels,f.language,"+custom+" FROM files f WHERE f.service=?", service)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[int]map[string]bool{}
-	for rows.Next() {
-		var id int
-		var resolution, codec, source, processing, hdr, depth, audio, channels, language, customRaw string
-		if err = rows.Scan(&id, &resolution, &codec, &source, &processing, &hdr, &depth, &audio, &channels, &language, &customRaw); err != nil {
-			return nil, err
-		}
-		if out[id] == nil {
-			out[id] = map[string]bool{}
-		}
-		add := func(enabled bool, value, separator string) {
-			if !enabled {
-				return
-			}
-			for _, part := range strings.Split(value, separator) {
-				if label := tagLabel(part); label != "" {
-					out[id][label] = true
-				}
-			}
-		}
-		add(g.Resolution, resolution, " + ")
-		add(g.Codec, codec, " + ")
-		add(g.Source, source, " + ")
-		add(g.Source, processing, " + ")
-		add(g.HDR, hdr, " + ")
-		add(g.BitDepth, depth, " + ")
-		add(g.Audio, audio, " + ")
-		add(g.Channels, channels, " + ")
-		add(g.Language, language, ", ")
-		if g.Custom {
-			var tags []CustomTag
-			if err = json.Unmarshal([]byte(customRaw), &tags); err != nil {
-				return nil, err
-			}
-			for _, tag := range tags {
-				add(true, tag.Name, "\x00")
-			}
-		}
-	}
-	return out, rows.Err()
+	snap, e := readTagSnapshot(ctx, s.DB, service, g)
+	return snap.desired, e
 }
 func sameTagIDs(a, b []int) bool {
 	if len(a) != len(b) {
@@ -279,14 +243,18 @@ func sameTagIDs(a, b []int) bool {
 	}
 	set := map[int]bool{}
 	for _, id := range a {
+		if id <= 0 || set[id] {
+			return false
+		}
 		set[id] = true
 	}
 	for _, id := range b {
 		if !set[id] {
 			return false
 		}
+		delete(set, id)
 	}
-	return true
+	return len(set) == 0
 }
 
 // Reconciliation is authoritative only after explicit opt-in. A durable media
@@ -314,7 +282,19 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	if err != nil {
 		return 0, false, err
 	}
-	if !c.TagSync.Active() && len(managed) == 0 {
+	policy, err := s.tagPolicies(ctx, service, endpoint, c.TagSync)
+	if err != nil {
+		return 0, false, err
+	}
+	var cleanupCount int
+	if err = s.DB.QueryRowContext(ctx, "SELECT count(*) FROM tag_sync_cleanup WHERE service=? AND endpoint=?", service, endpoint).Scan(&cleanupCount); err != nil {
+		return 0, false, err
+	}
+	if !c.TagSync.Active() && len(policy.remove) == 0 && cleanupCount == 0 && len(policy.keep) > 0 {
+		_, err = s.DB.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint)
+		return 0, false, err
+	}
+	if !c.TagSync.Active() && len(managed) == 0 && len(policy.remove) == 0 && cleanupCount == 0 {
 		return 0, false, nil
 	}
 	if !c.Enabled {
@@ -329,9 +309,11 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 			return 0, true, nil
 		}
 	}
-	desired := map[int]map[string]bool{}
+	snap := tagSnapshot{map[int]map[string]bool{}, map[string]map[string]bool{}, map[int]map[string]bool{}}
+	desired := snap.desired
 	if c.TagSync.Active() {
-		desired, err = s.desiredTags(ctx, service, c.TagSync)
+		snap, err = readTagSnapshot(ctx, s.DB, service, c.TagSync)
+		desired = snap.desired
 		if err != nil {
 			return 0, false, err
 		}
@@ -358,11 +340,13 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		return 0, false, err
 	}
 	labels := map[string]int{}
+	names := map[int]string{}
 	for _, tag := range definitions {
 		if tag.ID <= 0 || tag.Label == "" {
 			return 0, false, errors.New("Invalid tag catalog")
 		}
 		key := strings.ToLower(tag.Label)
+		names[tag.ID] = key
 		if id, ok := labels[key]; !ok || tag.ID < id {
 			labels[key] = tag.ID
 		}
@@ -373,7 +357,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 			return 0, false, errors.New("Invalid tag media catalog")
 		}
 		seen[item.ID] = true
-		if c.TagSync.Active() {
+		if c.TagSync.Active() || len(policy.remove) > 0 {
 			managed[item.ID] = true
 		}
 	}
@@ -395,8 +379,31 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		}
 	}
 	stmt.Close()
+
+	if c.TagSync.Active() {
+		if err = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true); err != nil {
+			return 0, false, err
+		}
+		for field, on := range c.TagSync.fields() {
+			if on {
+				if _, err = tx.ExecContext(ctx, "INSERT INTO tag_sync_groups VALUES(?,?,?,'active') ON CONFLICT(service,endpoint,field) DO UPDATE SET state='active'", service, endpoint, field); err != nil {
+					return 0, false, err
+				}
+			}
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return 0, false, err
+	}
+	oldCustom := policy.custom
+	policy, err = s.tagPolicies(ctx, service, endpoint, c.TagSync)
+	if err != nil {
+		return 0, false, err
+	}
+	for label := range policy.remove {
+		if err = s.stageTagCleanup(ctx, service, endpoint, label); err != nil {
+			return 0, false, err
+		}
 	}
 	required := map[string]bool{}
 	for id, tags := range desired {
@@ -440,25 +447,77 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		}
 		labels[label] = created.ID
 	}
-	type batch struct{ ids, tags []int }
+
+	type batch struct {
+		ids, tags []int
+		op        string
+	}
 	batches := map[string]*batch{}
+	queue := func(id int, op string, tags []int) {
+		if len(tags) == 0 && op != "replace" {
+			return
+		}
+		sort.Ints(tags)
+		key := op + fmt.Sprint(tags)
+		if batches[key] == nil {
+			batches[key] = &batch{tags: tags, op: op}
+		}
+		batches[key].ids = append(batches[key].ids, id)
+	}
 	for _, item := range media {
 		if !managed[item.ID] {
 			continue
 		}
-		want := []int{}
+		want := map[int]bool{}
 		for label := range desired[item.ID] {
-			want = append(want, labels[label])
+			want[labels[label]] = true
 		}
-		sort.Ints(want)
-		if sameTagIDs(want, item.Tags) {
-			continue
+		remove := []int{}
+		for _, id := range item.Tags {
+			label := names[id]
+			if policy.keep[label] {
+				want[id] = true
+				continue
+			}
+			if policy.remove[label] && !desired[item.ID][label] || c.TagSync.Custom && oldCustom[item.ID][label] && !desired[item.ID][label] {
+				remove = append(remove, id)
+			}
 		}
-		key := fmt.Sprint(want)
-		if batches[key] == nil {
-			batches[key] = &batch{tags: want}
+		if tagMode(c) == "replace" {
+			ids := []int{}
+			for id := range want {
+				ids = append(ids, id)
+			}
+			if sameTagIDs(ids, item.Tags) {
+				continue
+			}
+			for _, id := range item.Tags {
+				if !want[id] {
+					if err = s.stageTagCleanup(ctx, service, endpoint, names[id]); err != nil {
+						return 0, false, err
+					}
+				}
+			}
+			queue(item.ID, "replace", ids)
+		} else {
+			current := map[int]bool{}
+			for _, id := range item.Tags {
+				current[id] = true
+			}
+			for _, id := range remove {
+				if err = s.stageTagCleanup(ctx, service, endpoint, names[id]); err != nil {
+					return 0, false, err
+				}
+			}
+			queue(item.ID, "remove", remove)
+			add := []int{}
+			for id := range want {
+				if !current[id] {
+					add = append(add, id)
+				}
+			}
+			queue(item.ID, "add", add)
 		}
-		batches[key].ids = append(batches[key].ids, item.ID)
 	}
 	changed := 0
 	keys := []string{}
@@ -477,7 +536,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 				return changed, true, nil
 			}
 			var applied []taggedMedia
-			if err = client.writeTags(ctx, editor, "PUT", map[string]any{idsKey: b.ids[start:end], "tags": b.tags, "applyTags": "replace", "moveFiles": false}, &applied); err != nil {
+			if err = client.writeTags(ctx, editor, "PUT", map[string]any{idsKey: b.ids[start:end], "tags": b.tags, "applyTags": b.op, "moveFiles": false}, &applied); err != nil {
 				return changed, false, err
 			}
 			expected := map[int]bool{}
@@ -485,7 +544,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 				expected[id] = true
 			}
 			for _, item := range applied {
-				if !expected[item.ID] || !sameTagIDs(item.Tags, b.tags) {
+				if !expected[item.ID] || !tagResponseMatches(b.op, item.Tags, b.tags) {
 					return changed, false, errors.New("Tag update could not be verified")
 				}
 				delete(expected, item.ID)
@@ -499,6 +558,46 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	}
 	if !unchanged() {
 		return changed, true, nil
+	}
+
+	blocked, cleanErr := s.cleanupTags(ctx, service, endpoint, client, labels, required, policy.keep, unchanged)
+	if cleanErr != nil {
+		return changed, false, cleanErr
+	}
+	if err = s.Put("tagSyncRetained:"+service, blocked); err != nil {
+		return changed, false, err
+	}
+	// Completed group retirements and custom ownership updates are atomic. Blocked
+	// definitions retain their independent cleanup intent for the next file sync.
+	finish, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return changed, false, e
+	}
+	defer finish.Rollback()
+	for field, state := range policy.states {
+		if state == "delete" {
+			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field=?", service, endpoint, field); e != nil {
+				return changed, false, e
+			}
+			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_groups WHERE service=? AND endpoint=? AND field=?", service, endpoint, field); e != nil {
+				return changed, false, e
+			}
+		}
+	}
+	if c.TagSync.Custom {
+		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field='custom' AND media_id>0", service, endpoint); e != nil {
+			return changed, false, e
+		}
+		for id, vals := range snap.custom {
+			for label := range vals {
+				if _, e = finish.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_values VALUES(?,?,'custom',?,?)", service, endpoint, label, id); e != nil {
+					return changed, false, e
+				}
+			}
+		}
+	}
+	if e = finish.Commit(); e != nil {
+		return changed, false, e
 	}
 	if !c.TagSync.Active() {
 		_, err = s.DB.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint)

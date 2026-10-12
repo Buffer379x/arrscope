@@ -85,7 +85,8 @@ export function SystemInfo({
               {(Object.values(settings[service].tagSync || {}).some(Boolean) ||
                 tags?.running ||
                 tags?.pending ||
-                tags?.error) && (
+                tags?.error ||
+                tags?.retainedDefinitions) && (
                 <div class="tag-sync-status">
                   <b>{t("Tag synchronization")}</b>
                   <p class={tags?.error ? "error" : "quiet"}>
@@ -99,6 +100,14 @@ export function SystemInfo({
                               date: date(tags?.lastSuccess),
                             })}
                   </p>
+                  {!!tags?.retainedDefinitions && (
+                    <p class="quiet">
+                      {t(
+                        "{count} tag definitions retained because the service still uses them.",
+                        { count: tags.retainedDefinitions },
+                      )}
+                    </p>
+                  )}
                   {tags?.running && (
                     <progress
                       aria-label={t("Tag synchronization in progress …")}

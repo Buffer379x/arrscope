@@ -312,6 +312,7 @@ func DefaultRecognitionRules() []RecognitionRule {
 		marker := `(?:subbed|subs?|subtitles|hard[ ._-]?subbed|soft[ ._-]?subbed)`
 		rules[len(rules)-1].Unless = `(?:^|[ ._\[\]()-])(?:(?:` + aliases + `)[ ._-]+` + marker + `|` + marker + `[ ._-]+(?:` + aliases + `))(?:$|[ ._\[\]()-])`
 	}
+	rules = append(rules, uhdbdDefaultRule())
 	return rules
 }
 
@@ -366,4 +367,26 @@ func upgradeDefaultRules(rules []RecognitionRule) ([]RecognitionRule, bool) {
 		}
 	}
 	return next, changed
+}
+
+func uhdbdDefaultRule() RecognitionRule {
+	return RecognitionRule{ID: "default-source-uhdbd", Name: "source · UHD (UHDBD)", Field: "source", Match: "token", Pattern: "UHDBD", Value: "UHD", Mode: "override", Priority: 95, Enabled: true}
+}
+func addUHDBDDefault(rules []RecognitionRule) ([]RecognitionRule, bool) {
+	for _, r := range rules {
+		if r.ID == "default-source-uhdbd" {
+			return rules, false
+		}
+		if r.Field == "source" && strings.EqualFold(r.Value, "UHD") {
+			if r.Match == "token" && strings.EqualFold(r.Pattern, "UHDBD") || r.Pattern == token("uhdbd").String() {
+				return rules, false
+			}
+			probe := r
+			probe.Enabled = true
+			if engine, e := CompileRecognition([]RecognitionRule{probe}); e == nil && strings.EqualFold(engine.Recognize("Example.UHDBD.mkv").Values["source"], "UHD") {
+				return rules, false
+			}
+		}
+	}
+	return append(append([]RecognitionRule{}, rules...), uhdbdDefaultRule()), true
 }

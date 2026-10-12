@@ -1,3 +1,4 @@
+import { confirmDeletion } from "../confirmation";
 import { matchesRuleSearch } from "../rule-search";
 import { newRuleID } from "../rule-id";
 import { notify } from "../notifications";
@@ -346,14 +347,19 @@ export function RecognitionPage({
                           <Pencil size={15} />
                         </button>
                         <button
-                          class="icon-button"
+                          class="icon-button danger-button"
                           disabled={busy}
                           aria-label={t("Delete rule: {name}", {
                             name: rule.name,
                           })}
-                          onClick={() =>
-                            change(rules.filter((r) => r.id !== rule.id))
-                          }
+                          onClick={async () => {
+                            if (
+                              await confirmDeletion(
+                                t("Delete rule {name}?", { name: rule.name }),
+                              )
+                            )
+                              change(rules.filter((r) => r.id !== rule.id));
+                          }}
                         >
                           <Trash2 size={15} />
                         </button>

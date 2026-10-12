@@ -20,11 +20,12 @@ type tagFixture struct {
 	media                  map[int][]int
 	creates, writes, reads int
 	failWrite              bool
+	protected              map[int]bool
 	service                string
 }
 
 func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server) {
-	f := &tagFixture{tags: map[int]string{1: "manual", 2: "X264", 3: "obsolete", 4: "favorite"}, media: map[int][]int{10: {1, 2, 3, 4}, 20: {1}}, service: service}
+	f := &tagFixture{tags: map[int]string{1: "manual", 2: "X264", 3: "obsolete", 4: "favorite"}, media: map[int][]int{10: {1, 2, 3, 4}, 20: {1}}, service: service, protected: map[int]bool{}}
 	h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -39,6 +40,34 @@ func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server)
 		}
 		if r.Method == "GET" {
 			f.reads++
+			if positiveTagPath(strings.TrimPrefix(r.URL.Path, "/api/v3/"), "tag/detail/") {
+				var id int
+				fmt.Sscanf(r.URL.Path, "/api/v3/tag/detail/%d", &id)
+				label, ok := f.tags[id]
+				if !ok {
+					w.WriteHeader(404)
+					return
+				}
+				refs := []int{}
+				for mid, tags := range f.media {
+					for _, tid := range tags {
+						if tid == id {
+							refs = append(refs, mid)
+							break
+						}
+					}
+				}
+				key := "movieIds"
+				if service == "sonarr" {
+					key = "seriesIds"
+				}
+				extra := []int{}
+				if f.protected[id] {
+					extra = []int{42}
+				}
+				json.NewEncoder(w).Encode(map[string]any{"id": id, "label": label, key: refs, "importListIds": extra})
+				return
+			}
 			switch r.URL.Path {
 			case "/api/v3/tag":
 				out := []arrTag{}
@@ -66,6 +95,26 @@ func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server)
 			}
 			return
 		}
+		if r.Method == "DELETE" && positiveTagPath(strings.TrimPrefix(r.URL.Path, "/api/v3/"), "tag/") {
+			var id int
+			fmt.Sscanf(r.URL.Path, "/api/v3/tag/%d", &id)
+			if f.protected[id] {
+				w.WriteHeader(409)
+				return
+			}
+			for _, tags := range f.media {
+				for _, tid := range tags {
+					if tid == id {
+						t.Error("deleted used tag")
+						w.WriteHeader(409)
+						return
+					}
+				}
+			}
+			delete(f.tags, id)
+			w.WriteHeader(200)
+			return
+		}
 		if r.Method == "POST" && r.URL.Path == "/api/v3/tag" {
 			var tag arrTag
 			json.NewDecoder(r.Body).Decode(&tag)
@@ -88,7 +137,7 @@ func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server)
 			if service == "sonarr" {
 				key = "seriesIds"
 			}
-			if len(body) != 4 || string(body["applyTags"]) != `"replace"` || string(body["moveFiles"]) != "false" {
+			if len(body) != 4 || (string(body["applyTags"]) != `"replace"` && string(body["applyTags"]) != `"add"` && string(body["applyTags"]) != `"remove"`) || string(body["moveFiles"]) != "false" {
 				t.Errorf("unsafe edit payload %s", body)
 				w.WriteHeader(400)
 				return
@@ -100,7 +149,32 @@ func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server)
 				t.Error("invalid tag batch")
 			}
 			for _, id := range ids {
-				f.media[id] = append([]int{}, tags...)
+				switch string(body["applyTags"]) {
+				case `"replace"`:
+					f.media[id] = append([]int{}, tags...)
+				case `"add"`:
+					for _, tag := range tags {
+						found := false
+						for _, old := range f.media[id] {
+							found = found || old == tag
+						}
+						if !found {
+							f.media[id] = append(f.media[id], tag)
+						}
+					}
+				case `"remove"`:
+					next := []int{}
+					for _, old := range f.media[id] {
+						drop := false
+						for _, tag := range tags {
+							drop = drop || old == tag
+						}
+						if !drop {
+							next = append(next, old)
+						}
+					}
+					f.media[id] = next
+				}
 			}
 			f.writes++
 			if f.failWrite {
@@ -193,8 +267,8 @@ func TestOutboundTagsAuthorityReuseCustomRemovalAndOptOut(t *testing.T) {
 	if f.reads != before {
 		t.Fatal("disabled sync called upstream")
 	}
-	if len(f.tags) < 4 {
-		t.Fatal("global definitions were removed")
+	if len(f.tags) != 0 {
+		t.Fatal("unused definitions were retained")
 	}
 }
 func TestOutboundSeriesTagsUnionAndEndpointIsolation(t *testing.T) {

@@ -108,7 +108,7 @@ export function FilterPanel({
             <Bookmark size={16} />
           </button>
           <button
-            class="icon-button"
+            class="icon-button danger-button"
             aria-label={t("Delete selected preset")}
             title={t("Delete selected preset")}
             disabled={!selectedPreset}

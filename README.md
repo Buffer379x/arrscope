@@ -22,7 +22,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
 - A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.
-- Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Enabled synchronization authoritatively replaces upstream assignments.
+- Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. Unused affected definitions are cleaned up after checking service references.
 
 ## Install
 
@@ -58,7 +58,7 @@ Flags are representative language symbols, not claims about a file’s country o
 
 Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag`. Optional outbound synchronization can create tag definitions and replace movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
+Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag`. Optional outbound synchronization can create/delete affected tag definitions and add/remove/replace movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
 
 Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 

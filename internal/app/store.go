@@ -49,7 +49,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 7 {
+	if version > 8 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -207,6 +207,70 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(e)
 		}
 	}
+
+	if originalVersion < 8 {
+		if originalVersion == 7 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		var cfg RecognitionConfig
+		loaded := s.Get("recognition", &cfg) == nil
+		upgraded, changed := addUHDBDDefault(cfg.Rules)
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if _, e = tx.Exec(tagPolicySchema); e == nil && loaded {
+			var engine *RecognitionEngine
+			engine, e = CompileRecognition(upgraded)
+			if e == nil {
+				s.recognition = engine
+			}
+			if e == nil && changed {
+				raw, _ := json.Marshal(engine.Config())
+				_, e = tx.Exec("UPDATE kv SET value=? WHERE key='recognition'", string(raw))
+				if e == nil {
+					e = reparseCached(context.Background(), tx, engine)
+				}
+			}
+		}
+		var settings Settings
+		if e == nil && s.Get("settings", &settings) == nil {
+			for service, c := range map[string]ServiceConfig{"radarr": settings.Radarr, "sonarr": settings.Sonarr} {
+				if !c.TagSync.Active() {
+					continue
+				}
+				endpoint := tagEndpoint(c)
+				if e = s.seedTagValues(context.Background(), tx, service, endpoint, c.TagSync, true); e != nil {
+					break
+				}
+				for field, on := range c.TagSync.fields() {
+					if on {
+						_, e = tx.Exec("INSERT OR IGNORE INTO tag_sync_groups VALUES(?,?,?,'active')", service, endpoint, field)
+						if e != nil {
+							break
+						}
+					}
+				}
+				if e != nil {
+					break
+				}
+				_, e = tx.Exec("INSERT INTO kv VALUES(?, 'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", "tagSyncDirty:"+service)
+				if e != nil {
+					break
+				}
+			}
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
+
 	var recognition RecognitionConfig
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.

@@ -48,8 +48,8 @@ func ValidateConfig(c ServiceConfig) error {
 	return nil
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
-	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "tag": true}
-	if !allowed[path] {
+	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "tag": true, "tag/detail": true}
+	if !allowed[path] && !positiveTagPath(path, "tag/detail/") {
 		return errors.New("API endpoint is not allowed")
 	}
 	u, e := url.Parse(strings.TrimRight(c.Base, "/") + "/api/v3/" + path)

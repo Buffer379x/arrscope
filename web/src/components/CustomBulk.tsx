@@ -1,3 +1,4 @@
+import { confirmDeletion } from "../confirmation";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../api";
 import { t, useI18n } from "../i18n";
@@ -49,6 +50,15 @@ export function CustomBulk({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            if (
+              Object.values(changes).some((v) => !v) &&
+              !(await confirmDeletion(
+                t("Remove selected tags from all {count} matching files?", {
+                  count: selection.total,
+                }),
+              ))
+            )
+              return;
             setBusy(true);
             setError("");
             try {
