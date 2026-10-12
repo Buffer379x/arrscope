@@ -1,3 +1,4 @@
+import { notify } from "../notifications";
 import { CustomBulk } from "./CustomBulk";
 import type { CustomTag } from "../types";
 import { t, useI18n } from "../i18n";
@@ -177,6 +178,12 @@ export function Library({
     [savePreset, setSavePreset] = useState(false),
     [presetName, setPresetName] = useState(""),
     [presetError, setPresetError] = useState("");
+  useEffect(() => {
+    if (notice) {
+      notify(notice);
+      setNotice("");
+    }
+  }, [notice]);
   const libraryScroll = useRef(0);
   const q = new URLSearchParams(filters[service]);
   const sync = status.sync?.[service];
@@ -283,17 +290,6 @@ export function Library({
     setFilters({ ...filters, [service]: "" });
     setPage(1);
   };
-  const runSync = async () => {
-    try {
-      await api("sync", "POST", { service });
-      await refresh();
-      setNotice(
-        t("Sync queued. Services run one at a time; you can keep filtering."),
-      );
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
   const doSavePreset = async (e: Event) => {
     e.preventDefault();
     try {
@@ -304,6 +300,12 @@ export function Library({
             canonicalPresetQuery(filters[service]),
       );
       if (duplicate) {
+        notify(
+          t("These filters are already saved as {name}.", {
+            name: duplicate.name,
+          }),
+          "warning",
+        );
         setPresetError(
           t("These filters are already saved as {name}.", {
             name: duplicate.name,
@@ -544,18 +546,10 @@ export function Library({
                   saved={async () => {
                     await loadSettings();
                     await refresh();
-                    setNotice(t("Settings saved."));
                   }}
                 />
               ) : view === "recognition" ? (
-                <RecognitionPage
-                  onDirty={setRulesDirty}
-                  saved={refresh}
-                  back={() => {
-                    setView("statistics");
-                    openSettings("system");
-                  }}
-                />
+                <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
               ) : view === "statistics" ? (
                 <StatisticsPage
                   status={status}
@@ -573,32 +567,6 @@ export function Library({
                       {count(sync?.count || 0)} {t("files in cache")}
                     </span>
                   </section>
-                  {error && (
-                    <div class="notice error" role="alert">
-                      <AlertTriangle size={16} />
-                      {error}
-                      <button
-                        class="icon-button"
-                        aria-label={t("Dismiss error")}
-                        onClick={() => setError("")}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                  {notice && (
-                    <div class="notice success" role="status">
-                      <Check size={16} />
-                      {notice}
-                      <button
-                        class="icon-button"
-                        aria-label={t("Dismiss notification")}
-                        onClick={() => setNotice("")}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
                   {!status.demo && settings && !configured && (
                     <div class="connect-card">
                       <Database size={24} />
@@ -712,7 +680,11 @@ export function Library({
                       class={"table-wrap" + (busy ? " busy" : "")}
                       aria-busy={busy}
                     >
-                      <table class={displayColumns.includes("custom") ? "with-custom" : ""}>
+                      <table
+                        class={
+                          displayColumns.includes("custom") ? "with-custom" : ""
+                        }
+                      >
                         <thead>
                           <tr>
                             {displayColumns.map((field) =>
@@ -879,7 +851,8 @@ export function Library({
                                       <Tag
                                         kind="custom"
                                         value={String(tag.id)}
-                                        label={tag.name} title={tag.name}
+                                        label={tag.name}
+                                        title={tag.name}
                                       />
                                     ))}
                                     {!f.custom?.length && "—"}
@@ -990,53 +963,6 @@ export function Library({
                       </div>
                     </div>
                   </section>
-                  <footer class="footer">
-                    <div>
-                      <span
-                        class={
-                          "sync-dot " +
-                          (sync?.error
-                            ? "failed"
-                            : sync?.running
-                              ? "running"
-                              : "")
-                        }
-                      />
-                      <span>
-                        {sync?.running
-                          ? sync.queued
-                            ? t("Sync waiting for a slot …")
-                            : t("Sync in progress …")
-                          : sync?.error
-                            ? t("Sync failed · {error}", {
-                                error: t(sync.error),
-                              })
-                            : t("Last sync: {date}", {
-                                date: date(sync?.lastSuccess),
-                              })}
-                      </span>
-                      {sync?.error && sync.lastSuccess && (
-                        <span>
-                          {t("Cache: {date}", { date: date(sync.lastSuccess) })}
-                        </span>
-                      )}
-                      <button
-                        class="text-button"
-                        disabled={!!sync?.running || status.demo || !configured}
-                        onClick={runSync}
-                      >
-                        <RefreshCw
-                          size={13}
-                          class={sync?.running ? "spin" : ""}
-                        />{" "}
-                        {t("Sync now")}
-                      </button>
-                    </div>
-                    <span>
-                      <ShieldCheck size={13} />
-                      {t("Existing data only")}
-                    </span>
-                  </footer>
                 </>
               )}
             </main>

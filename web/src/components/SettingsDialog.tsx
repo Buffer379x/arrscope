@@ -1,3 +1,4 @@
+import { notify } from "../notifications";
 import { CustomTagsSettings } from "./CustomTagsSettings";
 import type { CustomTag } from "../types";
 import { LanguageSelect, t, useI18n } from "../i18n";
@@ -60,7 +61,8 @@ export function SettingsDialog({
   refresh: () => Promise<void>;
   initialSection?: string;
 }) {
-  useI18n();
+  const { locale, setLocale } = useI18n();
+  const [draftLocale, setDraftLocale] = useState(locale);
   const settingsFormId = useId();
   const [customDirty, setCustomDirty] = useState(false);
   const [rulesDirty, setRulesDirty] = useState(false);
@@ -106,7 +108,8 @@ export function SettingsDialog({
       })
       .catch((e) => setError(e.message));
   }, [customTags]);
-  const dirty = JSON.stringify(cfg) !== JSON.stringify(settings);
+  const dirty =
+    JSON.stringify(cfg) !== JSON.stringify(settings) || draftLocale !== locale;
   useEffect(() => {
     onDirty(dirty || rulesDirty || customDirty);
   }, [dirty, rulesDirty, customDirty]);
@@ -123,17 +126,29 @@ export function SettingsDialog({
   }, [dirty, rulesDirty, customDirty]);
   const changeSection = (next: string) => {
     if (
+      next !== section &&
       section === "custom" &&
       customDirty &&
       !confirm(t("Discard unsaved settings changes?"))
     )
       return;
     if (
+      next !== section &&
       section === "recognition" &&
       rulesDirty &&
       !confirm(t("Discard unsaved rule changes?"))
     )
       return;
+    if (
+      dirty &&
+      next !== section &&
+      !confirm(t("Discard unsaved settings changes?"))
+    )
+      return;
+    if (dirty && next !== section) {
+      setCfg(structuredClone(settings));
+      setDraftLocale(locale);
+    }
     setSection(next);
   };
   const manualSync = async (service: ConnectionService) => {
@@ -141,12 +156,9 @@ export function SettingsDialog({
     try {
       await api("sync", "POST", { service });
       await refresh();
-      setTest((current) => ({
-        ...current,
-        [service + "Sync"]: t(
-          "Sync queued. Services run one at a time; you can keep filtering.",
-        ),
-      }));
+      notify(
+        t("Sync queued. Services run one at a time; you can keep filtering."),
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -192,7 +204,8 @@ export function SettingsDialog({
       await api("settings", "PUT", cfg);
       setCfg(await api<Settings>("settings"));
       await saved();
-      setTest((current) => ({ ...current, saved: t("Settings saved.") }));
+      setLocale(draftLocale);
+      notify(t("Settings saved."));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -208,8 +221,8 @@ export function SettingsDialog({
         <nav class="settings-tabs" aria-label={t("Settings sections")}>
           {[
             ["connections", t("Services")],
-            ["appearance", t("Display and columns")],
-            ["colors", t("Colors and tags")],
+            ["appearance", t("Display")],
+            ["colors", t("Colors")],
             ["custom", t("Custom tags")],
             ["recognition", t("Filename recognition")],
             ["system", t("System")],
@@ -229,11 +242,7 @@ export function SettingsDialog({
         </nav>
         <div class="settings-content" ref={contentRef}>
           {section === "recognition" && (
-            <RecognitionPage
-              onDirty={setRulesDirty}
-              saved={refresh}
-              back={() => changeSection("connections")}
-            />
+            <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
           )}
           {section === "custom" && (
             <CustomTagsSettings
@@ -266,12 +275,30 @@ export function SettingsDialog({
             onSubmit={submit}
             hidden={["recognition", "custom"].includes(section)}
           >
-            <p
-              class="quiet"
-              hidden={["system", "recognition", "custom"].includes(section)}
-            >
-              {t("Your services, your cache. No media directories required.")}
-            </p>
+            <header class="settings-section-heading">
+              <h2>
+                {t(
+                  section === "connections"
+                    ? "Services"
+                    : section === "appearance"
+                      ? "Display"
+                      : section === "colors"
+                        ? "Colors"
+                        : "System",
+                )}
+              </h2>
+              <p class="quiet">
+                {t(
+                  section === "connections"
+                    ? "Configure read-only connections and synchronization intervals."
+                    : section === "appearance"
+                      ? "Choose your interface language, library layout and default columns."
+                      : section === "colors"
+                        ? "Customize tag backgrounds, text colors and warning indicators."
+                        : "Check synchronization, manage backups and secure your account.",
+                )}
+              </p>
+            </header>
             {demo && !["system", "recognition", "custom"].includes(section) && (
               <div class="notice">
                 {t(
@@ -282,8 +309,8 @@ export function SettingsDialog({
             <div class="settings-section" hidden={section !== "connections"}>
               {(["radarr", "sonarr", "emby"] as ConnectionService[]).map(
                 (service) => (
-                  <fieldset class="connection">
-                    <legend>
+                  <section class="connection">
+                    <h3 class="card-title">
                       {service === "radarr" ? (
                         <Film size={16} />
                       ) : (
@@ -294,7 +321,7 @@ export function SettingsDialog({
                         : service === "sonarr"
                           ? "Sonarr"
                           : t("Emby · optional")}
-                    </legend>
+                    </h3>
                     {service === "emby" && (
                       <p class="quiet">
                         {t(
@@ -431,55 +458,6 @@ export function SettingsDialog({
                           )}
                         </p>
                       )}
-                      <div class="service-sync">
-                        <button
-                          type="button"
-                          class="button"
-                          disabled={
-                            demo ||
-                            !settings[service].enabled ||
-                            syncing[service] ||
-                            (service === "emby"
-                              ? (!settings.radarr.enabled &&
-                                  !settings.sonarr.enabled) ||
-                                Object.values(status.sync || {}).some(
-                                  (s) => s.running,
-                                )
-                              : status.sync?.[service]?.running) ||
-                            JSON.stringify(cfg[service]) !==
-                              JSON.stringify(settings[service])
-                          }
-                          onClick={() => manualSync(service)}
-                        >
-                          <RefreshCw size={15} />
-                          {service === "emby" ? t("Match now") : t("Sync now")}
-                        </button>
-                        {service === "emby" && (
-                          <small>
-                            {t("Matches both enabled libraries against Emby.")}
-                          </small>
-                        )}
-                        {service !== "emby" && (
-                          <small>
-                            {status.sync?.[service]?.running
-                              ? t("Syncing …")
-                              : status.sync?.[service]?.lastSuccess
-                                ? t("Last sync") +
-                                  ": " +
-                                  new Date(
-                                    status.sync[service].lastSuccess!,
-                                  ).toLocaleString()
-                                : t("Not synced yet")}
-                          </small>
-                        )}
-                        <small role="status">{test[service + "Sync"]}</small>
-                        {JSON.stringify(cfg[service]) !==
-                          JSON.stringify(settings[service]) && (
-                          <small>
-                            {t("Save connection changes before syncing.")}
-                          </small>
-                        )}
-                      </div>
                       <div class="connection-test">
                         <button
                           type="button"
@@ -504,12 +482,11 @@ export function SettingsDialog({
                                   apiKey: cfg[service].apiKey || "",
                                 },
                               );
-                              setTest((current) => ({
-                                ...current,
-                                [service]: t("Connected · version {version}", {
+                              notify(
+                                t("Connected · version {version}", {
                                   version: r.version,
                                 }),
-                              }));
+                              );
                             } catch (e) {
                               setTest((current) => ({
                                 ...current,
@@ -526,28 +503,27 @@ export function SettingsDialog({
                           {t("Test connection")}
                           <ArrowUpRight size={14} />
                         </button>
-                        <small role="status">{test[service]}</small>
                       </div>
                     </div>
-                  </fieldset>
+                  </section>
                 ),
               )}
             </div>
             <div class="settings-section" hidden={section !== "appearance"}>
-              <fieldset class="connection">
-                <legend>{t("Interface language")}</legend>
-                <LanguageSelect />
+              <section class="connection">
+                <h3 class="card-title">{t("Interface language")}</h3>
+                <LanguageSelect value={draftLocale} onChange={setDraftLocale} />
                 <small>
                   {t(
-                    "Saved in this browser. Media names and filter values stay unchanged.",
+                    "Applied after saving in this browser. Media names and filter values stay unchanged.",
                   )}
                 </small>
-              </fieldset>
-              <fieldset class="connection">
-                <legend>
+              </section>
+              <section class="connection">
+                <h3 class="card-title">
                   <Layers size={16} />
                   {t("TV view")}
-                </legend>
+                </h3>
                 <label>
                   {t("Results with active filters")}
                   <select
@@ -573,9 +549,9 @@ export function SettingsDialog({
                     "One matching file is enough to show its season in context.",
                   )}
                 </small>
-              </fieldset>
-              <fieldset class="connection">
-                <legend>{t("Default columns")}</legend>
+              </section>
+              <section class="connection">
+                <h3 class="card-title">{t("Default columns")}</h3>
                 <p class="quiet">
                   {t(
                     "Choose visible columns and move them with the arrows. The order runs left to right, including hidden columns. Both are saved permanently. Filters and CSV still include all fields.",
@@ -583,12 +559,12 @@ export function SettingsDialog({
                 </p>
                 <div class="column-settings">
                   {(["radarr", "sonarr"] as Service[]).map((service) => (
-                    <fieldset>
-                      <legend>
+                    <section class="columns-group">
+                      <h3 class="card-title">
                         {service === "radarr"
                           ? t("Movies · Radarr")
                           : t("TV series · Sonarr")}
-                      </legend>
+                      </h3>
                       <div class="column-options">
                         {cfg.columnOrder[service].map((field, index) => (
                           <div class="column-option" key={field}>
@@ -711,14 +687,14 @@ export function SettingsDialog({
                       >
                         {t("Restore defaults")}
                       </button>
-                    </fieldset>
+                    </section>
                   ))}
                 </div>
-              </fieldset>
+              </section>
             </div>
             <div class="settings-section" hidden={section !== "colors"}>
-              <fieldset class="connection warning-color-settings">
-                <legend>{t("Warning colors")}</legend>
+              <section class="connection warning-color-settings">
+                <h3 class="card-title">{t("Warning colors")}</h3>
                 <p class="quiet">
                   {t(
                     "Metadata disagreements and conflicting recognition rules use separate icons.",
@@ -801,9 +777,9 @@ export function SettingsDialog({
                     </tbody>
                   </table>
                 </div>
-              </fieldset>
-              <fieldset class="connection tag-color-settings">
-                <legend>{t("Tag colors")}</legend>
+              </section>
+              <section class="connection tag-color-settings">
+                <h3 class="card-title">{t("Tag colors")}</h3>
                 <p class="quiet">
                   {t(
                     "Custom colors apply to both libraries and themes. They remain saved until reset.",
@@ -953,20 +929,18 @@ export function SettingsDialog({
                     )}
                   </p>
                 )}
-              </fieldset>
+              </section>
             </div>
             <div class="settings-section" hidden={section !== "system"}>
               <SystemInfo
                 status={status}
                 settings={settings}
                 connectionError={connectionError}
+                demo={demo}
+                syncing={syncing}
+                manualSync={manualSync}
               />
             </div>
-            {error && (
-              <p class="error" role="alert">
-                {error}
-              </p>
-            )}
             <div
               hidden={section !== "system"}
               class="settings-section maintenance-panel"
@@ -982,12 +956,9 @@ export function SettingsDialog({
                 onClick={async () => {
                   try {
                     await api("backup", "POST");
-                    setTest({
-                      ...test,
-                      backup: t(
-                        "Consistent backup created in the Appdata directory.",
-                      ),
-                    });
+                    notify(
+                      t("Consistent backup created in the Appdata directory."),
+                    );
                   } catch (e) {
                     setError((e as Error).message);
                   }
@@ -996,7 +967,6 @@ export function SettingsDialog({
                 <Database size={15} />
                 {t("Back up cache")}
               </button>
-              {test.backup && <p role="status">{test.backup}</p>}
             </div>
           </form>
           <div hidden={section !== "system"}>
@@ -1046,7 +1016,6 @@ export function SettingsDialog({
         </div>
       </div>
       <div class="modal-actions settings-save-bar">
-        {test.saved && <span role="status">{test.saved}</span>}
         <button
           type="submit"
           form={settingsFormId}

@@ -43,11 +43,7 @@ export function CustomBulk({
       <p class="quiet">
         {t("Automatically detected tags can return on the next sync.")}
       </p>
-      {error && (
-        <div class="notice error" role="alert">
-          {error}
-        </div>
-      )}
+
       {!selection && !error && <p role="status">{t("Loading …")}</p>}
       {selection && (
         <form

@@ -97,7 +97,7 @@ The generated Scopearr PNG icon, favicons and Apple touch icon are included unde
 
 ## Custom tags
 
-Create and rename tags under Settings → Custom tags. In Movies or TV series, use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
+Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
 
 Custom filters support OR, exclusion, contains-all and does-not-contain-all. Colors and filters list tags in use; the administration catalog also keeps unused tags available for future assignment. Filename rules can select Custom and an existing tag. All matching Custom rules add their tags; multiple tags are not conflicts. Manual additions survive synchronization and rule edits. Removed automatic tags may reappear after the next successful service sync.
 
@@ -106,3 +106,9 @@ Custom filters support OR, exclusion, contains-all and does-not-contain-all. Col
 Keep the existing appdata mount and `secret.key`. Schema 6 migration makes a backup; Scopearr consistently clones the legacy database to `scopearr.db` while retaining the original for rollback. Accounts, encrypted API keys, presets, recognition rules and cached media remain available. The previous image's `arrscope:stable` channel is also promoted to the approved Scopearr image so existing Unraid containers can update normally. New deployments use `scopearr:stable` and `deploy/scopearr.xml`. See [0.4.0 upgrade notes](docs/releases/0.4.0.md).
 
 Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=true` and `SCOPEARR_DEMO_DISCS=true`; the latter fixture presents BluRay, DVD and UHD sources consistent with displayed resolutions. It does not change production recognition defaults.
+
+## Settings and dashboard
+
+Each settings section has an explicit Save action. Language, colors, display preferences, custom-tag administration and filename rules remain drafts until saved; leaving a section warns about unsaved edits. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
+
+Dashboard distribution widgets show the top five entries. More/Less expands or collapses the remaining values without changing totals or percentages. Clicking an entry selects the existing library filters without saving a preset. Feedback appears as automatically dismissed bottom-right toasts.

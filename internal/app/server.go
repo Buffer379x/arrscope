@@ -215,6 +215,33 @@ func (s *Server) Handler() http.Handler {
 			http.SetCookie(w, &http.Cookie{Name: "arrscope_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
+
+		case "/api/custom-tags/batch":
+			if r.Method != "PUT" {
+				break
+			}
+			var draft struct {
+				Original []CustomTag `json:"original"`
+				Tags     []CustomTag `json:"tags"`
+			}
+			if err := decodeLimit(w, r, &draft, 128*1024); err != nil {
+				failure(w, r, 400, err)
+				return
+			}
+			tags, err := s.Store.SaveCustomTags(r.Context(), draft.Original, draft.Tags)
+			if err != nil {
+				failure(w, r, 400, err)
+				return
+			}
+			var stored Settings
+			if err := s.Store.Get("settings", &stored); err == nil {
+				s.mu.Lock()
+				s.settings.TagColors = stored.TagColors
+				s.settings.TagTextColors = stored.TagTextColors
+				s.mu.Unlock()
+			}
+			jsonOut(w, 200, tags)
+			return
 		case "/api/custom-tags":
 			if r.Method == "GET" {
 				tags, err := s.Store.CustomTags(r.Context())

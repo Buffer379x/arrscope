@@ -526,6 +526,21 @@
     "No custom tags": "Sin etiquetas personalizadas",
     "Custom rules add all matching tags; different tags are not conflicts.": "Las reglas personalizadas añaden todas las etiquetas coincidentes; las distintas etiquetas no son conflictos.",
     "No custom tags assigned yet. Assign tags in your library or add a filename rule.": "Aún no hay etiquetas personalizadas asignadas. Asígnalas en la biblioteca o añade una regla de nombres de archivo.",
-    "Custom tags updated for {count} matching files.": "Etiquetas personalizadas actualizadas para {count} archivos coincidentes."
+    "Custom tags updated for {count} matching files.": "Etiquetas personalizadas actualizadas para {count} archivos coincidentes.",
+    "Display": "Presentación",
+    "Colors": "Colores",
+    "Distribution": "Distribución",
+    "Notifications": "Notificaciones",
+    "More": "Más",
+    "Less": "Menos",
+    "Configure read-only connections and synchronization intervals.": "Configura las conexiones de solo lectura y los intervalos de sincronización.",
+    "Choose your interface language, library layout and default columns.": "Elige el idioma, la vista de biblioteca y las columnas predeterminadas.",
+    "Customize tag backgrounds, text colors and warning indicators.": "Personaliza los fondos de etiquetas, colores de texto e indicadores de advertencia.",
+    "Check synchronization, manage backups and secure your account.": "Consulta la sincronización, gestiona copias de seguridad y protege tu cuenta.",
+    "Applied after saving in this browser. Media names and filter values stay unchanged.": "Se aplica al guardar en este navegador. Los nombres y valores de filtro no cambian.",
+    "Add the entered tag to the list before saving.": "Añade la etiqueta a la lista antes de guardar.",
+    "Custom tags changed in another session. Reload before saving.": "Las etiquetas personalizadas cambiaron en otra sesión. Recarga antes de guardar.",
+    "Retry": "Reintentar",
+    "Sync completed · {service}": "Sincronización completada · {service}"
   }
 }

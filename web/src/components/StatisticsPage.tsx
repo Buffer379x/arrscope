@@ -35,6 +35,8 @@ export function StatisticsPage({
   useI18n();
   const [data, setData] = useState<Statistics | null>(null),
     [scope, setScope] = useState("all"),
+    [retry, setRetry] = useState(0),
+    [embyExpanded, setEmbyExpanded] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
@@ -55,6 +57,7 @@ export function StatisticsPage({
     status.sync?.radarr.lastSuccess,
     status.sync?.sonarr.lastSuccess,
     status.recognitionRevision,
+    retry,
   ]);
   return (
     <section class="statistics-page" aria-label={t("Dashboard")}>
@@ -67,10 +70,11 @@ export function StatisticsPage({
           {t("From the local cache")}
         </span>
       </div>
+
       {error && (
-        <p class="notice error" role="alert">
-          {error}
-        </p>
+        <button class="button" onClick={() => setRetry((value) => value + 1)}>
+          {t("Retry")}
+        </button>
       )}
       {!data && !error && (
         <p class="quiet">
@@ -117,10 +121,53 @@ export function StatisticsPage({
               </article>
             ))}
           </div>
+          <section class="quality-widgets" aria-label={t("Metadata quality")}>
+            <article class="stat-widget">
+              <span>{t("Incomplete metadata")}</span>
+              <strong>{count(data.incomplete)}</strong>
+              <small>
+                {t(
+                  "Resolution, codec, source, audio and language; HDR may be SDR or unknown.",
+                )}
+              </small>
+            </article>
+            <article class="stat-widget">
+              <span>{t("Emby matching")}</span>
+              <dl>
+                {[
+                  ["matched", t("Matched")],
+                  ["missing", t("Not found")],
+                  ["ambiguous", t("Ambiguous")],
+                  ["missing_size", t("Size missing")],
+                  ["no_tracks", t("Audio tracks missing")],
+                  ["unconfigured", t("Without Emby enrichment")],
+                ]
+                  .sort(
+                    (a, b) => (data.emby[b[0]] || 0) - (data.emby[a[0]] || 0),
+                  )
+                  .slice(0, embyExpanded ? 6 : 5)
+                  .map(([key, label]) => (
+                    <div>
+                      <dt>{label}</dt>
+                      <dd>{count(data.emby[key] || 0)}</dd>
+                    </div>
+                  ))}
+              </dl>
+              <button
+                class="button widget-expand"
+                aria-expanded={embyExpanded}
+                onClick={() => setEmbyExpanded(!embyExpanded)}
+              >
+                {t(embyExpanded ? "Less" : "More")}
+              </button>
+              <small>
+                {t("A match may still contain unknown audio track attributes.")}
+              </small>
+            </article>
+          </section>
           <div class="distribution-heading">
             <div>
-              <h2>{t("Media attributes")}</h2>
-              <p>{t("Distribution by files · independent of list filters")}</p>
+              <h2>{t("Distribution")}</h2>
             </div>
             <div
               class="statistics-scopes"
@@ -142,38 +189,6 @@ export function StatisticsPage({
               ))}
             </div>
           </div>
-          <section class="quality-widgets" aria-label={t("Metadata quality")}>
-            <article class="stat-widget">
-              <span>{t("Incomplete metadata")}</span>
-              <strong>{count(data.incomplete)}</strong>
-              <small>
-                {t(
-                  "Resolution, codec, source, audio and language; HDR may be SDR or unknown.",
-                )}
-              </small>
-            </article>
-            <article class="stat-widget">
-              <span>{t("Emby matching")}</span>
-              <dl>
-                {[
-                  ["matched", t("Matched")],
-                  ["missing", t("Not found")],
-                  ["ambiguous", t("Ambiguous")],
-                  ["missing_size", t("Size missing")],
-                  ["no_tracks", t("Audio tracks missing")],
-                  ["unconfigured", t("Without Emby enrichment")],
-                ].map(([key, label]) => (
-                  <div>
-                    <dt>{label}</dt>
-                    <dd>{count(data.emby[key] || 0)}</dd>
-                  </div>
-                ))}
-              </dl>
-              <small>
-                {t("A match may still contain unknown audio track attributes.")}
-              </small>
-            </article>
-          </section>
           <div class="distribution-grid">
             {["resolution", "codec", "source"].map((field) => (
               <DistributionChart
@@ -203,14 +218,17 @@ function DistributionChart({
   buckets: { value: string; count: number }[];
 }) {
   useI18n();
+  const [expanded, setExpanded] = useState(false);
   const colors = useContext(TagColors);
   const total = buckets.reduce((sum, b) => sum + b.count, 0);
-  const colored = buckets.map((bucket, i) => ({
-    ...bucket,
-    color:
-      colors[field + ":" + (bucket.value || "__unknown__")] ||
-      (!bucket.value ? "#87949c" : chartPalette[i % chartPalette.length]),
-  }));
+  const colored = [...buckets]
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+    .map((bucket, i) => ({
+      ...bucket,
+      color:
+        colors[field + ":" + (bucket.value || "__unknown__")] ||
+        (!bucket.value ? "#87949c" : chartPalette[i % chartPalette.length]),
+    }));
   return (
     <article class="distribution-card">
       <div class="distribution-title">
@@ -243,7 +261,7 @@ function DistributionChart({
             ))}
           </div>
           <ul class="distribution-list">
-            {colored.map((b) => (
+            {(expanded ? colored : colored.slice(0, 5)).map((b) => (
               <li>
                 <button
                   type="button"
@@ -283,6 +301,15 @@ function DistributionChart({
               </li>
             ))}
           </ul>
+          {colored.length > 5 && (
+            <button
+              class="button widget-expand"
+              aria-expanded={expanded}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {t(expanded ? "Less" : "More")}
+            </button>
+          )}
         </>
       ) : (
         <div class="statistics-empty">
@@ -304,6 +331,10 @@ function LanguageDistribution({
   onFilter: (value: string) => void;
 }) {
   useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const ranked = [...buckets].sort(
+    (a, b) => b.count - a.count || a.value.localeCompare(b.value),
+  );
   return (
     <article class="distribution-card language-distribution">
       <div class="distribution-title">
@@ -312,14 +343,9 @@ function LanguageDistribution({
           {count(total)} {t("titles")}
         </span>
       </div>
-      <p class="quiet">
-        {t(
-          "Each movie and episode counts once per language. Multilingual titles appear in multiple groups; percentages can overlap.",
-        )}
-      </p>
       {total ? (
         <ul class="distribution-list">
-          {buckets.map((bucket, i) => {
+          {(expanded ? ranked : ranked.slice(0, 5)).map((bucket, i) => {
             const label = t(audioLanguageKey(bucket.value)),
               percentage = (bucket.count / total) * 100;
             return (
@@ -353,6 +379,15 @@ function LanguageDistribution({
         </ul>
       ) : (
         <p class="quiet">{t("No files in cache yet")}</p>
+      )}
+      {ranked.length > 5 && (
+        <button
+          class="button widget-expand"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {t(expanded ? "Less" : "More")}
+        </button>
       )}
     </article>
   );

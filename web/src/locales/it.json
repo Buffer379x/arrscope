@@ -526,6 +526,21 @@
     "No custom tags": "Senza tag personalizzati",
     "Custom rules add all matching tags; different tags are not conflicts.": "Le regole personalizzate aggiungono tutti i tag corrispondenti; tag diversi non sono conflitti.",
     "No custom tags assigned yet. Assign tags in your library or add a filename rule.": "Nessun tag personalizzato assegnato. Assegnali nella libreria o aggiungi una regola dei nomi file.",
-    "Custom tags updated for {count} matching files.": "Tag personalizzati aggiornati per {count} file corrispondenti."
+    "Custom tags updated for {count} matching files.": "Tag personalizzati aggiornati per {count} file corrispondenti.",
+    "Display": "Aspetto",
+    "Colors": "Colori",
+    "Distribution": "Distribuzione",
+    "Notifications": "Notifiche",
+    "More": "Altro",
+    "Less": "Meno",
+    "Configure read-only connections and synchronization intervals.": "Configura le connessioni in sola lettura e gli intervalli di sincronizzazione.",
+    "Choose your interface language, library layout and default columns.": "Scegli lingua, vista della libreria e colonne predefinite.",
+    "Customize tag backgrounds, text colors and warning indicators.": "Personalizza sfondi delle etichette, colori del testo e indicatori di avviso.",
+    "Check synchronization, manage backups and secure your account.": "Controlla la sincronizzazione, gestisci i backup e proteggi il tuo account.",
+    "Applied after saving in this browser. Media names and filter values stay unchanged.": "Applicata dopo il salvataggio in questo browser. Nomi e valori dei filtri non cambiano.",
+    "Add the entered tag to the list before saving.": "Aggiungi l’etichetta all’elenco prima di salvare.",
+    "Custom tags changed in another session. Reload before saving.": "Le etichette personalizzate sono cambiate in un’altra sessione. Ricarica prima di salvare.",
+    "Retry": "Riprova",
+    "Sync completed · {service}": "Sincronizzazione completata · {service}"
   }
 }

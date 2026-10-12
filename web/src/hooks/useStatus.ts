@@ -1,3 +1,5 @@
+import { notify } from "../notifications";
+import { t } from "../i18n";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { api, setCSRF } from "../api";
 import type { Status } from "../types";
@@ -26,6 +28,23 @@ export function useStatus() {
       );
       if (!mounted.current || id !== sequence.current) return;
       setCSRF(value.csrf || "");
+      const previous = current.current;
+      if (previous?.authenticated) {
+        for (const service of ["radarr", "sonarr"] as const) {
+          const before = previous.sync?.[service],
+            after = value.sync?.[service];
+          if (before?.running && after && !after.running) {
+            notify(
+              after.error
+                ? t("Sync failed · {error}", { error: t(after.error) })
+                : t("Sync completed · {service}", {
+                    service: service === "radarr" ? "Radarr" : "Sonarr",
+                  }),
+              after.error ? "error" : "success",
+            );
+          }
+        }
+      }
       current.current = value;
       setStatus(value);
       setError("");
