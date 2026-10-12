@@ -315,3 +315,186 @@ func (s *Store) ApplyCustom(ctx context.Context, q url.Values, changes map[strin
 	s.invalidateCustomFacets()
 	return total, nil
 }
+
+// SaveCustomTags applies a settings draft atomically and rejects stale snapshots.
+func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) ([]CustomTag, error) {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	current, err := s.CustomTags(ctx)
+	if err != nil {
+		return nil, err
+	}
+	baseline := map[int64]string{}
+	for _, tag := range original {
+		baseline[tag.ID] = tag.Name
+	}
+	if len(original) != len(current) || len(baseline) != len(original) {
+		return nil, fmt.Errorf("Custom tags changed in another session. Reload before saving.")
+	}
+	for _, tag := range current {
+		if baseline[tag.ID] != tag.Name {
+			return nil, fmt.Errorf("Custom tags changed in another session. Reload before saving.")
+		}
+	}
+	if len(tags) > 128 {
+		return nil, fmt.Errorf("At most 128 custom tags are allowed")
+	}
+	ids := map[int64]bool{}
+	names := map[string]bool{}
+	deleted := map[int64]bool{}
+	for _, tag := range current {
+		deleted[tag.ID] = true
+	}
+	for i := range tags {
+		tag := &tags[i]
+		tag.Name = strings.TrimSpace(tag.Name)
+		if tag.Name == "" || len([]rune(tag.Name)) > 80 || strings.ContainsFunc(tag.Name, unicode.IsControl) {
+			return nil, fmt.Errorf("Enter a tag name between 1 and 80 characters")
+		}
+		key := strings.ToLower(tag.Name)
+		if names[key] {
+			return nil, fmt.Errorf("A custom tag with this name already exists")
+		}
+		names[key] = true
+		if ids[tag.ID] || tag.ID == 0 {
+			return nil, fmt.Errorf("Invalid custom tag")
+		}
+		ids[tag.ID] = true
+		if tag.ID > 0 {
+			if _, ok := baseline[tag.ID]; !ok {
+				return nil, fmt.Errorf("Custom tag no longer exists")
+			}
+			delete(deleted, tag.ID)
+		}
+	}
+	rules := []RecognitionRule{}
+	for _, rule := range s.recognition.config.Rules {
+		id, _ := strconv.ParseInt(rule.Value, 10, 64)
+		if rule.Field != "custom" || !deleted[id] {
+			rules = append(rules, rule)
+		}
+	}
+	engine, err := CompileRecognition(rules)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	for _, tag := range current {
+		if _, err = tx.ExecContext(ctx, "UPDATE custom_tags SET name_key=? WHERE id=?", "\x00draft:"+strconv.FormatInt(tag.ID, 10), tag.ID); err != nil {
+			return nil, err
+		}
+	}
+	for id := range deleted {
+		if _, err = tx.ExecContext(ctx, "DELETE FROM custom_tags WHERE id=?", id); err != nil {
+			return nil, err
+		}
+	}
+	for i := range tags {
+		tag := &tags[i]
+		if tag.ID > 0 {
+			_, err = tx.ExecContext(ctx, "UPDATE custom_tags SET name=?,name_key=? WHERE id=?", tag.Name, strings.ToLower(tag.Name), tag.ID)
+		} else {
+			var result sql.Result
+			result, err = tx.ExecContext(ctx, "INSERT INTO custom_tags(name,name_key) VALUES(?,?)", tag.Name, strings.ToLower(tag.Name))
+			if err == nil {
+				tag.ID, err = result.LastInsertId()
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(deleted) > 0 {
+		raw, e := json.Marshal(engine.Config())
+		if e != nil {
+			return nil, e
+		}
+		if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(raw)); err != nil {
+			return nil, err
+		}
+		var rawSettings string
+		err = tx.QueryRowContext(ctx, "SELECT value FROM kv WHERE key='settings'").Scan(&rawSettings)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+		if err == nil {
+			var cfg Settings
+			if err = json.Unmarshal([]byte(rawSettings), &cfg); err != nil {
+				return nil, err
+			}
+			for id := range deleted {
+				key := "custom:" + strconv.FormatInt(id, 10)
+				delete(cfg.TagColors, key)
+				delete(cfg.TagTextColors, key)
+			}
+			raw, err = json.Marshal(cfg)
+			if err != nil {
+				return nil, err
+			}
+			if _, err = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(raw)); err != nil {
+				return nil, err
+			}
+		}
+		for id := range deleted {
+			rows, err := tx.QueryContext(ctx, "SELECT id,query FROM presets")
+			if err != nil {
+				return nil, err
+			}
+			type presetQuery struct {
+				id    int64
+				query string
+			}
+			updates := []presetQuery{}
+			for rows.Next() {
+				var item presetQuery
+				if err = rows.Scan(&item.id, &item.query); err != nil {
+					rows.Close()
+					return nil, err
+				}
+				q, e := url.ParseQuery(item.query)
+				if e != nil {
+					continue
+				}
+				values := q["custom"]
+				kept := []string{}
+				for _, v := range values {
+					if v != strconv.FormatInt(id, 10) {
+						kept = append(kept, v)
+					}
+				}
+				if len(kept) != len(values) {
+					q.Del("custom")
+					for _, v := range kept {
+						q.Add("custom", v)
+					}
+					if len(kept) == 0 {
+						q.Del("customOp")
+					}
+					item.query = q.Encode()
+					updates = append(updates, item)
+				}
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return nil, err
+			}
+			for _, item := range updates {
+				if _, err = tx.ExecContext(ctx, "UPDATE presets SET query=? WHERE id=?", item.query, item.id); err != nil {
+					return nil, err
+				}
+			}
+
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	s.recognition = engine
+	s.invalidateCustomFacets()
+	return s.CustomTags(ctx)
+}

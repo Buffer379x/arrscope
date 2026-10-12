@@ -526,6 +526,21 @@
     "No custom tags": "Ohne eigene Tags",
     "Custom rules add all matching tags; different tags are not conflicts.": "Eigene Regeln ergänzen alle passenden Tags; unterschiedliche Tags sind keine Konflikte.",
     "No custom tags assigned yet. Assign tags in your library or add a filename rule.": "Noch keine eigenen Tags zugewiesen. Weise sie in der Bibliothek zu oder lege eine Erkennungsregel an.",
-    "Custom tags updated for {count} matching files.": "Eigene Tags für {count} passende Dateien aktualisiert."
+    "Custom tags updated for {count} matching files.": "Eigene Tags für {count} passende Dateien aktualisiert.",
+    "Display": "Darstellung",
+    "Colors": "Farben",
+    "Distribution": "Aufteilung",
+    "Notifications": "Benachrichtigungen",
+    "More": "Mehr",
+    "Less": "Weniger",
+    "Configure read-only connections and synchronization intervals.": "Konfiguriere die lesenden Verbindungen und Synchronisationsintervalle.",
+    "Choose your interface language, library layout and default columns.": "Wähle Sprache, Bibliotheksansicht und Standardspalten.",
+    "Customize tag backgrounds, text colors and warning indicators.": "Passe Tag-Hintergründe, Schriftfarben und Warnanzeigen an.",
+    "Check synchronization, manage backups and secure your account.": "Prüfe Synchronisationen, verwalte Sicherungen und schütze dein Konto.",
+    "Applied after saving in this browser. Media names and filter values stay unchanged.": "Wird nach dem Speichern in diesem Browser übernommen. Mediennamen und Filterwerte bleiben unverändert.",
+    "Add the entered tag to the list before saving.": "Füge den eingegebenen Tag vor dem Speichern zur Liste hinzu.",
+    "Custom tags changed in another session. Reload before saving.": "Eigene Tags wurden in einer anderen Sitzung geändert. Lade die Seite vor dem Speichern neu.",
+    "Retry": "Erneut versuchen",
+    "Sync completed · {service}": "Synchronisation abgeschlossen · {service}"
   }
 }

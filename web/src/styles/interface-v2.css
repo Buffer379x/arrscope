@@ -489,11 +489,179 @@ select {
   flex: none;
 }
 
-.custom-tags-settings > h2 { font-size:18px; line-height:24px; font-weight:600; margin:0 0 14px; }
-.custom-tags-table td:last-child, .custom-tags-table th:last-child { width:128px; padding-left:8px; padding-right:16px; }
-.custom-tags-table .row-actions { flex-wrap:nowrap; }
+.custom-tags-settings > h2 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.custom-tags-table td:last-child,
+.custom-tags-table th:last-child {
+  width: 128px;
+  padding-left: 8px;
+  padding-right: 16px;
+}
+.custom-tags-table .row-actions {
+  flex-wrap: nowrap;
+}
 
-.with-custom .title-cell { width:28%; }
-.custom-cell { min-width:180px; }
-.custom-cell .source-tags { flex-wrap:wrap; }
-.tag.custom { white-space:nowrap; overflow-wrap:normal; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; }
+.with-custom .title-cell {
+  width: 28%;
+}
+.custom-cell {
+  min-width: 180px;
+}
+.custom-cell .source-tags {
+  flex-wrap: wrap;
+}
+.tag.custom {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Shared settings cards and unobtrusive feedback. */
+.settings-content .connection,
+.settings-card,
+.settings-content .maintenance-panel,
+.settings-content .password-settings,
+.system-services > article,
+.recognition-guide > div,
+.recognition-actions,
+.recognition-preview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+.settings-content .connection {
+  margin: 0 0 18px;
+}
+.settings-content .card-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+.settings-section-heading h2,
+.custom-tags-settings h2,
+.recognition-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.settings-section-heading {
+  margin-bottom: 20px;
+}
+.settings-section-heading p {
+  margin: 8px 0 0;
+}
+.settings-content .settings-card .table-wrap {
+  margin-top: 16px;
+}
+.settings-content .settings-save-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.system-sync-button {
+  display: flex;
+  margin-top: 16px;
+}
+.system-services progress {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  accent-color: var(--accent);
+}
+.language-distribution .distribution-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.widget-expand {
+  margin-top: 16px;
+}
+.toast-region {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10000;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid #31b99a;
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 8px 30px #0003;
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+  overflow-wrap: anywhere;
+}
+.toast > svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+.toast > span {
+  flex: 1;
+}
+.toast .icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  flex: 0 0 auto;
+}
+.toast-error {
+  border-left-color: #e45d68;
+}
+.toast-warning {
+  border-left-color: #dda13a;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .toast-region {
+    right: 16px;
+    bottom: 16px;
+  }
+  .settings-content .connection,
+  .settings-card,
+  .settings-content .maintenance-panel,
+  .settings-content .password-settings {
+    padding: 16px;
+  }
+}
+
+.settings-content .connection {
+  margin: 0;
+}
+.settings-content .card-title {
+  margin: 0;
+}
+.system-services {
+  gap: 18px;
+}

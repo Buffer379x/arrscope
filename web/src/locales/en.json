@@ -526,6 +526,21 @@
     "No custom tags": "No custom tags",
     "Custom rules add all matching tags; different tags are not conflicts.": "Custom rules add all matching tags; different tags are not conflicts.",
     "No custom tags assigned yet. Assign tags in your library or add a filename rule.": "No custom tags assigned yet. Assign tags in your library or add a filename rule.",
-    "Custom tags updated for {count} matching files.": "Custom tags updated for {count} matching files."
+    "Custom tags updated for {count} matching files.": "Custom tags updated for {count} matching files.",
+    "Display": "Display",
+    "Colors": "Colors",
+    "Distribution": "Distribution",
+    "Notifications": "Notifications",
+    "More": "More",
+    "Less": "Less",
+    "Configure read-only connections and synchronization intervals.": "Configure read-only connections and synchronization intervals.",
+    "Choose your interface language, library layout and default columns.": "Choose your interface language, library layout and default columns.",
+    "Customize tag backgrounds, text colors and warning indicators.": "Customize tag backgrounds, text colors and warning indicators.",
+    "Check synchronization, manage backups and secure your account.": "Check synchronization, manage backups and secure your account.",
+    "Applied after saving in this browser. Media names and filter values stay unchanged.": "Applied after saving in this browser. Media names and filter values stay unchanged.",
+    "Add the entered tag to the list before saving.": "Add the entered tag to the list before saving.",
+    "Custom tags changed in another session. Reload before saving.": "Custom tags changed in another session. Reload before saving.",
+    "Retry": "Retry",
+    "Sync completed · {service}": "Sync completed · {service}"
   }
 }

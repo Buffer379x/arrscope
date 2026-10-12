@@ -22,7 +22,9 @@ export const getLocale = () => active.locale;
 function initialLocale() {
   let saved: string | null = null;
   try {
-    saved = localStorage.getItem("scopearr-language") || localStorage.getItem("arrscope-language");
+    saved =
+      localStorage.getItem("scopearr-language") ||
+      localStorage.getItem("arrscope-language");
   } catch {}
   return resolveLocale(
     saved ? [saved] : navigator.languages,
@@ -58,15 +60,18 @@ export function I18nProvider({ children }: { children: ComponentChildren }) {
 export function useI18n() {
   return useContext(Context);
 }
-export function LanguageSelect() {
+export function LanguageSelect({
+  value,
+  onChange,
+}: { value?: string; onChange?: (locale: string) => void } = {}) {
   const { locale, setLocale } = useI18n();
   return (
     <label class="language-select">
       <span>{t("Interface language")}</span>
       <select
         aria-label={t("Interface language")}
-        value={locale}
-        onChange={(event) => setLocale(event.currentTarget.value)}
+        value={value ?? locale}
+        onChange={(event) => (onChange ?? setLocale)(event.currentTarget.value)}
       >
         {catalogs.map((catalog) => (
           <option key={catalog.locale} value={catalog.locale}>

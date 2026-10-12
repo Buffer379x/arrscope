@@ -36,7 +36,7 @@ Advanced controls include an exclusion expression and consuming matched text bef
 
 ## Saving and data safety
 
-**Apply to draft** changes the draft only. **Restore defaults** also changes the draft only. **Save and reprocess cache** validates all rules, creates a backup and commits rules and the recomputed cache in one transaction. Failed or cancelled saves preserve the previous state. A revision check prevents a stale browser from overwriting another session's changes.
+**Apply to draft** changes the draft only. **Restore defaults** also changes the draft only. **Save settings** validates all rules, creates a backup and commits rules and the recomputed cache in one transaction. Failed or cancelled saves preserve the previous state. A revision check prevents a stale browser from overwriting another session's changes.
 
 No upstream requests or media scans are made. API traits stay separate from filename evidence. Previously matched Emby tracks and HDR data are replayed from the cache. A sync that finishes after an edit uses the current rules at commit time. Library filters, CSV, facets and statistics all use the updated cache.
 

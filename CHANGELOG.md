@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.4.1
+
+Automatic toast notifications; explicit settings drafts and atomic custom-tag saves; consistent settings cards; HTTP-compatible rule creation; synchronization controls in System; expandable top-five Dashboard distributions. No database schema migration. See [release notes](docs/releases/0.4.1.md).
+
 ## 0.4.0
 
 Scopearr branding; persistent custom tags with administration, atomic bulk assignment, filters, colors and filename recognition; custom CSV output; compatible upgrade to SQLite schema 6. See [release notes](docs/releases/0.4.0.md).

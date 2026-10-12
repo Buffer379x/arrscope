@@ -82,3 +82,9 @@ Paged lists materialize sorted row IDs and fetch full evidence/track JSON only f
 The sync writer owns its completed upstream snapshot and drops each input record while inserting it into the atomic SQLite transaction. Remaining input is cleared on failure; transaction rollback preserves the last complete cache. Ordinary `Store.Replace` callers retain their inputs. This avoids keeping the full live snapshot alongside growing database buffers during large syncs.
 
 Emby matching stores only normalized tracks/HDR for candidate files plus a SHA-256 fingerprint of the decoded raw stream records. Conflicting duplicates remain ambiguous even when their normalized traits agree. Raw page data is discarded rather than retained across the whole Emby catalog.
+
+### Settings drafts and notifications
+
+`PUT /api/custom-tags/batch` accepts `{ original, tags }`. Positive IDs reference existing tags; negative IDs denote unsaved additions. The original snapshot must match stored identities/names. A single transaction applies the validated list and dependent cleanup; the recognition mutex coordinates sync/reprocessing. This prevents partial saves and stale-editor overwrite. CSRF and authenticated mutation checks apply to the new endpoint.
+
+Settings language changes remain browser-local drafts until the Display section is saved. Notifications are emitted through a local UI event bus and rendered as accessible, timed toasts. Toasts pause while hovered or focused and remain available inside an active native modal. System sync activity is indeterminate because upstream fetching does not expose a stable total.

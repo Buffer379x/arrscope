@@ -130,11 +130,7 @@ export function Login({
               </small>
             )}
           </label>
-          {error && (
-            <p class="error" role="alert">
-              {error}
-            </p>
-          )}
+
           <button class="primary" disabled={busy}>
             {busy ? (
               <LoaderCircle class="spin" size={18} />

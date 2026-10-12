@@ -1,8 +1,9 @@
+import { newRuleID } from "../rule-id";
+import { notify } from "../notifications";
 import {
   ArrowDown,
   ArrowUp,
   ArrowDownUp,
-  ArrowLeft,
   Check,
   LoaderCircle,
   Pencil,
@@ -50,11 +51,9 @@ const columns: [keyof RecognitionRule, string][] = [
   ["mode", "Mode"],
 ];
 export function RecognitionPage({
-  back,
   saved,
   onDirty,
 }: {
-  back: () => void;
   saved: () => Promise<void>;
   onDirty: (dirty: boolean) => void;
 }) {
@@ -73,6 +72,12 @@ export function RecognitionPage({
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [previewBusy, setPreviewBusy] = useState(false);
+  useEffect(() => {
+    if (notice) {
+      notify(notice);
+      setNotice("");
+    }
+  }, [notice]);
   const dirty =
     !!config && JSON.stringify(rules) !== JSON.stringify(config.rules);
   useEffect(() => {
@@ -125,18 +130,10 @@ export function RecognitionPage({
         : String(x).localeCompare(String(y));
     return (sort.desc ? -cmp : cmp) || a.id.localeCompare(b.id);
   });
-  const leave = () => {
-    if (!busy && (!dirty || confirm(t("Discard unsaved rule changes?"))))
-      back();
-  };
   return (
     <section class="recognition-page">
       <div class="recognition-heading">
-        <h1>{t("Filename recognition")}</h1>
-        <button class="button" onClick={leave} disabled={busy}>
-          <ArrowLeft size={15} />
-          {t("Back to settings")}
-        </button>
+        <h2>{t("Filename recognition")}</h2>
       </div>
       <p class="quiet">
         {t(
@@ -164,25 +161,10 @@ export function RecognitionPage({
           "Lower priority numbers run first; ties use the rule ID. Table sorting does not change priority. Different scalar values create a warning; HDR, audio codecs and languages are additive.",
         )}
       </p>
-      {error && (
-        <div class="notice error" role="alert">
-          {error}
-          <button
-            class="text-button"
-            disabled={busy}
-            onClick={() => {
-              if (!dirty || confirm(t("Discard unsaved rule changes?")))
-                void load();
-            }}
-          >
-            {t("Reload rules")}
-          </button>
-        </div>
-      )}
-      {notice && (
-        <p class="notice success" role="status">
-          {notice}
-        </p>
+      {error && !config && (
+        <button class="button" onClick={() => void load()}>
+          {t("Reload rules")}
+        </button>
       )}
       {!config && !error && (
         <p class="quiet">
@@ -208,7 +190,7 @@ export function RecognitionPage({
                 disabled={busy || rules.length >= 256}
                 onClick={() =>
                   setEditing({
-                    id: crypto.randomUUID(),
+                    id: newRuleID(),
                     name: "",
                     field: "resolution",
                     match: "token",
@@ -231,40 +213,6 @@ export function RecognitionPage({
               >
                 <RotateCcw size={15} />
                 {t("Restore defaults")}
-              </button>
-              <button
-                class="primary"
-                disabled={busy || !dirty}
-                onClick={async () => {
-                  setBusy(true);
-                  setError("");
-                  try {
-                    const current = await api<RecognitionConfig>(
-                      "recognition",
-                      "PUT",
-                      { rules, revision: config.revision },
-                    );
-                    setConfig(current);
-                    setRules(current.rules);
-                    setPreview(null);
-                    onDirty(false);
-                    setNotice(
-                      t("Rules saved. Cached filenames have been reprocessed."),
-                    );
-                    await saved();
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {busy ? (
-                  <LoaderCircle class="spin" size={15} />
-                ) : (
-                  <Check size={15} />
-                )}{" "}
-                {t(busy ? "Reprocessing cache …" : "Save and reprocess cache")}
               </button>
             </div>
           </div>
@@ -495,6 +443,43 @@ export function RecognitionPage({
               )}
             </>
           </section>
+          <div class="settings-save-bar">
+            {" "}
+            <button
+              class="primary"
+              disabled={busy || !dirty}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  const current = await api<RecognitionConfig>(
+                    "recognition",
+                    "PUT",
+                    { rules, revision: config.revision },
+                  );
+                  setConfig(current);
+                  setRules(current.rules);
+                  setPreview(null);
+                  onDirty(false);
+                  setNotice(
+                    t("Rules saved. Cached filenames have been reprocessed."),
+                  );
+                  await saved();
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? (
+                <LoaderCircle class="spin" size={15} />
+              ) : (
+                <Check size={15} />
+              )}{" "}
+              {t(busy ? "Reprocessing cache …" : "Save settings")}
+            </button>
+          </div>
         </>
       )}
       {editing && (
