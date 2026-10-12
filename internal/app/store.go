@@ -213,6 +213,11 @@ PRAGMA user_version=1;COMMIT;`)
 	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_traits ON files(service,resolution,codec,source,hdr,audio,language,media_id,season,processing,family,bitDepth,channels,size,conflict,rule_conflict,emby_match,title COLLATE NOCASE,id)`); err != nil {
 		return fail(err)
 	}
+	// Dashboard reads need only episode identities and completeness, not the large
+	// evidence/track JSON. SQLite maintains these compact expressions on every write.
+	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_statistics ON files(service,media_id,season,id,CASE WHEN json_valid(data) THEN json_extract(data,'$.episodes') END,CASE WHEN json_valid(data) THEN coalesce(json_extract(data,'$.metadataIncomplete'),0) END,json_valid(data))`); err != nil {
+		return fail(err)
+	}
 	if err = s.Get("recognition", &recognition); err == nil {
 		s.recognition, err = CompileRecognition(recognition.Rules)
 		if err != nil {
@@ -819,16 +824,23 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 		return out, e
 	}
 	defer tx.Rollback()
+	var damaged int
+	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files INDEXED BY files_statistics WHERE json_valid(data)=0").Scan(&damaged); e != nil {
+		return out, e
+	}
+	if damaged > 0 {
+		return out, fmt.Errorf("Invalid cached file data")
+	}
 	if e = tx.QueryRowContext(ctx, `SELECT (SELECT count(DISTINCT media_id) FROM files WHERE service='radarr'),(SELECT count(DISTINCT media_id) FROM files WHERE service='sonarr'),count(*) FROM files`).Scan(&out.Movies, &out.Series, &out.Files); e != nil {
 		return out, e
 	}
-	if e = tx.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT DISTINCT f.media_id,f.season,json_extract(ep.value,'$.number') FROM files f,json_each(f.data,'$.episodes') ep WHERE f.service='sonarr')`).Scan(&out.Episodes); e != nil {
+	if e = tx.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT DISTINCT f.media_id,f.season,json_extract(ep.value,'$.number') FROM files f INDEXED BY files_statistics,json_each(CASE WHEN json_valid(f.data) THEN json_extract(f.data,'$.episodes') END) ep WHERE f.service='sonarr')`).Scan(&out.Episodes); e != nil {
 		return out, e
 	}
-	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files WHERE json_extract(data,'$.metadataIncomplete')=1").Scan(&out.Incomplete); e != nil {
+	if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files INDEXED BY files_statistics WHERE (CASE WHEN json_valid(data) THEN coalesce(json_extract(data,'$.metadataIncomplete'),0) END)=1").Scan(&out.Incomplete); e != nil {
 		return out, e
 	}
-	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(emby_match,''),'unconfigured'),count(*) FROM files GROUP BY 1")
+	rows, e := tx.QueryContext(ctx, "SELECT coalesce(nullif(emby_match,''),'unconfigured'),count(*) FROM files INDEXED BY files_emby_match GROUP BY 1")
 	if e != nil {
 		return out, e
 	}
@@ -880,7 +892,7 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 	// Decode episode associations once, rather than once per language and scope.
 	// DISTINCT entity identities retain multi-episode and duplicate-file semantics.
 	entity := `f.service||':'||f.media_id||CASE WHEN f.service='sonarr' THEN ':'||f.season||':'||CASE WHEN json_extract(ep.value,'$.number') IS NULL THEN 'file:'||f.id ELSE 'episode:'||json_extract(ep.value,'$.number') END ELSE '' END`
-	query := `WITH entities AS MATERIALIZED (SELECT f.rowid AS file_rowid,f.service,` + entity + ` AS identity FROM files f LEFT JOIN json_each(CASE WHEN f.service='sonarr' THEN json_extract(f.data,'$.episodes') ELSE '[]' END) ep),
+	query := `WITH entities AS MATERIALIZED (SELECT f.rowid AS file_rowid,f.service,` + entity + ` AS identity FROM files f INDEXED BY files_statistics LEFT JOIN json_each(CASE WHEN f.service='sonarr' THEN (CASE WHEN json_valid(f.data) THEN json_extract(f.data,'$.episodes') END) ELSE '[]' END) ep),
 scopes(service) AS (VALUES('all'),('radarr'),('sonarr'))
 SELECT s.service,'' AS language,1 AS is_total,count(DISTINCT e.identity) AS n FROM scopes s LEFT JOIN entities e ON s.service='all' OR e.service=s.service GROUP BY s.service
 UNION ALL

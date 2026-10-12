@@ -4,7 +4,7 @@ All project versions follow semantic versioning. Every release has an English en
 
 ## 0.5.1
 
-Opt-in authoritative Radarr/Sonarr tag synchronization; editable DTS comparison tolerance and subtitle-language exclusions; searchable recognition rules; simplified presets and reset controls; consistent settings spacing and filename preview layout. SQLite schema 7 retains existing configuration and customized rules. See [release notes](docs/releases/0.5.1.md).
+Opt-in authoritative Radarr/Sonarr tag synchronization; editable DTS comparison tolerance and subtitle-language exclusions; searchable recognition rules; simplified presets and reset controls; consistent settings spacing and filename preview layout; compact indexes for cold Dashboard queries. SQLite schema 7 retains existing configuration and customized rules. See [release notes](docs/releases/0.5.1.md).
 
 ## 0.4.1
 
