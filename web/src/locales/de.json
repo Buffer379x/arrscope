@@ -541,6 +541,22 @@
     "Add the entered tag to the list before saving.": "Füge den eingegebenen Tag vor dem Speichern zur Liste hinzu.",
     "Custom tags changed in another session. Reload before saving.": "Eigene Tags wurden in einer anderen Sitzung geändert. Lade die Seite vor dem Speichern neu.",
     "Retry": "Erneut versuchen",
-    "Sync completed · {service}": "Synchronisation abgeschlossen · {service}"
+    "Sync completed · {service}": "Synchronisation abgeschlossen · {service}",
+    "Tag synchronization": "Tag-Synchronisation",
+    "Tag synchronization to {service}": "Tags zu {service} synchronisieren",
+    "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.": "Standardmäßig aus. Die ausgewählten Gruppen bestimmen alle Tags eines Films oder einer Serie; andere vorhandene Zuordnungen werden entfernt. Globale Tag-Definitionen bleiben erhalten.",
+    "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.": "Source enthält auch Verarbeitungsarten wie Remux. Serien erhalten die Werte aller Episodendateien. Tag-Namen verwenden Kleinbuchstaben, Ziffern und Bindestriche.",
+    "Configure connections, synchronization intervals and optional outbound tags.": "Konfiguriere Verbindungen, Sync-Intervalle und die optionale Tag-Übertragung.",
+    "Search recognition rules": "Erkennungsregeln suchen",
+    "Search all rule columns …": "Alle Regelspalten durchsuchen …",
+    "{count} matching rules": "{count} passende Regeln",
+    "Restore all default recognition rules?": "Alle Standard-Erkennungsregeln wiederherstellen?",
+    "Equivalent metadata codecs (regular expression)": "Gleichwertige Metadaten-Codecs (Regex)",
+    "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.": "Passende Codec-Namen gelten nur beim Warnungsabgleich als gleichwertig. Für einen strengen Vergleich diese Regex leeren; angezeigte Tonspuren bleiben unverändert.",
+    "Tag synchronization in progress …": "Tag-Synchronisation läuft …",
+    "Tag synchronization pending …": "Tag-Synchronisation wartet …",
+    "No matching rules.": "Keine passenden Regeln.",
+    "Tag update could not be verified": "Die Tag-Aktualisierung konnte nicht bestätigt werden",
+    "Tag write request failed": "Tags konnten nicht übertragen werden"
   }
 }

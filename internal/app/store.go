@@ -49,7 +49,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 6 {
+	if version > 7 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -163,6 +163,41 @@ PRAGMA user_version=1;COMMIT;`)
 		if _, e = tx.Exec(customSchema); e == nil && saved {
 			raw, _ := json.Marshal(cfg)
 			_, e = tx.Exec("UPDATE kv SET value=? WHERE key='settings'", string(raw))
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
+	if originalVersion < 7 {
+		if originalVersion == 6 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		var cfg RecognitionConfig
+		loaded := s.Get("recognition", &cfg) == nil
+		upgraded, changed := upgradeDefaultRules(cfg.Rules)
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if _, e = tx.Exec(tagSyncSchema); e == nil && loaded && changed {
+			engine, compileErr := CompileRecognition(upgraded)
+			e = compileErr
+			if e == nil {
+				var raw []byte
+				raw, e = json.Marshal(engine.Config())
+				if e == nil {
+					_, e = tx.Exec("UPDATE kv SET value=? WHERE key='recognition'", string(raw))
+				}
+			}
+			if e == nil {
+				e = reparseCached(context.Background(), tx, engine)
+			}
 		}
 		if e != nil {
 			tx.Rollback()

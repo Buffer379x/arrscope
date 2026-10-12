@@ -9,6 +9,8 @@ import (
 )
 
 type Syncer struct {
+	AfterSync  func(string)
+	AfterStop  func()
 	store      *Store
 	mu         sync.Mutex
 	status     map[string]SyncStatus
@@ -136,6 +138,7 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 		} else {
 			now := time.Now().UTC()
 			st.LastSuccess = &now
+			st.Source = tagEndpoint(c)
 			st.Count = len(files)
 			st.Error = ""
 			if err = m.store.replaceSyncSnapshot(service, files, st); err != nil {
@@ -151,6 +154,9 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 		debug.FreeOSMemory()
 		m.status[service] = st
 		delete(m.cancels, service)
+		if err == nil && m.AfterSync != nil {
+			m.AfterSync(service)
+		}
 	}()
 	return nil
 }
@@ -162,6 +168,9 @@ func (m *Syncer) Shutdown() {
 	}
 	m.mu.Unlock()
 	m.wg.Wait()
+	if m.AfterStop != nil {
+		m.AfterStop()
+	}
 }
 func (m *Syncer) Schedule(ctx context.Context, dispatch func()) {
 	tick := time.NewTicker(15 * time.Second)

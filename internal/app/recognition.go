@@ -13,17 +13,18 @@ import (
 
 // Rules affect filenames only. API normalization and Emby track attribution remain separate.
 type RecognitionRule struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Field    string `json:"field"`
-	Match    string `json:"match"`
-	Pattern  string `json:"pattern"`
-	Value    string `json:"value"`
-	Mode     string `json:"mode"`
-	Priority int    `json:"priority"`
-	Enabled  bool   `json:"enabled"`
-	Consume  bool   `json:"consume"`
-	Unless   string `json:"unless,omitempty"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Field             string `json:"field"`
+	Match             string `json:"match"`
+	Pattern           string `json:"pattern"`
+	Value             string `json:"value"`
+	Mode              string `json:"mode"`
+	Priority          int    `json:"priority"`
+	Enabled           bool   `json:"enabled"`
+	Consume           bool   `json:"consume"`
+	Unless            string `json:"unless,omitempty"`
+	ComparisonPattern string `json:"comparisonPattern,omitempty"`
 }
 type RecognitionConfig struct {
 	Rules    []RecognitionRule `json:"rules"`
@@ -37,12 +38,13 @@ type RecognitionConflict struct {
 }
 type compiledRule struct {
 	RecognitionRule
-	re, unless *regexp.Regexp
+	re, unless, comparison *regexp.Regexp
 }
 type RecognitionEngine struct {
-	config RecognitionConfig
-	groups map[string][]compiledRule
-	names  map[string]string
+	config      RecognitionConfig
+	groups      map[string][]compiledRule
+	names       map[string]string
+	comparisons map[string]*regexp.Regexp
 }
 type RecognitionResult struct {
 	Values    map[string]string     `json:"values"`
@@ -65,14 +67,14 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		}
 		return rules[i].ID < rules[j].ID
 	})
-	engine := &RecognitionEngine{config: RecognitionConfig{Rules: rules}, groups: map[string][]compiledRule{}, names: map[string]string{}}
+	engine := &RecognitionEngine{config: RecognitionConfig{Rules: rules}, groups: map[string][]compiledRule{}, names: map[string]string{}, comparisons: map[string]*regexp.Regexp{}}
 	ids := map[string]bool{}
 	for _, r := range rules {
 		validField := false
 		for _, f := range recognitionFields {
 			validField = validField || f == r.Field
 		}
-		if !ruleIDPattern.MatchString(r.ID) || ids[r.ID] || !validField || strings.TrimSpace(r.Name) == "" || len(r.Name) > 80 || r.Pattern == "" || len(r.Pattern) > 500 || strings.TrimSpace(r.Value) == "" || len(r.Value) > 80 || len(r.Unless) > 500 || r.Priority < 0 || r.Priority > 10000 {
+		if !ruleIDPattern.MatchString(r.ID) || ids[r.ID] || !validField || strings.TrimSpace(r.Name) == "" || len(r.Name) > 80 || r.Pattern == "" || len(r.Pattern) > 500 || strings.TrimSpace(r.Value) == "" || len(r.Value) > 80 || len(r.Unless) > 500 || len(r.ComparisonPattern) > 500 || r.Priority < 0 || r.Priority > 10000 {
 			return nil, fmt.Errorf("Invalid recognition rule")
 		}
 		if r.Field == "custom" {
@@ -104,9 +106,22 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 				return nil, fmt.Errorf("Invalid exclusion expression in rule %s", r.Name)
 			}
 		}
-		compiled := compiledRule{r, re, unless}
+		var comparison *regexp.Regexp
+		if r.ComparisonPattern != "" {
+			if r.Field != "audio" {
+				return nil, fmt.Errorf("Metadata comparison is only supported for audio rules")
+			}
+			comparison, err = regexp.Compile("(?i)" + r.ComparisonPattern)
+			if err != nil || comparison.MatchString("") {
+				return nil, fmt.Errorf("Invalid metadata comparison expression in rule %s", r.Name)
+			}
+		}
+		compiled := compiledRule{r, re, unless, comparison}
 		engine.names[r.ID] = r.Name
 		if r.Enabled {
+			if comparison != nil {
+				engine.comparisons[r.ID] = comparison
+			}
 			engine.groups[r.Field+":"+r.Mode] = append(engine.groups[r.Field+":"+r.Mode], compiled)
 		}
 	}
@@ -284,12 +299,18 @@ func DefaultRecognitionRules() []RecognitionRule {
 	for i, m := range audioMatchers {
 		add("audio", m.re.String(), m.label, 100+i)
 		rules[len(rules)-1].Consume = true
+		if m.label == "DTS" || m.label == "DTS-HD" || m.label == "DTS-HD MA" {
+			rules[len(rules)-1].ComparisonPattern = `^DTS(?:-HD(?: MA)?)?$`
+		}
 	}
 	for _, v := range []string{"2.0", "2.1", "5.1", "7.1"} {
 		add("channels", token(regexp.QuoteMeta(v)).String(), v, 100)
 	}
 	for _, m := range languageMatchers {
 		add("language", m.re.String(), m.label, 100)
+		aliases := map[string]string{"Deutsch": "german|deutsch", "Englisch": "english", "Französisch": "french", "Japanisch": "japanese"}[m.label]
+		marker := `(?:subbed|subs?|subtitles|hard[ ._-]?subbed|soft[ ._-]?subbed)`
+		rules[len(rules)-1].Unless = `(?:^|[ ._\[\]()-])(?:(?:` + aliases + `)[ ._-]+` + marker + `|` + marker + `[ ._-]+(?:` + aliases + `))(?:$|[ ._\[\]()-])`
 	}
 	return rules
 }
@@ -301,3 +322,48 @@ var defaultRecognitionEngine = func() *RecognitionEngine {
 	}
 	return e
 }()
+
+// Comparison tolerances belong to matching filename rules, not global codec normalization.
+func (e *RecognitionEngine) containsAudio(actual, expected string, ruleIDs []string) bool {
+	for _, want := range strings.Split(expected, " + ") {
+		found := false
+		for _, got := range strings.Split(actual, " + ") {
+			if got == want {
+				found = true
+				break
+			}
+			for _, id := range ruleIDs {
+				if comparison := e.comparisons[id]; comparison != nil && comparison.MatchString(want) && comparison.MatchString(got) {
+					found = true
+					break
+				}
+			}
+
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+func upgradeDefaultRules(rules []RecognitionRule) ([]RecognitionRule, bool) {
+	next := append([]RecognitionRule{}, rules...)
+	changed := false
+	for _, updated := range DefaultRecognitionRules() {
+		old := updated
+		old.ComparisonPattern = ""
+		if old.Field == "language" {
+			old.Unless = ""
+		}
+		if old == updated {
+			continue
+		}
+		for i, rule := range next {
+			if rule == old {
+				next[i] = updated
+				changed = true
+			}
+		}
+	}
+	return next, changed
+}

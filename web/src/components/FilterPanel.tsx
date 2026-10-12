@@ -1,6 +1,7 @@
 import { t, useI18n } from "../i18n";
 import { audioLanguageKey } from "../languages";
 import {
+  RotateCcw,
   Bookmark,
   ChevronDown,
   Search,
@@ -79,13 +80,8 @@ export function FilterPanel({
         <div class="preset-toolbar">
           <select
             aria-label={t("Filter preset")}
-            value={
-              selectedPreset
-                ? String(selectedPreset.id)
-                : active.length
-                  ? ""
-                  : "all"
-            }
+            value={selectedPreset ? String(selectedPreset.id) : "all"}
+            disabled={!presets.some((p) => p.service === service)}
             onChange={(e) => {
               const preset = presets.find(
                 (p) => String(p.id) === e.currentTarget.value,
@@ -94,7 +90,6 @@ export function FilterPanel({
               else if (e.currentTarget.value === "all") reset();
             }}
           >
-            <option value="">{t("Custom filters")}</option>
             <option value="all">{t("All files")}</option>
             {presets
               .filter((p) => p.service === service)
@@ -392,8 +387,13 @@ export function FilterPanel({
           )}
         </div>
         {active.length > 0 && (
-          <button class="text-button" onClick={reset}>
-            {t("Reset")}
+          <button
+            class="icon-button"
+            onClick={reset}
+            aria-label={t("Reset filters")}
+            title={t("Reset filters")}
+          >
+            <RotateCcw size={16} />
           </button>
         )}
       </div>

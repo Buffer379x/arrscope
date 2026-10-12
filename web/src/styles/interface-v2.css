@@ -665,3 +665,65 @@ select {
 .system-services {
   gap: 18px;
 }
+
+/* Consistent section headers and fluid recognition inputs. */
+.custom-tags-settings > .quiet,
+.recognition-page > .quiet {
+  margin: 8px 0 20px;
+}
+.recognition-preview form label {
+  max-width: none;
+  flex: 1 1 0;
+}
+.recognition-actions {
+  align-items: end;
+  gap: 16px;
+}
+.recognition-actions .recognition-rule-search {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.recognition-rule-count {
+  margin: 12px 0 20px;
+}
+.tag-group-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.outbound-tag-settings {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.outbound-tag-settings h4 {
+  margin: 0 0 8px;
+}
+.tag-sync-status {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 16px;
+}
+@media (max-width: 650px) {
+  .recognition-actions {
+    flex-wrap: wrap;
+  }
+  .recognition-actions .recognition-rule-search {
+    flex-basis: 100%;
+  }
+  .tag-group-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.settings-section-heading {
+  min-height: 72px;
+  margin-bottom: 0;
+}
+.custom-tags-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.custom-tags-settings .settings-section-heading > .quiet {
+  margin: 8px 0 0;
+}

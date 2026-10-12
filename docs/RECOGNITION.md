@@ -34,10 +34,12 @@ Tokens match case-insensitively at separators such as dots, spaces, hyphens and 
 
 Advanced controls include an exclusion expression and consuming matched text before subsequent rules in the same attribute and mode. Default audio rules use consumption to distinguish DTS-HD from DTS. Preserve this setting when editing overlapping audio patterns.
 
+Audio rules also expose an optional comparison expression. The default DTS-family rules accept DTS, DTS-HD and DTS-HD MA as equivalent for disagreement warnings, while retaining precise recognized and Emby track labels. Clear the expression for strict comparisons. Default audio-language rules exclude adjacent subtitle qualifiers such as German.Subbed; a subtitle language does not establish an audio language.
+
 ## Saving and data safety
 
 **Apply to draft** changes the draft only. **Restore defaults** also changes the draft only. **Save settings** validates all rules, creates a backup and commits rules and the recomputed cache in one transaction. Failed or cancelled saves preserve the previous state. A revision check prevents a stale browser from overwriting another session's changes.
 
-No upstream requests or media scans are made. API traits stay separate from filename evidence. Previously matched Emby tracks and HDR data are replayed from the cache. A sync that finishes after an edit uses the current rules at commit time. Library filters, CSV, facets and statistics all use the updated cache.
+Cache reprocessing makes no upstream reads or media scans. If optional outbound tag synchronization is enabled, a successful save queues tag reconciliation separately. API traits stay separate from filename evidence. Previously matched Emby tracks and HDR data are replayed from the cache. A sync that finishes after an edit uses the current rules at commit time. Library filters, CSV, facets and statistics all use the updated cache.
 
-Rules are stored in SQLite, not in the application image. New installations receive the built-in defaults; an update does not replace your saved rules. Keep a complete Appdata backup, including the local key. Rule edits and migrations share the last-three-snapshot retention policy.
+Rules are stored in SQLite, not in the application image. New installations receive the built-in defaults; customized rules remain intact on upgrade. Version 0.5.1 updates only untouched old DTS/language defaults and reprocesses the cache if those defaults change. Keep a complete Appdata backup, including the local key. Rule edits and migrations share the last-three-snapshot retention policy.

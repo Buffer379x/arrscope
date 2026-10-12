@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.5.1
+
+Opt-in authoritative Radarr/Sonarr tag synchronization; editable DTS comparison tolerance and subtitle-language exclusions; searchable recognition rules; simplified presets and reset controls; consistent settings spacing and filename preview layout. SQLite schema 7 retains existing configuration and customized rules. See [release notes](docs/releases/0.5.1.md).
+
 ## 0.4.1
 
 Automatic toast notifications; explicit settings drafts and atomic custom-tag saves; consistent settings cards; HTTP-compatible rule creation; synchronization controls in System; expandable top-five Dashboard distributions. No database schema migration. See [release notes](docs/releases/0.4.1.md).

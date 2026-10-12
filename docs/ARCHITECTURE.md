@@ -20,6 +20,8 @@ Facet and dashboard caches are defensively copied immutable snapshots, invalidat
 
 ## Endpoints
 
+Optional outbound tag reconciliation uses the same global gate as file synchronization. A durable schema-7 ledger records managed resource IDs by service and URL fingerprint. Pending work survives restart; a completed file snapshot for the current URL is required before adopting IDs. Selected groups authoritatively replace assignments using bounded editor batches, while global definitions remain intact. The worker permits only tag creation and movie/series tag updates, verifies returned assignments and reports failures separately from file-cache status. See [tag synchronization](TAG-SYNC.md).
+
 | Method/path | Purpose |
 | --- | --- |
 | GET `/healthz` | Public process health and version |

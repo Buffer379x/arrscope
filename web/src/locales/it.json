@@ -541,6 +541,22 @@
     "Add the entered tag to the list before saving.": "Aggiungi l’etichetta all’elenco prima di salvare.",
     "Custom tags changed in another session. Reload before saving.": "Le etichette personalizzate sono cambiate in un’altra sessione. Ricarica prima di salvare.",
     "Retry": "Riprova",
-    "Sync completed · {service}": "Sincronizzazione completata · {service}"
+    "Sync completed · {service}": "Sincronizzazione completata · {service}",
+    "Tag synchronization": "Sincronizzazione etichette",
+    "Tag synchronization to {service}": "Sincronizza etichette con {service}",
+    "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.": "Disattivata per impostazione predefinita. I gruppi selezionati definiscono tutte le etichette di un film o serie; le altre assegnazioni esistenti vengono rimosse. Le definizioni globali restano.",
+    "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.": "La fonte include elaborazioni come Remux. Le serie raccolgono i valori di tutti i file degli episodi. I nomi usano minuscole, cifre e trattini.",
+    "Configure connections, synchronization intervals and optional outbound tags.": "Configura connessioni, intervalli di sincronizzazione ed etichette in uscita opzionali.",
+    "Search recognition rules": "Cerca regole di riconoscimento",
+    "Search all rule columns …": "Cerca in tutte le colonne …",
+    "{count} matching rules": "{count} regole corrispondenti",
+    "Restore all default recognition rules?": "Ripristinare tutte le regole predefinite?",
+    "Equivalent metadata codecs (regular expression)": "Codec dei metadati equivalenti (espressione regolare)",
+    "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.": "I codec corrispondenti sono equivalenti solo per gli avvisi. Cancella l’espressione per il confronto rigoroso; le tracce mostrate non cambiano.",
+    "Tag synchronization in progress …": "Sincronizzazione etichette in corso …",
+    "Tag synchronization pending …": "Sincronizzazione etichette in attesa …",
+    "No matching rules.": "Nessuna regola corrispondente.",
+    "Tag update could not be verified": "Impossibile verificare l’aggiornamento delle etichette",
+    "Tag write request failed": "Invio delle etichette non riuscito"
   }
 }

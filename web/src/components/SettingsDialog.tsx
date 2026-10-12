@@ -284,7 +284,7 @@ export function SettingsDialog({
               <p class="quiet">
                 {t(
                   section === "connections"
-                    ? "Configure read-only connections and synchronization intervals."
+                    ? "Configure connections, synchronization intervals and optional outbound tags."
                     : section === "appearance"
                       ? "Choose your interface language, library layout and default columns."
                       : section === "colors"
@@ -451,6 +451,60 @@ export function SettingsDialog({
                             "Synced with Radarr and Sonarr. An error preserves the last complete cache.",
                           )}
                         </p>
+                      )}
+                      {service !== "emby" && (
+                        <section class="outbound-tag-settings">
+                          <h4>
+                            {t("Tag synchronization to {service}", {
+                              service:
+                                service === "radarr" ? "Radarr" : "Sonarr",
+                            })}
+                          </h4>
+                          <p class="quiet">
+                            {t(
+                              "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.",
+                            )}
+                          </p>
+                          <div class="tag-group-options">
+                            {[
+                              "resolution",
+                              "codec",
+                              "source",
+                              "hdr",
+                              "bitDepth",
+                              "audio",
+                              "channels",
+                              "language",
+                              "custom",
+                            ].map((field) => (
+                              <label class="check-field">
+                                <input
+                                  type="checkbox"
+                                  disabled={demo}
+                                  checked={
+                                    !!cfg[service].tagSync?.[
+                                      field as keyof import("../types").TagGroups
+                                    ]
+                                  }
+                                  onChange={(e) =>
+                                    update(service, {
+                                      tagSync: {
+                                        ...cfg[service].tagSync,
+                                        [field]: e.currentTarget.checked,
+                                      } as import("../types").TagGroups,
+                                    })
+                                  }
+                                />
+                                {labels[field]}
+                              </label>
+                            ))}
+                          </div>
+                          <small>
+                            {t(
+                              "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.",
+                            )}
+                          </small>
+                        </section>
                       )}
                       <div class="connection-test">
                         <button
@@ -656,7 +710,9 @@ export function SettingsDialog({
                       </div>
                       <button
                         type="button"
-                        class="text-button"
+                        class="icon-button"
+                        aria-label={t("Restore defaults")}
+                        title={t("Restore defaults")}
                         onClick={() =>
                           setCfg((current) => ({
                             ...current,
@@ -671,7 +727,7 @@ export function SettingsDialog({
                           }))
                         }
                       >
-                        {t("Restore defaults")}
+                        <RotateCcw size={16} />
                       </button>
                     </section>
                   ))}

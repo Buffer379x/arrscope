@@ -1,5 +1,18 @@
 export type Service = "radarr" | "sonarr";
+export type TagGroups = Record<
+  | "resolution"
+  | "codec"
+  | "source"
+  | "hdr"
+  | "bitDepth"
+  | "audio"
+  | "channels"
+  | "language"
+  | "custom",
+  boolean
+>;
 export type Connection = {
+  tagSync?: TagGroups;
   enabled: boolean;
   url: string;
   apiKey?: string;
@@ -90,6 +103,16 @@ export type SyncStatus = {
   count: number;
 };
 export type Status = {
+  tagSync?: Record<
+    Service,
+    {
+      running: boolean;
+      pending: boolean;
+      error: string;
+      lastSuccess?: string;
+      changed: number;
+    }
+  >;
   initialized: boolean;
   authenticated: boolean;
   version: string;
@@ -132,6 +155,7 @@ export type RecognitionRule = {
   enabled: boolean;
   consume: boolean;
   unless?: string;
+  comparisonPattern?: string;
 };
 export type RecognitionConfig = { rules: RecognitionRule[]; revision: string };
 export type RecognitionConflict = {

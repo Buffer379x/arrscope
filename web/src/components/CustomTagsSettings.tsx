@@ -59,12 +59,14 @@ export function CustomTagsSettings({
   };
   return (
     <section class="custom-tags-settings" aria-label={t("Custom tags")}>
-      <h2>{t("Custom tags")}</h2>
-      <p class="quiet">
-        {t(
-          "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
-        )}
-      </p>
+      <header class="settings-section-heading">
+        <h2>{t("Custom tags")}</h2>
+        <p class="quiet">
+          {t(
+            "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
+          )}
+        </p>
+      </header>
       <section class="settings-card">
         <form
           class="custom-tag-create"
