@@ -34,7 +34,7 @@ func OpenStore(dir string) (*Store, error) {
 	if err := migrateLegacyDatabase(dir); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
 	if err != nil {
 		return nil, err
 	}
