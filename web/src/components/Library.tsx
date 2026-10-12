@@ -13,7 +13,6 @@ import {
   ArrowUpRight,
   BarChart3,
   Bookmark,
-  Check,
   Columns3,
   Database,
   Download,
@@ -24,13 +23,10 @@ import {
   LoaderCircle,
   LogOut,
   Moon,
-  RefreshCw,
   Search,
   Settings as SettingsIcon,
-  ShieldCheck,
   Sun,
   Tv,
-  X,
 } from "lucide-preact";
 import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -54,7 +50,6 @@ import {
   bytes,
   columnLabels,
   count,
-  date,
   defaultColumnOrder,
   defaultColumns,
   emptyResults,

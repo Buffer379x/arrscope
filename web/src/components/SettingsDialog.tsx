@@ -7,7 +7,6 @@ import { RecognitionPage } from "./RecognitionPage";
 
 import {
   RotateCcw,
-  RefreshCw,
   AlertTriangle,
   OctagonAlert,
   SlidersHorizontal,
@@ -70,8 +69,6 @@ export function SettingsDialog({
   const contentRef = useRef<HTMLDivElement>(null);
   const [cfg, setCfg] = useState<Settings>(structuredClone(settings)),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [test, setTest] = useState<Record<string, string>>({}),
     [testing, setTesting] = useState<Record<string, boolean>>({}),
     [current, setCurrent] = useState(""),
     [password, setPassword] = useState(""),
@@ -106,7 +103,7 @@ export function SettingsDialog({
         });
         setRecognized(values);
       })
-      .catch((e) => setError(e.message));
+      .catch(() => {});
   }, [customTags]);
   const dirty =
     JSON.stringify(cfg) !== JSON.stringify(settings) || draftLocale !== locale;
@@ -159,8 +156,7 @@ export function SettingsDialog({
       notify(
         t("Sync queued. Services run one at a time; you can keep filtering."),
       );
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
     } finally {
       setSyncing((current) => ({ ...current, [service]: false }));
     }
@@ -198,7 +194,6 @@ export function SettingsDialog({
     }));
   const submit = async (e: Event) => {
     e.preventDefault();
-    setError("");
     setBusy(true);
     try {
       await api("settings", "PUT", cfg);
@@ -206,8 +201,7 @@ export function SettingsDialog({
       await saved();
       setLocale(draftLocale);
       notify(t("Settings saved."));
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
     } finally {
       setBusy(false);
     }
@@ -468,10 +462,6 @@ export function SettingsDialog({
                               ...current,
                               [service]: true,
                             }));
-                            setTest((current) => ({
-                              ...current,
-                              [service]: t("Testing …"),
-                            }));
                             try {
                               const r = await api<{ version: string }>(
                                 "test",
@@ -487,11 +477,7 @@ export function SettingsDialog({
                                   version: r.version,
                                 }),
                               );
-                            } catch (e) {
-                              setTest((current) => ({
-                                ...current,
-                                [service]: (e as Error).message,
-                              }));
+                            } catch {
                             } finally {
                               setTesting((current) => ({
                                 ...current,
@@ -959,9 +945,7 @@ export function SettingsDialog({
                     notify(
                       t("Consistent backup created in the Appdata directory."),
                     );
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
+                  } catch {}
                 }}
               >
                 <Database size={15} />
@@ -981,9 +965,7 @@ export function SettingsDialog({
                   try {
                     await api("password", "PUT", { current, password });
                     location.reload();
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
+                  } catch {}
                 }}
               >
                 <label>
