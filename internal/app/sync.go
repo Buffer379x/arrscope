@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -101,12 +102,22 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 			st.Queued = false
 			m.status[service] = st
 			m.mu.Unlock()
+			// Return released pages from the previous service before fetching another snapshot.
+			debug.FreeOSMemory()
 			files, err = NewArr(c).Fetch(ctx, service)
+			if len(files) >= 10000 {
+				debug.FreeOSMemory()
+			}
 		}
 		if err == nil && len(supplemental) > 0 && supplemental[0].Enabled {
 			if err = NewEmby(supplemental[0]).Enrich(ctx, service, files); err != nil {
 				err = errors.New("Emby enrichment failed: " + err.Error())
 			}
+		}
+		// Arr catalog indexes and Emby candidate maps are no longer needed.
+		// Reclaim their backing pages before SQLite starts a large transaction.
+		if len(files) >= 10000 {
+			debug.FreeOSMemory()
 		}
 		if err == nil {
 			err = ctx.Err()
@@ -134,6 +145,10 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 				m.store.Put("sync:"+service, st)
 			}
 		}
+		// replaceSyncSnapshot consumes file contents; drop its backing slice too.
+		// The next service must not overlap with the outgoing snapshot's RSS.
+		files = nil
+		debug.FreeOSMemory()
 		m.status[service] = st
 		delete(m.cancels, service)
 	}()
