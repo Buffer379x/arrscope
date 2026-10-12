@@ -727,3 +727,54 @@ select {
 .custom-tags-settings .settings-section-heading > .quiet {
   margin: 8px 0 0;
 }
+
+/* Consistent destructive actions, compact filters and settings language width. */
+.button.danger-button,
+.icon-button.danger-button {
+  color: #d96c73;
+  background: #6e283033;
+  border-color: #a4455055;
+}
+.button.danger-button:hover:not(:disabled),
+.icon-button.danger-button:hover:not(:disabled) {
+  color: #ef9299;
+  background: #852f394d;
+  border-color: #b84f5b;
+}
+[data-theme="light"] .danger-button {
+  color: #a33743;
+  background: #a3374312;
+  border-color: #a3374340;
+}
+.filter-panel.collapsed .filter-footer {
+  border-top: 0;
+}
+.settings-content .language-select,
+.settings-content .language-select select {
+  width: 100%;
+  max-width: none;
+}
+.tag-policy-dialog .connection {
+  margin-bottom: 16px;
+}
+.tag-policy-options {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+.tag-policy-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tag-policy-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+[data-theme="light"] .danger-button:hover:not(:disabled) {
+  color: #8d2230;
+  background: #8d22301f;
+  border-color: #a33743;
+}

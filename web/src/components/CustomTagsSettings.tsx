@@ -1,3 +1,4 @@
+import { confirmDeletion } from "../confirmation";
 import { useEffect, useState } from "preact/hooks";
 import { Plus, Check, Trash2, LoaderCircle } from "lucide-preact";
 import type { CustomTag } from "../types";
@@ -123,13 +124,13 @@ export function CustomTagsSettings({
                     <div class="row-actions">
                       <button
                         type="button"
-                        class="button"
+                        class="button danger-button"
                         disabled={busy}
                         aria-label={t("Delete tag: {name}", { name: tag.name })}
                         title={t("Delete tag: {name}", { name: tag.name })}
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            confirm(
+                            await confirmDeletion(
                               t(
                                 "Delete {name}, its assignments and matching filename rules?",
                                 { name: tag.name },

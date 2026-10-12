@@ -22,7 +22,7 @@ Facet and dashboard caches are defensively copied immutable snapshots, invalidat
 
 Cold Dashboard queries use a compact expression index for episode associations and metadata completeness, avoiding full evidence/audio JSON scans. SQLite maintains the expressions automatically on file writes; the index is additive and contains no new canonical state.
 
-Optional outbound tag reconciliation uses the same global gate as file synchronization. A durable schema-7 ledger records managed resource IDs by service and URL fingerprint. Pending work survives restart; a completed file snapshot for the current URL is required before adopting IDs. Selected groups authoritatively replace assignments using bounded editor batches, while global definitions remain intact. The worker permits only tag creation and movie/series tag updates, verifies returned assignments and reports failures separately from file-cache status. See [tag synchronization](TAG-SYNC.md).
+Optional outbound tag reconciliation shares the file-sync gate. Schema 8 records managed resources by URL fingerprint, group retention/deletion states, observed labels, custom ownership and independent cleanup intent. Settings and policy transitions commit together. Add mode uses targeted add/remove editor operations; replacement verifies the exact desired set. Kept groups survive future syncs until a newly confirmed overwrite releases them. Cleanup verifies fresh usage details and relies on the upstream in-use deletion guard; blocked definitions remain queued for a later file sync. See [tag synchronization](TAG-SYNC.md).
 
 | Method/path | Purpose |
 | --- | --- |

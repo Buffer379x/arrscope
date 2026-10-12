@@ -12,6 +12,8 @@ export type TagGroups = Record<
   boolean
 >;
 export type Connection = {
+  tagSyncMode?: "add" | "replace";
+  tagSyncDisable?: "keep" | "delete";
   tagSync?: TagGroups;
   enabled: boolean;
   url: string;
@@ -111,6 +113,7 @@ export type Status = {
       error: string;
       lastSuccess?: string;
       changed: number;
+      retainedDefinitions?: number;
     }
   >;
   initialized: boolean;

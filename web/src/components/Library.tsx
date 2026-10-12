@@ -1,3 +1,4 @@
+import { confirmDeletion } from "../confirmation";
 import { notify } from "../notifications";
 import { CustomBulk } from "./CustomBulk";
 import type { CustomTag } from "../types";
@@ -348,7 +349,13 @@ export function Library({
     matchingPresets.find((p) => p.id === presetIds[service]) ||
     matchingPresets[0];
   const deletePreset = async () => {
-    if (!selectedPreset) return;
+    if (
+      !selectedPreset ||
+      !(await confirmDeletion(
+        t("Delete preset {name}?", { name: selectedPreset.name }),
+      ))
+    )
+      return;
     try {
       await api("presets?id=" + selectedPreset.id, "DELETE");
       await loadPresets();

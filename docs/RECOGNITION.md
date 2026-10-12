@@ -43,3 +43,7 @@ Audio rules also expose an optional comparison expression. The default DTS-famil
 Cache reprocessing makes no upstream reads or media scans. If optional outbound tag synchronization is enabled, a successful save queues tag reconciliation separately. API traits stay separate from filename evidence. Previously matched Emby tracks and HDR data are replayed from the cache. A sync that finishes after an edit uses the current rules at commit time. Library filters, CSV, facets and statistics all use the updated cache.
 
 Rules are stored in SQLite, not in the application image. New installations receive the built-in defaults; customized rules remain intact on upgrade. Version 0.5.1 updates only untouched old DTS/language defaults and reprocesses the cache if those defaults change. Keep a complete Appdata backup, including the local key. Rule edits and migrations share the last-three-snapshot retention policy.
+
+## UHDBD source default
+
+Version 0.5.2 adds a specific UHDBD → UHD source override, so a broad BluRay token does not override the more specific disc notation. Resolution stays independent; add a fallback rule if UHDBD should also imply 2160p in your installation. Equivalent existing rules, including customized/disabled rules, are preserved during upgrade.

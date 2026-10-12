@@ -437,11 +437,24 @@ func (s *Server) Handler() http.Handler {
 					failure(w, r, 400, errors.New("Emby syncs at the Radarr/Sonarr interval"))
 					return
 				}
+
+				for _, pair := range [][2]ServiceConfig{{old.Radarr, cfg.Radarr}, {old.Sonarr, cfg.Sonarr}} {
+					if e := validateTagPolicy(pair[0], pair[1]); e != nil {
+						s.mu.Unlock()
+						failure(w, r, 400, e)
+						return
+					}
+				}
+				if cfg.Emby.TagSyncMode != "" || cfg.Emby.TagSyncDisable != "" {
+					s.mu.Unlock()
+					failure(w, r, 400, errors.New("Emby does not support outbound tags"))
+					return
+				}
 				stored := cfg
 				for _, connection := range stored.Connections() {
 					connection.APIKey = s.Security.Seal(connection.APIKey)
 				}
-				if e := s.Store.Put("settings", stored); e != nil {
+				if e := s.Store.saveSettingsWithTagPolicies(r.Context(), stored, old, cfg); e != nil {
 					s.mu.Unlock()
 					failure(w, r, 500, errors.New("Could not save settings"))
 					return
