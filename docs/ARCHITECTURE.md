@@ -20,6 +20,8 @@ Facet and dashboard caches are defensively copied immutable snapshots, invalidat
 
 ## Endpoints
 
+Cold Dashboard queries use a compact expression index for episode associations and metadata completeness, avoiding full evidence/audio JSON scans. SQLite maintains the expressions automatically on file writes; the index is additive and contains no new canonical state.
+
 Optional outbound tag reconciliation uses the same global gate as file synchronization. A durable schema-7 ledger records managed resource IDs by service and URL fingerprint. Pending work survives restart; a completed file snapshot for the current URL is required before adopting IDs. Selected groups authoritatively replace assignments using bounded editor batches, while global definitions remain intact. The worker permits only tag creation and movie/series tag updates, verifies returned assignments and reports failures separately from file-cache status. See [tag synchronization](TAG-SYNC.md).
 
 | Method/path | Purpose |
