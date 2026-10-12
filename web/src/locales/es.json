@@ -541,6 +541,22 @@
     "Add the entered tag to the list before saving.": "Añade la etiqueta a la lista antes de guardar.",
     "Custom tags changed in another session. Reload before saving.": "Las etiquetas personalizadas cambiaron en otra sesión. Recarga antes de guardar.",
     "Retry": "Reintentar",
-    "Sync completed · {service}": "Sincronización completada · {service}"
+    "Sync completed · {service}": "Sincronización completada · {service}",
+    "Tag synchronization": "Sincronización de etiquetas",
+    "Tag synchronization to {service}": "Sincronizar etiquetas con {service}",
+    "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.": "Desactivado por defecto. Los grupos seleccionados definen todas las etiquetas de una película o serie; se eliminan otras asignaciones existentes. Las definiciones globales se conservan.",
+    "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.": "La fuente incluye tipos de procesamiento como Remux. Las series reúnen los valores de todos los archivos de episodios. Los nombres usan minúsculas, dígitos y guiones.",
+    "Configure connections, synchronization intervals and optional outbound tags.": "Configura conexiones, intervalos de sincronización y etiquetas de salida opcionales.",
+    "Search recognition rules": "Buscar reglas de reconocimiento",
+    "Search all rule columns …": "Buscar en todas las columnas …",
+    "{count} matching rules": "{count} reglas coincidentes",
+    "Restore all default recognition rules?": "¿Restaurar todas las reglas predeterminadas?",
+    "Equivalent metadata codecs (regular expression)": "Códecs de metadatos equivalentes (expresión regular)",
+    "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.": "Los códecs coincidentes se consideran equivalentes solo para las advertencias. Borra la expresión para comparar estrictamente; las pistas mostradas no cambian.",
+    "Tag synchronization in progress …": "Sincronizando etiquetas …",
+    "Tag synchronization pending …": "Sincronización de etiquetas pendiente …",
+    "No matching rules.": "No hay reglas coincidentes.",
+    "Tag update could not be verified": "No se pudo verificar la actualización de etiquetas",
+    "Tag write request failed": "No se pudieron enviar las etiquetas"
   }
 }

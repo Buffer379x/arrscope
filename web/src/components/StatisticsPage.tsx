@@ -36,7 +36,6 @@ export function StatisticsPage({
   const [data, setData] = useState<Statistics | null>(null),
     [scope, setScope] = useState("all"),
     [retry, setRetry] = useState(0),
-    [embyExpanded, setEmbyExpanded] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
@@ -145,7 +144,6 @@ export function StatisticsPage({
                   .sort(
                     (a, b) => (data.emby[b[0]] || 0) - (data.emby[a[0]] || 0),
                   )
-                  .slice(0, embyExpanded ? 6 : 5)
                   .map(([key, label]) => (
                     <div>
                       <dt>{label}</dt>
@@ -153,16 +151,6 @@ export function StatisticsPage({
                     </div>
                   ))}
               </dl>
-              <button
-                class="button widget-expand"
-                aria-expanded={embyExpanded}
-                onClick={() => setEmbyExpanded(!embyExpanded)}
-              >
-                {t(embyExpanded ? "Less" : "More")}
-              </button>
-              <small>
-                {t("A match may still contain unknown audio track attributes.")}
-              </small>
             </article>
           </section>
           <div class="distribution-heading">

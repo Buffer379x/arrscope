@@ -1,3 +1,4 @@
+import { matchesRuleSearch } from "../rule-search";
 import { newRuleID } from "../rule-id";
 import { notify } from "../notifications";
 import {
@@ -66,6 +67,7 @@ export function RecognitionPage({
       { field: "priority", desc: false },
     ),
     [editing, setEditing] = useState<RecognitionRule | null>(null),
+    [ruleSearch, setRuleSearch] = useState(""),
     [filename, setFilename] = useState(""),
     [preview, setPreview] = useState<RecognitionResult | null>(null),
     [error, setError] = useState(""),
@@ -115,7 +117,23 @@ export function RecognitionPage({
     setPreview(null);
     setNotice("");
   };
-  const sorted = [...rules].sort((a, b) => {
+  const filtered = rules.filter((rule) =>
+    matchesRuleSearch(ruleSearch, [
+      String(rule.priority),
+      t(rule.enabled ? "Enabled" : "Disabled"),
+      rule.name,
+      labels[rule.field],
+      t(rule.match === "token" ? "Token" : "Regular expression"),
+      rule.pattern,
+      rule.field === "custom"
+        ? customNames[rule.value] || rule.value
+        : rule.value,
+      t(modes[rule.mode as keyof typeof modes]),
+      rule.unless || "",
+      rule.comparisonPattern || "",
+    ]),
+  );
+  const sorted = [...filtered].sort((a, b) => {
     const x =
         sort.field === "value" && a.field === "custom"
           ? customNames[a.value] || a.value
@@ -132,14 +150,14 @@ export function RecognitionPage({
   });
   return (
     <section class="recognition-page">
-      <div class="recognition-heading">
+      <header class="settings-section-heading">
         <h2>{t("Filename recognition")}</h2>
-      </div>
-      <p class="quiet">
-        {t(
-          "Rules only read filenames. API metadata fills remaining gaps; Emby audio tracks stay separate. No media scans are triggered.",
-        )}
-      </p>
+        <p class="quiet">
+          {t(
+            "Rules only read filenames. API metadata fills remaining gaps; Emby audio tracks stay separate. No media scans are triggered.",
+          )}
+        </p>
+      </header>
       <div class="recognition-guide">
         {Object.entries(modes).map(([mode, label]) => (
           <div>
@@ -180,10 +198,19 @@ export function RecognitionPage({
             )}
           </p>
           <div class="recognition-actions">
-            <span>
-              {t("{count} rules", { count: rules.length })}
-              {dirty && " · " + t("Unsaved changes")}
-            </span>
+            <label class="search-field recognition-rule-search">
+              <span>{t("Search recognition rules")}</span>
+              <div class="input-wrap">
+                <Search size={17} />
+                <input
+                  type="search"
+                  aria-label={t("Search recognition rules")}
+                  placeholder={t("Search all rule columns …")}
+                  value={ruleSearch}
+                  onInput={(e) => setRuleSearch(e.currentTarget.value)}
+                />
+              </div>
+            </label>
             <div>
               <button
                 class="button"
@@ -207,12 +234,16 @@ export function RecognitionPage({
                 {t("Add rule")}
               </button>
               <button
-                class="button"
+                class="icon-button"
+                aria-label={t("Restore defaults")}
+                title={t("Restore defaults")}
                 disabled={busy || !defaults}
-                onClick={() => change(structuredClone(defaults!.rules))}
+                onClick={() => {
+                  if (confirm(t("Restore all default recognition rules?")))
+                    change(structuredClone(defaults!.rules));
+                }}
               >
                 <RotateCcw size={15} />
-                {t("Restore defaults")}
               </button>
             </div>
           </div>
@@ -332,6 +363,9 @@ export function RecognitionPage({
                 ))}
               </tbody>
             </table>
+            {!!rules.length && !filtered.length && (
+              <p class="quiet empty-rules">{t("No matching rules.")}</p>
+            )}
             {!rules.length && (
               <p class="quiet empty-rules">
                 {t(
@@ -340,6 +374,12 @@ export function RecognitionPage({
               </p>
             )}
           </div>
+          <p class="quiet recognition-rule-count">
+            {t("{count} rules", { count: rules.length })}
+            {ruleSearch.trim() &&
+              " · " + t("{count} matching rules", { count: filtered.length })}
+            {dirty && " · " + t("Unsaved changes")}
+          </p>
           <section class="recognition-preview">
             <h2>{t("Preview filename")}</h2>
             <p class="quiet">
@@ -538,6 +578,10 @@ function RuleEditor({
             onChange={(e) =>
               patch({
                 field: e.currentTarget.value,
+                comparisonPattern:
+                  e.currentTarget.value === "audio"
+                    ? draft.comparisonPattern
+                    : "",
                 mode:
                   e.currentTarget.value === "custom" ? "direct" : draft.mode,
                 value:
@@ -638,6 +682,24 @@ function RuleEditor({
         </p>
         <details class="rule-advanced">
           <summary>{t("Advanced matching")}</summary>
+          {draft.field === "audio" && (
+            <label>
+              {t("Equivalent metadata codecs (regular expression)")}
+              <input
+                maxLength={500}
+                value={draft.comparisonPattern || ""}
+                placeholder="^DTS(?:-HD(?: MA)?)?$"
+                onInput={(e) =>
+                  patch({ comparisonPattern: e.currentTarget.value })
+                }
+              />
+              <small>
+                {t(
+                  "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.",
+                )}
+              </small>
+            </label>
+          )}
           <label>
             {t("Skip when filename matches this expression")}
             <input

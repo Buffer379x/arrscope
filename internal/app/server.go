@@ -19,6 +19,7 @@ import (
 )
 
 type Server struct {
+	Tags     *TagWriter
 	Store    *Store
 	Security *Security
 	Sync     *Syncer
@@ -65,6 +66,9 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		}
 		s.settings = cfg
 	}
+	s.Tags = NewTagWriter(ctx, store, s.Config, s.Sync.gate)
+	s.Sync.AfterSync = s.Tags.Queue
+	s.Sync.AfterStop = s.Tags.Close
 	go s.Sync.Schedule(ctx, s.scheduleDue)
 	return s, nil
 }
@@ -159,6 +163,7 @@ func (s *Server) Handler() http.Handler {
 					states[service] = state
 				}
 				out["sync"] = states
+				out["tagSync"] = s.Tags.Statuses()
 				out["recognitionRevision"] = s.Store.Recognition().Revision
 			}
 			jsonOut(w, 200, out)
@@ -240,6 +245,7 @@ func (s *Server) Handler() http.Handler {
 				s.settings.TagTextColors = stored.TagTextColors
 				s.mu.Unlock()
 			}
+			s.queueTagSync()
 			jsonOut(w, 200, tags)
 			return
 		case "/api/custom-tags":
@@ -263,6 +269,7 @@ func (s *Server) Handler() http.Handler {
 				if err != nil {
 					failure(w, r, 400, err)
 				} else {
+					s.queueTagSync()
 					jsonOut(w, 200, out)
 				}
 				return
@@ -281,6 +288,7 @@ func (s *Server) Handler() http.Handler {
 						s.settings.TagTextColors = stored.TagTextColors
 						s.mu.Unlock()
 					}
+					s.queueTagSync()
 					jsonOut(w, 200, map[string]bool{"ok": true})
 				}
 				return
@@ -316,6 +324,7 @@ func (s *Server) Handler() http.Handler {
 				if err != nil {
 					failure(w, r, 400, err)
 				} else {
+					s.Tags.Queue(q.Get("service"))
 					jsonOut(w, 200, map[string]int{"total": total})
 				}
 				return
@@ -366,6 +375,7 @@ func (s *Server) Handler() http.Handler {
 					failure(w, r, status, err)
 					return
 				}
+				s.queueTagSync()
 				jsonOut(w, 200, out)
 				return
 			}
@@ -422,7 +432,7 @@ func (s *Server) Handler() http.Handler {
 					failure(w, r, 403, errors.New("Demo connections cannot be changed"))
 					return
 				}
-				if cfg.Emby.Interval != 0 {
+				if cfg.Emby.Interval != 0 || cfg.Emby.TagSync.Active() {
 					s.mu.Unlock()
 					failure(w, r, 400, errors.New("Emby syncs at the Radarr/Sonarr interval"))
 					return
@@ -437,17 +447,22 @@ func (s *Server) Handler() http.Handler {
 					return
 				}
 				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
-					if pair[0] != pair[1] || old.Emby != cfg.Emby {
+					if dataConfig(pair[0]) != dataConfig(pair[1]) || old.Emby != cfg.Emby {
 						s.Sync.Invalidate(service)
 					}
 				}
 				s.settings = cfg
 				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
-					if pair[1].Enabled && (!pair[0].Enabled || pair[0].URL != pair[1].URL || pair[0].APIKey != pair[1].APIKey || old.Emby != cfg.Emby) {
+					if pair[1].Enabled && (!pair[0].Enabled || pair[0].URL != pair[1].URL || pair[0].APIKey != pair[1].APIKey || old.Emby != cfg.Emby || pair[0].TagSync != pair[1].TagSync && pair[1].TagSync.Active()) {
 						s.Sync.Start(s.ctx, service, pair[1], cfg.Emby)
 					}
 				}
 				s.mu.Unlock()
+				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
+					if pair[0] != pair[1] {
+						s.Tags.Queue(service)
+					}
+				}
 				jsonOut(w, 200, map[string]bool{"ok": true})
 				return
 			}
@@ -825,4 +840,11 @@ func combinedAudioSummary(f File, locale ...string) string {
 		summary += " | "
 	}
 	return summary + localizedMessage(language, "Languages:") + " " + languages + " | " + localizedMessage(language, "Codecs:") + " " + codecs + " | " + localizedMessage(language, "Track mapping unavailable")
+}
+
+func (s *Server) queueTagSync() {
+	if s.Tags != nil {
+		s.Tags.Queue("radarr")
+		s.Tags.Queue("sonarr")
+	}
 }

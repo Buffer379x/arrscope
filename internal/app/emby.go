@@ -324,6 +324,13 @@ func applyEmbyMetadata(f *File, metadata embyMetadata) {
 		}
 		evidence.Origin = "emby"
 		evidence.Conflict = evidence.Filename != "" && value != "" && !containsAllTraits(value, evidence.Filename, separator)
+		if field == "audio" {
+			engine := f.comparisonEngine
+			if engine == nil {
+				engine = defaultRecognitionEngine
+			}
+			evidence.Conflict = evidence.Filename != "" && !engine.containsAudio(value, evidence.Filename, evidence.Rules)
+		}
 		f.Evidence[field] = evidence
 		return value
 	}

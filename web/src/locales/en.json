@@ -541,6 +541,22 @@
     "Add the entered tag to the list before saving.": "Add the entered tag to the list before saving.",
     "Custom tags changed in another session. Reload before saving.": "Custom tags changed in another session. Reload before saving.",
     "Retry": "Retry",
-    "Sync completed · {service}": "Sync completed · {service}"
+    "Sync completed · {service}": "Sync completed · {service}",
+    "Tag synchronization": "Tag synchronization",
+    "Tag synchronization to {service}": "Tag synchronization to {service}",
+    "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.": "Disabled by default. Selected groups define the complete movie or series tag set; other existing assignments are removed. Global tag definitions are retained.",
+    "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.": "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.",
+    "Configure connections, synchronization intervals and optional outbound tags.": "Configure connections, synchronization intervals and optional outbound tags.",
+    "Search recognition rules": "Search recognition rules",
+    "Search all rule columns …": "Search all rule columns …",
+    "{count} matching rules": "{count} matching rules",
+    "Restore all default recognition rules?": "Restore all default recognition rules?",
+    "Equivalent metadata codecs (regular expression)": "Equivalent metadata codecs (regular expression)",
+    "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.": "Matching codec names are equivalent for warnings only. Clear this expression to compare strictly; displayed audio tracks stay unchanged.",
+    "Tag synchronization in progress …": "Tag synchronization in progress …",
+    "Tag synchronization pending …": "Tag synchronization pending …",
+    "No matching rules.": "No matching rules.",
+    "Tag update could not be verified": "Tag update could not be verified",
+    "Tag write request failed": "Tag write request failed"
   }
 }

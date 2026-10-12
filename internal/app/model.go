@@ -7,14 +7,30 @@ import (
 	"time"
 )
 
+type TagGroups struct {
+	Resolution bool `json:"resolution"`
+	Codec      bool `json:"codec"`
+	Source     bool `json:"source"`
+	HDR        bool `json:"hdr"`
+	BitDepth   bool `json:"bitDepth"`
+	Audio      bool `json:"audio"`
+	Channels   bool `json:"channels"`
+	Language   bool `json:"language"`
+	Custom     bool `json:"custom"`
+}
+
+func (g TagGroups) Active() bool               { return g != (TagGroups{}) }
+func dataConfig(c ServiceConfig) ServiceConfig { c.TagSync = TagGroups{}; return c }
+
 type ServiceConfig struct {
-	Enabled      bool   `json:"enabled"`
-	URL          string `json:"url"`
-	APIKey       string `json:"apiKey,omitempty"`
-	HasKey       bool   `json:"hasKey"`
-	ClearKey     bool   `json:"clearKey,omitempty"`
-	PathMappings string `json:"pathMappings,omitempty"`
-	Interval     int    `json:"interval"`
+	TagSync      TagGroups `json:"tagSync"`
+	Enabled      bool      `json:"enabled"`
+	URL          string    `json:"url"`
+	APIKey       string    `json:"apiKey,omitempty"`
+	HasKey       bool      `json:"hasKey"`
+	ClearKey     bool      `json:"clearKey,omitempty"`
+	PathMappings string    `json:"pathMappings,omitempty"`
+	Interval     int       `json:"interval"`
 }
 type Settings struct {
 	WarningColors  map[string]string   `json:"warningColors"`
@@ -55,6 +71,7 @@ type CustomTag struct {
 	Name string `json:"name"`
 }
 type File struct {
+	comparisonEngine     *RecognitionEngine
 	Custom               []CustomTag           `json:"custom"`
 	RecognizedCustom     []int64               `json:"recognizedCustom,omitempty"`
 	APIInfo              *APIInfo              `json:"apiInfo,omitempty"`
@@ -92,6 +109,7 @@ type File struct {
 	MetadataIncomplete   bool                  `json:"metadataIncomplete"`
 }
 type SyncStatus struct {
+	Source      string     `json:"source,omitempty"`
 	Running     bool       `json:"running"`
 	Queued      bool       `json:"queued"`
 	LastAttempt *time.Time `json:"lastAttempt"`

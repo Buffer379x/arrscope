@@ -33,7 +33,12 @@ export function useStatus() {
         for (const service of ["radarr", "sonarr"] as const) {
           const before = previous.sync?.[service],
             after = value.sync?.[service];
-          if (before?.running && after && !after.running) {
+          if (
+            before?.running &&
+            after &&
+            !after.running &&
+            (after.error || after.lastSuccess !== before.lastSuccess)
+          ) {
             notify(
               after.error
                 ? t("Sync failed · {error}", { error: t(after.error) })
@@ -45,6 +50,13 @@ export function useStatus() {
           }
         }
       }
+      if (previous?.authenticated)
+        for (const service of ["radarr", "sonarr"] as const) {
+          const before = previous.tagSync?.[service],
+            after = value.tagSync?.[service];
+          if (after?.error && after.error !== before?.error)
+            notify(t(after.error), "error");
+        }
       current.current = value;
       setStatus(value);
       setError("");
@@ -70,9 +82,10 @@ export function useStatus() {
     schedule.current = () => {
       clearTimeout(timer.current);
       if (!mounted.current || document.hidden) return;
-      const active = Object.values(current.current?.sync || {}).some(
-        (s) => s.running,
-      );
+      const active = [
+        ...Object.values(current.current?.sync || {}),
+        ...Object.values(current.current?.tagSync || {}),
+      ].some((s) => s.running);
       timer.current = setTimeout(
         poll,
         active ? 3000 : current.current?.authenticated ? 30000 : 60000,

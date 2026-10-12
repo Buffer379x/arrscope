@@ -19,6 +19,7 @@ func (s *Store) Recognition() RecognitionConfig {
 	return s.recognition.Config()
 }
 func reparseFile(f *File, engine *RecognitionEngine) {
+	f.comparisonEngine = engine
 	if f.RecognitionRevision == engine.config.Revision {
 		return
 	}

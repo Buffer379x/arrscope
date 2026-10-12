@@ -227,6 +227,7 @@ type APIInfo struct {
 
 func Enrich(f *File, api APIInfo) { EnrichWithRules(f, api, defaultRecognitionEngine) }
 func EnrichWithRules(f *File, api APIInfo, engine *RecognitionEngine) {
+	f.comparisonEngine = engine
 	f.APIInfo = &api
 	result := engine.Recognize(f.Filename)
 	f.RecognizedCustom = nil
@@ -259,6 +260,9 @@ func EnrichWithRules(f *File, api APIInfo, engine *RecognitionEngine) {
 			e.Origin = "unknown"
 		}
 		e.Conflict = n != "" && a != "" && n != a
+		if k == "audio" {
+			e.Conflict = n != "" && a != "" && !engine.containsAudio(a, n, result.Matches[k])
+		}
 		if k == "codec" {
 			e.Conflict = n != "" && a != "" && family(n) != family(a)
 		}

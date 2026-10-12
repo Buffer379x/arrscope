@@ -45,6 +45,7 @@ export function SystemInfo({
       <div class="system-services">
         {(["radarr", "sonarr"] as const).map((service) => {
           const sync = status.sync?.[service];
+          const tags = status.tagSync?.[service];
           return (
             <article key={service}>
               <h4>{service === "radarr" ? "Radarr" : "Sonarr"}</h4>
@@ -80,6 +81,30 @@ export function SystemInfo({
               </button>
               {sync?.running && (
                 <progress aria-label={t("Sync in progress …")} />
+              )}
+              {(Object.values(settings[service].tagSync || {}).some(Boolean) ||
+                tags?.running ||
+                tags?.pending ||
+                tags?.error) && (
+                <div class="tag-sync-status">
+                  <b>{t("Tag synchronization")}</b>
+                  <p class={tags?.error ? "error" : "quiet"}>
+                    {tags?.error
+                      ? t(tags.error)
+                      : tags?.running
+                        ? t("Tag synchronization in progress …")
+                        : tags?.pending
+                          ? t("Tag synchronization pending …")
+                          : t("Last sync: {date}", {
+                              date: date(tags?.lastSuccess),
+                            })}
+                  </p>
+                  {tags?.running && (
+                    <progress
+                      aria-label={t("Tag synchronization in progress …")}
+                    />
+                  )}
+                </div>
               )}
               {sync?.error && sync.lastSuccess && (
                 <p class="quiet">

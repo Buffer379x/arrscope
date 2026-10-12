@@ -48,7 +48,7 @@ func ValidateConfig(c ServiceConfig) error {
 	return nil
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
-	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true}
+	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "tag": true}
 	if !allowed[path] {
 		return errors.New("API endpoint is not allowed")
 	}
@@ -60,7 +60,8 @@ func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any)
 	return c.readJSON(ctx, u, "X-Api-Key", out)
 }
 
-// All integrations share GET-only requests, timeout, bounded retries and header authentication.
+// Catalog and Emby reads share GET-only requests, timeouts, bounded retries and header authentication.
+// Optional outbound tag mutations have a separate strict allowlist.
 func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, out any) error {
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {

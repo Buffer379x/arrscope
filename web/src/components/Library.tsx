@@ -3,6 +3,7 @@ import { CustomBulk } from "./CustomBulk";
 import type { CustomTag } from "../types";
 import { t, useI18n } from "../i18n";
 import {
+  RotateCcw,
   AlertTriangle,
   OctagonAlert,
   ArrowDown,
@@ -910,14 +911,24 @@ export function Library({
                                 )}
                           </p>
                           <button
-                            class="button"
+                            class={active.length ? "icon-button" : "button"}
+                            title={
+                              active.length ? t("Reset filters") : undefined
+                            }
+                            aria-label={
+                              active.length
+                                ? t("Reset filters")
+                                : t("Open settings")
+                            }
                             onClick={
                               active.length ? reset : () => openSettings()
                             }
                           >
-                            {active.length
-                              ? t("Reset filters")
-                              : t("Open settings")}
+                            {active.length ? (
+                              <RotateCcw size={16} />
+                            ) : (
+                              t("Open settings")
+                            )}
                           </button>
                         </div>
                       )}
