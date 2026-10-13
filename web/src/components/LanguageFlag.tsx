@@ -1,4 +1,5 @@
-import { Tag } from "../ui";
+import { TagColors, TagVisibility, TagInformation } from "../ui";
+import { useContext } from "preact/hooks";
 import { Languages } from "lucide-preact";
 import { t, useI18n } from "../i18n";
 import { audioLanguage, audioLanguageKey } from "../languages";
@@ -17,26 +18,42 @@ const vertical: Record<string, string[]> = {
 export function LanguageFlag({
   value,
   focusable = true,
-  tagged = true,
+  colors,
 }: {
   value: string;
   focusable?: boolean;
-  tagged?: boolean;
+  colors?: Record<string, string>;
 }) {
   useI18n();
   const language = audioLanguage(value),
     label = t(audioLanguageKey(value));
   const flag = language?.flag;
+  const inherited = useContext(TagColors),
+    visibility = useContext(TagVisibility),
+    information = useContext(TagInformation);
+  const enabled =
+    !(information.language || []).includes(value) &&
+    (!visibility ||
+      !Object.hasOwn(visibility, "language") ||
+      (visibility.language || []).includes(value));
+  const color = (colors || inherited)["language:" + value];
+  const edge =
+    flag && enabled && /^#[0-9a-f]{6}$/i.test(color || "") ? color : undefined;
   const renderedFlag = (
     <span
-      class="language-flag"
+      class={"language-flag" + (flag ? " known-language" : "")}
       role="img"
       aria-label={label}
       title={label}
       tabIndex={focusable ? 0 : undefined}
     >
       {flag ? (
-        <svg viewBox="0 0 30 20" aria-hidden="true" focusable="false">
+        <svg
+          viewBox="0 0 30 20"
+          aria-hidden="true"
+          focusable="false"
+          style={edge ? { boxShadow: `0 0 0 1px ${edge}` } : undefined}
+        >
           {horizontal[flag]?.map((color, i, colors) => (
             <rect
               key={i}
@@ -95,13 +112,7 @@ export function LanguageFlag({
       </span>
     </span>
   );
-  return tagged ? (
-    <Tag kind="language" value={value}>
-      {renderedFlag}
-    </Tag>
-  ) : (
-    renderedFlag
-  );
+  return renderedFlag;
 }
 export function LanguageFlags({ value }: { value: string }) {
   useI18n();

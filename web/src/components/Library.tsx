@@ -906,7 +906,6 @@ export function Library({
                                           title={tag.name}
                                         />
                                       ))}
-                                      {!f.custom?.length && "—"}
                                     </div>
                                   </td>
                                 ),

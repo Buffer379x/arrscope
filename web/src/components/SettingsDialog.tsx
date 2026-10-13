@@ -23,7 +23,6 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpRight,
-  Pencil,
   Check,
   Database,
   Film,
@@ -188,14 +187,8 @@ export function SettingsDialog({
       setSyncing((current) => ({ ...current, [service]: false }));
     }
   };
-  const colorValues = [
-    ...new Set([
-      ...(recognized[colorField] || []),
-      ...Object.keys({ ...cfg.tagColors, ...cfg.tagTextColors })
-        .filter((k) => k.startsWith(colorField + ":"))
-        .map((k) => k.slice(colorField.length + 1)),
-    ]),
-  ].sort();
+  // Stored overrides are retained for reactivation but never resurrect inactive values.
+  const colorValues = [...new Set(recognized[colorField] || [])].sort();
   const setColor = (key: string, color?: string) => {
     setCfg((current) => {
       const colors = { ...current.tagColors };
@@ -329,7 +322,7 @@ export function SettingsDialog({
             ["connections", t("Services")],
             ["appearance", t("Display")],
             ["custom", t("Custom tags")],
-            ["recognition", t("Filename recognition")],
+            ["recognition", t("Tag rules")],
             ["system", t("System")],
           ].map(([value, label]) => (
             <button
@@ -595,47 +588,6 @@ export function SettingsDialog({
                               service:
                                 service === "radarr" ? "Radarr" : "Sonarr",
                             })}
-                            {Object.values(cfg[service].tagSync || {}).some(
-                              Boolean,
-                            ) && (
-                              <button
-                                type="button"
-                                class="icon-button"
-                                disabled={demo || busy}
-                                aria-label={t(
-                                  "Configure tag handling for {service}",
-                                  {
-                                    service:
-                                      service === "radarr"
-                                        ? "Radarr"
-                                        : "Sonarr",
-                                  },
-                                )}
-                                title={t(
-                                  "Configure tag handling for {service}",
-                                  {
-                                    service:
-                                      service === "radarr"
-                                        ? "Radarr"
-                                        : "Sonarr",
-                                  },
-                                )}
-                                onClick={() =>
-                                  setTagChanges([
-                                    {
-                                      ...tagTransition(
-                                        service as Service,
-                                        settings[service],
-                                        cfg[service],
-                                      ),
-                                      needsMode: true,
-                                    },
-                                  ])
-                                }
-                              >
-                                <Pencil size={15} />
-                              </button>
-                            )}
                           </h4>
                           <p class="quiet">
                             {t(
@@ -1026,123 +978,131 @@ export function SettingsDialog({
                       </tr>
                     </thead>
                     <tbody>
-                      {colorValues.map((value) => {
-                        const key = colorField + ":" + value;
-                        const label =
-                          value === "__unknown__"
-                            ? t("Unknown")
-                            : colorField === "language"
-                              ? t(audioLanguageKey(value))
-                              : colorField === "custom"
-                                ? customTags.find(
-                                    (tag) => String(tag.id) === value,
-                                  )?.name || value
-                                : value;
-                        return (
-                          <tr>
-                            <td>
-                              <Tag
-                                kind={colorField}
-                                value={value === "__unknown__" ? "" : value}
-                                colors={cfg.tagColors || {}}
-                                textColors={cfg.tagTextColors || {}}
-                              >
+                      {colorValues
+                        .filter(
+                          (value) =>
+                            colorField !== "language" ||
+                            value !== "__unknown__",
+                        )
+                        .map((value) => {
+                          const key = colorField + ":" + value;
+                          const label =
+                            value === "__unknown__"
+                              ? t("Unknown")
+                              : colorField === "language"
+                                ? t(audioLanguageKey(value))
+                                : colorField === "custom"
+                                  ? customTags.find(
+                                      (tag) => String(tag.id) === value,
+                                    )?.name || value
+                                  : value;
+                          return (
+                            <tr>
+                              <td>
                                 {colorField === "language" ? (
-                                  <LanguageFlag tagged={false}
-                                    value={value === "__unknown__" ? "" : value}
+                                  <LanguageFlag
+                                    value={value}
+                                    colors={cfg.tagColors || {}}
                                   />
-                                ) : undefined}
-                              </Tag>
-                            </td>
-                            <td>
-                              <input
-                                type="color"
-                                aria-label={t("Color for {value}", {
-                                  value: label,
-                                })}
-                                value={
-                                  cfg.tagColors?.[key] ||
-                                  defaultColor(colorField, value)
-                                }
-                                onInput={(e) =>
-                                  setColor(key, e.currentTarget.value)
-                                }
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                class="icon-button tag-text-color color-action"
-                                aria-label={
-                                  t("Text color for {value}", {
+                                ) : (
+                                  <Tag
+                                    kind={colorField}
+                                    value={value === "__unknown__" ? "" : value}
+                                    colors={cfg.tagColors || {}}
+                                    textColors={cfg.tagTextColors || {}}
+                                  ></Tag>
+                                )}
+                              </td>
+                              <td>
+                                <input
+                                  type="color"
+                                  aria-label={t("Color for {value}", {
                                     value: label,
-                                  }) +
-                                  ": " +
-                                  t(
+                                  })}
+                                  value={
+                                    cfg.tagColors?.[key] ||
+                                    defaultColor(colorField, value)
+                                  }
+                                  onInput={(e) =>
+                                    setColor(key, e.currentTarget.value)
+                                  }
+                                />
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  class="icon-button tag-text-color color-action"
+                                  disabled={colorField === "language"}
+                                  aria-label={
+                                    t("Text color for {value}", {
+                                      value: label,
+                                    }) +
+                                    ": " +
+                                    t(
+                                      cfg.tagTextColors?.[key] === "#000000"
+                                        ? "Black"
+                                        : cfg.tagTextColors?.[key] === "#ffffff"
+                                          ? "White"
+                                          : "Automatic",
+                                    )
+                                  }
+                                  title={t(
                                     cfg.tagTextColors?.[key] === "#000000"
                                       ? "Black"
                                       : cfg.tagTextColors?.[key] === "#ffffff"
                                         ? "White"
                                         : "Automatic",
-                                  )
-                                }
-                                title={t(
-                                  cfg.tagTextColors?.[key] === "#000000"
-                                    ? "Black"
-                                    : cfg.tagTextColors?.[key] === "#ffffff"
-                                      ? "White"
-                                      : "Automatic",
-                                )}
-                                onClick={() =>
-                                  setTextColor(
-                                    key,
-                                    cfg.tagTextColors?.[key] === "#000000"
-                                      ? "#ffffff"
-                                      : cfg.tagTextColors?.[key] === "#ffffff"
-                                        ? ""
-                                        : "#000000",
-                                  )
-                                }
-                              >
-                                <span>A</span>
-                                <span aria-hidden="true">
-                                  {cfg.tagTextColors?.[key] === "#000000"
-                                    ? "●"
-                                    : cfg.tagTextColors?.[key] === "#ffffff"
-                                      ? "○"
-                                      : "◐"}
-                                </span>
-                              </button>
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                class="icon-button color-action"
-                                disabled={
-                                  !cfg.tagColors?.[key] &&
-                                  !cfg.tagTextColors?.[key]
-                                }
-                                onClick={() => {
-                                  if (
-                                    confirm(
-                                      t(
-                                        "Reset background and text colors for {value}?",
-                                        { value: label },
-                                      ),
+                                  )}
+                                  onClick={() =>
+                                    setTextColor(
+                                      key,
+                                      cfg.tagTextColors?.[key] === "#000000"
+                                        ? "#ffffff"
+                                        : cfg.tagTextColors?.[key] === "#ffffff"
+                                          ? ""
+                                          : "#000000",
                                     )
-                                  )
-                                    setColor(key);
-                                }}
-                                aria-label={t("Default color for {value}", {
-                                  value: label,
-                                })}
-                              >
-                                <RotateCcw size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                  }
+                                >
+                                  <span>A</span>
+                                  <span aria-hidden="true">
+                                    {cfg.tagTextColors?.[key] === "#000000"
+                                      ? "●"
+                                      : cfg.tagTextColors?.[key] === "#ffffff"
+                                        ? "○"
+                                        : "◐"}
+                                  </span>
+                                </button>
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  class="icon-button color-action"
+                                  disabled={
+                                    !cfg.tagColors?.[key] &&
+                                    !cfg.tagTextColors?.[key]
+                                  }
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        t(
+                                          "Reset background and text colors for {value}?",
+                                          { value: label },
+                                        ),
+                                      )
+                                    )
+                                      setColor(key);
+                                  }}
+                                  aria-label={t("Default color for {value}", {
+                                    value: label,
+                                  })}
+                                >
+                                  <RotateCcw size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>

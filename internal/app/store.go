@@ -44,7 +44,7 @@ func OpenStore(dir string) (*Store, error) {
 			}
 		}
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
+	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_txlock=immediate&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=soft_heap_limit(16777216)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 9 {
+	if version > 10 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -324,6 +324,55 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(e)
 		}
 	}
+	if originalVersion < 10 {
+		if originalVersion == 9 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		var cfg RecognitionConfig
+		loaded := s.Get("recognition", &cfg) == nil
+		rules, changed := upgradeRules054(cfg.Rules)
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if loaded && changed {
+			var engine *RecognitionEngine
+			engine, e = CompileRecognition(rules)
+			if e == nil {
+				raw, _ := json.Marshal(engine.Config())
+				_, e = tx.Exec("UPDATE kv SET value=? WHERE key='recognition'", string(raw))
+			}
+			if e == nil {
+				e = reparseCached(context.Background(), tx, engine)
+			}
+			if e == nil {
+				var settings Settings
+				if s.Get("settings", &settings) == nil {
+					for service, config := range map[string]ServiceConfig{"radarr": settings.Radarr, "sonarr": settings.Sonarr} {
+						if config.TagSync.Active() {
+							_, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?, 'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", "tagSyncDirty:"+service)
+							if e != nil {
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		if e == nil {
+			_, e = tx.Exec("PRAGMA user_version=10")
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
+
 	var recognition RecognitionConfig
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.

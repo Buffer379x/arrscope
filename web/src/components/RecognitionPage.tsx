@@ -1,4 +1,5 @@
 import { confirmDeletion, confirmReset } from "../confirmation";
+import { mergeRuleDraft, sameRuleDraft } from "../rule-draft";
 import { matchesRuleSearch } from "../rule-search";
 import { newRuleID } from "../rule-id";
 import { notify } from "../notifications";
@@ -45,7 +46,7 @@ const modes = {
 const columns: [keyof RecognitionRule, string][] = [
   ["priority", "Priority"],
   ["enabled", "Enabled"],
-  ["tag", "Tag"],
+  ["tag", "Tag color"],
   ["name", "Name"],
   ["field", "Attribute"],
   ["match", "Match type"],
@@ -82,19 +83,18 @@ export function RecognitionPage({
       setNotice("");
     }
   }, [notice]);
-  const dirty =
-    !!config && JSON.stringify(rules) !== JSON.stringify(config.rules);
+  const dirty = !!config && !sameRuleDraft(rules, config.rules);
   useEffect(() => {
-    onDirty(dirty);
+    onDirty(dirty || busy);
     const warn = (e: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty || busy) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [dirty, busy]);
   useEffect(() => () => onDirty(false), []);
   const load = async () => {
     try {
@@ -114,12 +114,11 @@ export function RecognitionPage({
   useEffect(() => {
     void load();
   }, []);
-  const change = async (next: RecognitionRule[]) => {
+  const change = async (next: RecognitionRule[], draft = next) => {
     if (!config || busy) return false;
-    const previous = config.rules;
+    const previous = rules;
     setBusy(true);
-    onDirty(true);
-    setRules(next);
+    setRules(draft);
     setPreview(null);
     try {
       const current = await api<RecognitionConfig>("recognition", "PUT", {
@@ -127,9 +126,13 @@ export function RecognitionPage({
         revision: config.revision,
       });
       setConfig(current);
-      setRules(current.rules);
+      setRules(mergeRuleDraft(next, draft, current.rules));
       notify(t("Rules saved. Cached filenames have been reprocessed."));
-      await saved();
+      try {
+        await saved();
+      } catch (e) {
+        setError((e as Error).message);
+      }
       return true;
     } catch (e) {
       setRules(previous);
@@ -137,14 +140,13 @@ export function RecognitionPage({
       return false;
     } finally {
       setBusy(false);
-      onDirty(false);
     }
   };
   const filtered = rules.filter((rule) =>
     matchesRuleSearch(ruleSearch, [
       String(rule.priority),
       t(rule.enabled ? "Enabled" : "Disabled"),
-      t(rule.tag !== false ? "Tag" : "Information only"),
+      t(rule.tag !== false ? "Tag color" : "Default presentation"),
       rule.name,
       labels[rule.field],
       t(rule.match === "token" ? "Token" : "Regular expression"),
@@ -179,7 +181,16 @@ export function RecognitionPage({
   return (
     <section class="recognition-page">
       <header class="settings-section-heading">
-        <h2>{t("Filename recognition")}</h2>
+        <h2>{t("Tag rules")}</h2>
+        <button
+          type="button"
+          class="primary"
+          disabled={!config || busy || !dirty}
+          onClick={() => void change(rules)}
+        >
+          {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}{" "}
+          {t("Save settings")}
+        </button>
         <p class="quiet">
           {t(
             "Rules only read filenames. API metadata fills remaining gaps; Emby audio tracks stay separate. No media scans are triggered.",
@@ -227,7 +238,7 @@ export function RecognitionPage({
           </p>
           <p class="quiet">
             {t(
-              "Tag controls presentation and colors. Recognition, filters and outbound categories remain independent.",
+              "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.",
             )}
           </p>
           <div class="recognition-actions">
@@ -273,7 +284,7 @@ export function RecognitionPage({
                 disabled={busy || !defaults}
                 onClick={async () => {
                   if (
-                    await confirmDeletion(
+                    await confirmReset(
                       t("Restore all default recognition rules?"),
                     )
                   )
@@ -339,7 +350,7 @@ export function RecognitionPage({
                         checked={rule.enabled}
                         disabled={busy}
                         onChange={(e) =>
-                          change(
+                          setRules(
                             rules.map((r) =>
                               r.id === rule.id
                                 ? { ...r, enabled: e.currentTarget.checked }
@@ -354,11 +365,11 @@ export function RecognitionPage({
                         type="checkbox"
                         checked={rule.tag !== false}
                         disabled={busy}
-                        aria-label={t("Show as tag: {name}", {
+                        aria-label={t("Use tag color: {name}", {
                           name: rule.name,
                         })}
                         onChange={(e) =>
-                          void change(
+                          void setRules(
                             rules.map((r) =>
                               r.id === rule.id
                                 ? { ...r, tag: e.currentTarget.checked }
@@ -413,7 +424,10 @@ export function RecognitionPage({
                                 t("Delete rule {name}?", { name: rule.name }),
                               )
                             )
-                              change(rules.filter((r) => r.id !== rule.id));
+                              change(
+                                config!.rules.filter((r) => r.id !== rule.id),
+                                rules.filter((r) => r.id !== rule.id),
+                              );
                           }}
                         >
                           <Trash2 size={15} />
@@ -445,7 +459,7 @@ export function RecognitionPage({
             <h2>{t("Preview filename")}</h2>
             <p class="quiet">
               {t(
-                "Preview uses saved rules and the filename only. API and Emby enrichment is not included.",
+                "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.",
               )}
             </p>
             <form
@@ -555,6 +569,9 @@ export function RecognitionPage({
           }}
           save={async (rule) => {
             const ok = await change(
+              config!.rules.some((r) => r.id === rule.id)
+                ? config!.rules.map((r) => (r.id === rule.id ? rule : r))
+                : [...config!.rules, rule],
               rules.some((r) => r.id === rule.id)
                 ? rules.map((r) => (r.id === rule.id ? rule : r))
                 : [...rules, rule],
