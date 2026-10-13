@@ -114,4 +114,43 @@
   border-radius: 7px;
 }
 
-.flag-tooltip { width:max-content; max-width:min(340px, calc(100vw - 32px)); white-space:normal; overflow-wrap:anywhere; }
+.flag-tooltip {
+  width: max-content;
+  max-width: min(340px, calc(100vw - 32px));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Info is an independently configurable action column; it does not sort data. */
+.info-cell {
+  white-space: nowrap;
+  width: 1%;
+}
+.info-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 29px;
+}
+.row-icon.info-action {
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel2);
+  text-decoration: none;
+  position: relative;
+}
+.info-action:hover:not(:disabled),
+.info-action:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.info-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.info-warning:hover {
+  background: var(--panel);
+}

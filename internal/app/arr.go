@@ -49,7 +49,7 @@ func ValidateConfig(c ServiceConfig) error {
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
 	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "tag": true, "tag/detail": true}
-	if !allowed[path] && !positiveTagPath(path, "tag/detail/") {
+	if !allowed[path] && !positiveTagPath(path, "tag/detail/") && !positiveTagPath(path, "movie/") && !positiveTagPath(path, "series/") {
 		return errors.New("API endpoint is not allowed")
 	}
 	u, e := url.Parse(strings.TrimRight(c.Base, "/") + "/api/v3/" + path)
@@ -214,9 +214,11 @@ func (c *ArrClient) Fetch(ctx context.Context, service string) ([]File, error) {
 }
 func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 	var movies []struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
-		Year  int    `json:"year"`
+		ID        int    `json:"id"`
+		Title     string `json:"title"`
+		Year      int    `json:"year"`
+		TitleSlug string `json:"titleSlug"`
+		TMDBID    int    `json:"tmdbId"`
 	}
 	if e := c.get(ctx, "movie", url.Values{"excludeLocalCovers": {"true"}}, &movies); e != nil {
 		return nil, e
@@ -224,6 +226,7 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 	index := map[int]struct {
 		title string
 		year  int
+		slug  string
 	}{}
 	for _, m := range movies {
 		if m.ID <= 0 || m.Title == "" {
@@ -235,7 +238,8 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 		index[m.ID] = struct {
 			title string
 			year  int
-		}{m.Title, m.Year}
+			slug  string
+		}{m.Title, m.Year, movieSlug(m.TitleSlug, m.TMDBID)}
 	}
 	out := make([]File, 0, len(movies))
 	seenFiles := map[int]bool{}
@@ -263,7 +267,7 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 			if !ok {
 				return nil, errors.New("Movie mapping changed during sync; sync again")
 			}
-			f := File{ID: a.ID, Service: "radarr", MediaID: a.MovieID, Title: m.title, Filename: basename(a), SourcePath: a.Path, Size: a.Size, Years: []int{}, Episodes: []Episode{}}
+			f := File{ID: a.ID, Service: "radarr", MediaID: a.MovieID, TitleSlug: m.slug, Title: m.title, Filename: basename(a), SourcePath: a.Path, Size: a.Size, Years: []int{}, Episodes: []Episode{}}
 			if m.year > 0 {
 				f.Years = []int{m.year}
 			}
@@ -276,8 +280,9 @@ func (c *ArrClient) movies(ctx context.Context) ([]File, error) {
 }
 func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 	var series []struct {
-		ID    int    `json:"id"`
-		Title string `json:"title"`
+		ID        int    `json:"id"`
+		Title     string `json:"title"`
+		TitleSlug string `json:"titleSlug"`
 	}
 	if e := c.get(ctx, "series", nil, &series); e != nil {
 		return nil, e
@@ -336,7 +341,7 @@ func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 			if eps == nil {
 				eps = []Episode{}
 			}
-			f := File{ID: a.ID, Service: "sonarr", MediaID: s.ID, Title: title, Series: s.Title, Season: a.Season, Episodes: eps, Years: years, Filename: basename(a), SourcePath: a.Path, Size: a.Size}
+			f := File{ID: a.ID, Service: "sonarr", MediaID: s.ID, TitleSlug: safeTitleSlug(s.TitleSlug), Title: title, Series: s.Title, Season: a.Season, Episodes: eps, Years: years, Filename: basename(a), SourcePath: a.Path, Size: a.Size}
 			a.MediaInfo.Quality = a.Quality.Quality.Name
 			Enrich(&f, a.MediaInfo)
 			out = append(out, f)

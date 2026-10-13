@@ -21,6 +21,7 @@ export const labels: Record<string, string> = translatedLabels({
   custom: "Custom",
 });
 export const tableColumns = [
+  ["info", "Info"],
   ["title", "Title / episode"],
   ["year", "Year"],
   ["resolution", "Resolution"],
@@ -55,6 +56,7 @@ export type FilterUpdate = string[] | ((current: string[]) => string[]);
 export const defaultColumnOrder = tableColumns.map(([field]) => field);
 export const columnLabels = translatedLabels(Object.fromEntries(tableColumns));
 export const defaultColumns = [
+  "info",
   "title",
   "year",
   "resolution",

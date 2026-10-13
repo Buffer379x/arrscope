@@ -1,3 +1,4 @@
+import { ListLayoutSettings } from "./ListLayoutSettings";
 import { interfaceThemes, themeLabels } from "../themes";
 import { audioLanguageLabel } from "../languages";
 import { LanguageFlag } from "./LanguageFlag";
@@ -744,6 +745,10 @@ export function SettingsDialog({
                   )}
                 </small>
               </section>
+              <ListLayoutSettings
+                settings={cfg}
+                changed={(next) => setCfg(next)}
+              />
               <section class="connection">
                 <h3 class="card-title">{t("Default columns")}</h3>
                 <p class="quiet">

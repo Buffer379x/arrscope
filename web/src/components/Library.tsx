@@ -1,3 +1,4 @@
+import { RowInfo } from "./RowInfo";
 import { applyInterfaceTheme } from "../themes";
 import { TagInformation, TagVisibility } from "../ui";
 import { confirmDeletion } from "../confirmation";
@@ -8,8 +9,6 @@ import { t, useI18n } from "../i18n";
 import {
   Tag as TagIcon,
   RotateCcw,
-  AlertTriangle,
-  OctagonAlert,
   ArrowDown,
   ArrowDownUp,
   ArrowLeft,
@@ -21,7 +20,6 @@ import {
   Columns3,
   Database,
   Download,
-  FileVideo2,
   Film,
   Info,
   Layers,
@@ -411,7 +409,7 @@ export function Library({
         scope="col"
         class={titleCell ? "title-cell" : undefined}
         aria-sort={
-          service === "radarr"
+          service === "radarr" && field !== "info"
             ? current
               ? movieSort.direction === "asc"
                 ? "ascending"
@@ -420,7 +418,7 @@ export function Library({
             : undefined
         }
       >
-        {service === "radarr" ? (
+        {service === "radarr" && field !== "info" ? (
           <button
             class={"column-sort" + (current ? " current" : "")}
             onClick={() => sortColumn(field)}
@@ -752,67 +750,7 @@ export function Library({
                                 title: (
                                   <td key="title" class="title-cell">
                                     <div class="title-line">
-                                      <button
-                                        class="row-icon file-button"
-                                        aria-label={t(
-                                          "Filename and metadata: {title}",
-                                          { title: f.title },
-                                        )}
-                                        aria-describedby={"filename-" + f.id}
-                                        onClick={() => setFilename(f)}
-                                      >
-                                        {service === "radarr" ? (
-                                          <Film size={15} />
-                                        ) : (
-                                          <FileVideo2 size={15} />
-                                        )}
-                                        <span
-                                          class="filename-tooltip"
-                                          role="tooltip"
-                                          id={"filename-" + f.id}
-                                        >
-                                          {f.filename}
-                                        </span>
-                                      </button>
                                       <b>{f.title}</b>
-                                      {f.conflict && (
-                                        <button
-                                          class="conflict-button"
-                                          title={t("Metadata disagreement")}
-                                          style={{
-                                            color:
-                                              settings?.warningColors
-                                                .metadata ||
-                                              defaultWarningColors.metadata,
-                                          }}
-                                          aria-label={t(
-                                            "Show conflicting metadata",
-                                          )}
-                                          onClick={() => setFilename(f)}
-                                        >
-                                          <AlertTriangle size={14} />
-                                        </button>
-                                      )}
-                                      {f.ruleConflict && (
-                                        <button
-                                          class="conflict-button"
-                                          style={{
-                                            color:
-                                              settings?.warningColors
-                                                .recognition ||
-                                              defaultWarningColors.recognition,
-                                          }}
-                                          title={t(
-                                            "Conflicting recognition rules",
-                                          )}
-                                          aria-label={t(
-                                            "Show recognition conflicts",
-                                          )}
-                                          onClick={() => setFilename(f)}
-                                        >
-                                          <OctagonAlert size={14} />
-                                        </button>
-                                      )}
                                     </div>
                                     {service === "sonarr" && (
                                       <small class="episode-filename">
@@ -826,6 +764,15 @@ export function Library({
                                         )}
                                       </small>
                                     )}
+                                  </td>
+                                ),
+                                info: (
+                                  <td key="info" class="info-cell">
+                                    <RowInfo
+                                      file={f}
+                                      settings={settings}
+                                      details={() => setFilename(f)}
+                                    />
                                   </td>
                                 ),
                                 year: (

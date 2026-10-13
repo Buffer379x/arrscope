@@ -655,6 +655,15 @@
     "Discard your unsaved rule changes?": "Discard your unsaved rule changes?",
     "Saving rule…": "Saving rule…",
     "Saving rule and updating the cached library. Keep this dialog open until saving completes.": "Saving rule and updating the cached library. Keep this dialog open until saving completes.",
-    "Names are saved when you press Enter or leave the field.": "Names are saved when you press Enter or leave the field."
+    "Names are saved when you press Enter or leave the field.": "Names are saved when you press Enter or leave the field.",
+    "Info": "Info",
+    "List display": "List display",
+    "Show link to Radarr / Sonarr entry": "Show link to Radarr / Sonarr entry",
+    "Show file details": "Show file details",
+    "Show metadata disagreement warning": "Show metadata disagreement warning",
+    "Show recognition conflict warning": "Show recognition conflict warning",
+    "Choose the icons in the Info column. Move them with the arrows to set their left-to-right order in both libraries. Warnings appear only for affected files.": "Choose the icons in the Info column. Move them with the arrows to set their left-to-right order in both libraries. Warnings appear only for affected files.",
+    "Open {service} entry in a new tab": "Open {service} entry in a new tab",
+    "Entry link unavailable. Configure the service and synchronize the library.": "Entry link unavailable. Configure the service and synchronize the library."
   }
 }

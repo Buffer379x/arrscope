@@ -313,7 +313,7 @@ func TestAudioColumnMigrationAndWarningColors(t *testing.T) {
 	if err := normalizeVisibleColumns(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(cfg.VisibleColumns["radarr"], ",") != "title,audio,resolution" || cfg.ColumnOrder["radarr"][9] != "audio" {
+	if strings.Join(cfg.VisibleColumns["radarr"], ",") != "title,audio,resolution" || cfg.ColumnOrder["radarr"][10] != "audio" {
 		t.Fatal(cfg)
 	}
 	cfg.WarningColors = map[string]string{"metadata": "#123456"}

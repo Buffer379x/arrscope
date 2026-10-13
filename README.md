@@ -18,7 +18,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Grouped TV seasons, specials and multi-episode files. Show only matching files or complete matching seasons with highlighted matches.
 - Dashboard counts and distributions by resolution, codec and source. Click a tag to select its value in the existing library filters. Selections remain unsaved unless you explicitly save a preset.
 - Optional Emby enrichment reads already available audio tracks. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
-- Persistent configurable columns, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers for sorting.
+- Persistent configurable columns and an Info action column with new-tab Radarr/Sonarr links, file details and warning icons. Saved icon visibility/order, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers for sorting.
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
 - A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.

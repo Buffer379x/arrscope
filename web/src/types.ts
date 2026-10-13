@@ -24,6 +24,8 @@ export type Connection = {
   interval: number;
 };
 export type Settings = {
+  listInfoOrder: string[];
+  listInfoVisible: string[];
   interfaceTheme: string;
   columnOrder: Record<Service, string[]>;
   visibleColumns: Record<Service, string[]>;
@@ -55,6 +57,7 @@ export type MediaFile = {
   id: number;
   service: Service;
   mediaId: number;
+  titleSlug?: string;
   title: string;
   series: string;
   season: number;
