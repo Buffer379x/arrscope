@@ -57,3 +57,5 @@ The sortable **Tag color** checkbox controls the matching value's presentation a
 Adding/editing, confirmed deletion and restore save atomically. Checkbox changes save together using the heading Save action. Cached evidence is reprocessed; failures restore the previous rule state, and revision conflicts reject stale edits. Preview uses the current draft.
 
 A token matches a fixed case-insensitive term at separator boundaries. A regular expression describes a pattern, such as `UHD[ ._-]+BluRay`, allowing alternate separators.
+
+The standalone UHD override excludes explicit WEB-DL, WEBRip, HDTV and DVD tokens. In `UHD.WEB-DL`, UHD is a quality indication and the known source remains WEB-DL. The exclusion expression is editable, and an existing user-defined exclusion is preserved during migration.

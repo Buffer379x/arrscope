@@ -44,7 +44,7 @@ func OpenStore(dir string) (*Store, error) {
 			}
 		}
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_txlock=immediate&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
+	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_txlock=immediate&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=soft_heap_limit(16777216)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,11 @@ func TestUHDStandaloneAndRegionalSourceOverride(t *testing.T) {
 		r := e.Recognize(name)
 		if r.Values["source"] != "UHD" || len(r.Conflicts) > 0 {
 			t.Fatal(name, r)
+		}
+	}
+	for name, want := range map[string]string{"Film.UHD.WEB-DL.mkv": "WEB-DL", "Film.UHD.WebRip.mkv": "WEBRip", "Film.UHD.DVD.mkv": "DVD"} {
+		if got := e.Recognize(name).Values["source"]; got != want {
+			t.Fatal(name, got)
 		}
 	}
 	if got := e.Recognize("Film.BluRay.mkv").Values["source"]; got != "BluRay" {
@@ -120,5 +126,30 @@ func TestRecognitionUpdateWaitsForSyncGate(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("write never resumed")
+	}
+}
+
+func TestRecognitionMemoryTargetRestoredAfterSuccessAndCancellation(t *testing.T) {
+	old := debug.SetMemoryLimit(40 << 20)
+	defer debug.SetMemoryLimit(old)
+	s := testStore(t)
+	cfg := s.Recognition()
+	rules := append([]RecognitionRule{}, cfg.Rules...)
+	rules[0].Enabled = !rules[0].Enabled
+	saved, e := s.SaveRecognition(context.Background(), rules, cfg.Revision)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if got := debug.SetMemoryLimit(-1); got != 40<<20 {
+		t.Fatal("caller target not restored", got)
+	}
+	rules[0].Enabled = !rules[0].Enabled
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, e = s.SaveRecognition(ctx, rules, saved.Revision); e == nil {
+		t.Fatal("canceled save accepted")
+	}
+	if got := debug.SetMemoryLimit(-1); got != 40<<20 {
+		t.Fatal("failed save changed caller target", got)
 	}
 }

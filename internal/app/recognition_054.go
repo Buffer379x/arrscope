@@ -9,6 +9,9 @@ func upgradeRules054(rules []RecognitionRule) ([]RecognitionRule, bool) {
 	for i, r := range next {
 		if r.ID == "default-source-uhd-bluray" && r.Field == "source" && r.Match == "regex" && r.Pattern == oldPattern && r.Value == "UHD" && r.Mode == "override" {
 			next[i].Pattern = uhdBluRayDefaultRule().Pattern
+			if r.Unless == "" {
+				next[i].Unless = uhdBluRayDefaultRule().Unless
+			}
 			if r.Name == "Source / UHD BluRay" {
 				next[i].Name = "Source / UHD"
 			}

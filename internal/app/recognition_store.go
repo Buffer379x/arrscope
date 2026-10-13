@@ -77,6 +77,8 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	if engine.config.Revision == revision {
 		return engine.Config(), nil
 	}
+	restoreMemory := recognitionMemoryBudget()
+	defer restoreMemory()
 	// Large syncs may leave reclaimable heap pages behind. Release them before
 	// SQLite's backup and reprocessing allocations, outside the request hot path.
 	debug.FreeOSMemory()
@@ -103,7 +105,21 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	s.invalidateAggregates()
 	return engine.Config(), nil
 }
+
+// Bulk cache work shares one process-level budget under the recognition mutex.
+// Nested calls respect an already smaller target; the outer caller restores it.
+func recognitionMemoryBudget() func() {
+	previous := debug.SetMemoryLimit(-1)
+	if previous <= 24<<20 {
+		return func() {}
+	}
+	debug.SetMemoryLimit(24 << 20)
+	return func() { debug.FreeOSMemory(); debug.SetMemoryLimit(previous) }
+}
+
 func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) error {
+	restoreMemory := recognitionMemoryBudget()
+	defer restoreMemory()
 	update, err := tx.PrepareContext(ctx, "UPDATE files SET resolution=?,codec=?,family=?,source=?,processing=?,hdr=?,bitDepth=?,audio=?,channels=?,language=?,conflict=?,rule_conflict=?,emby_match=?,data=? WHERE rowid=?")
 	if err != nil {
 		return err

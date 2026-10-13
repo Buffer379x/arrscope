@@ -150,7 +150,27 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
             rule = {'id':'stress-source','name':'Synthetic source override','field':'source','match':'token','pattern':'WEB-DL','value':'UHD','mode':'override','priority':1,'enabled':True,'consume':False}
             before_calls = Fixture.calls
             t = time.perf_counter()
-            updated = req('/api/recognition', {'rules':current['rules']+[rule], 'revision':current['revision']}, 'PUT', timeout=195)
+            # Sample the entire rewrite, not just the initial synchronization.
+            # The unchanged cgroup/OOM gates still account for helper processes.
+            sampling_done = threading.Event()
+            bulk_rss = [0.0]
+            def sample_bulk_rss():
+                while not sampling_done.is_set():
+                    try:
+                        value = re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status', check=False))
+                        if value: bulk_rss[0] = max(bulk_rss[0], int(value[1])/1024)
+                    except Exception:
+                        pass
+                    sampling_done.wait(0.25)
+            sampler = threading.Thread(target=sample_bulk_rss, daemon=True)
+            sampler.start()
+            try:
+                updated = req('/api/recognition', {'rules':current['rules']+[rule], 'revision':current['revision']}, 'PUT', timeout=195)
+            finally:
+                sampling_done.set()
+                sampler.join(timeout=5)
+                result['recognition_sampled_rss_peak_mib'] = round(bulk_rss[0],2)
+                result['sampled_app_rss_peak_mib'] = round(max(rss_peak, bulk_rss[0]),2)
             result['recognition_reprocess_ms'] = round((time.perf_counter()-t)*1000,3)
             assert updated['revision'] != current['revision']
             assert Fixture.calls == before_calls, 'Rule save contacted an upstream service'
