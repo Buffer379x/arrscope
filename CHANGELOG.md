@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.6.0
+
+Saved Default/Nordic/Catppuccin interface palettes in both modes; simplified status filters and accessible filter help; compact language color settings and bundled Turkish flags. No database schema migration. See [release notes](docs/releases/0.6.0.md).
+
 ## 0.5.4
 
 Fixed-size language flags without tag badges; Tag rules/Tag color naming; batched checkbox drafts with explicit Save and independent immediate CRUD; serialized cache reprocessing and immediate SQLite writes; standalone/regional UHD source recognition preserving custom rules; simpler tag-sync settings; clean empty Custom cells; host-compatible Unraid RAM parameters. Schema 10 makes a consistent backup. See [release notes](docs/releases/0.5.4.md).

@@ -1,6 +1,8 @@
+import { useState, useId } from "preact/hooks";
 import { t, useI18n } from "../i18n";
 import { audioLanguageKey } from "../languages";
 import {
+  CircleHelp,
   RotateCcw,
   Bookmark,
   ChevronDown,
@@ -51,6 +53,8 @@ export function FilterPanel({
   change,
 }: Props) {
   useI18n();
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
   return (
     <section
       class={"filter-panel filter-panel-v2" + (collapsed ? " collapsed" : "")}
@@ -223,7 +227,35 @@ export function FilterPanel({
             </div>
           </section>
           <section class="state-filters">
-            <h2>{t("Status and metadata quality")}</h2>
+            <div class="state-filter-heading">
+              <h2>{t("Status and metadata quality")}</h2>
+              <div
+                class={"filter-logic-help" + (helpOpen ? " open" : "")}
+                onMouseEnter={() => setHelpOpen(true)}
+                onMouseLeave={() => setHelpOpen(false)}
+              >
+                <button
+                  type="button"
+                  class="icon-button"
+                  aria-label={t("Filter logic")}
+                  onFocus={() => setHelpOpen(true)}
+                  aria-describedby={helpId}
+                  aria-expanded={helpOpen}
+                  onClick={() => setHelpOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setHelpOpen(false);
+                  }}
+                  onBlur={() => setHelpOpen(false)}
+                >
+                  <CircleHelp size={17} />
+                </button>
+                <p id={helpId} role="tooltip" class="filter-logic-tooltip">
+                  {t(
+                    "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
+                  )}
+                </p>
+              </div>
+            </div>
             <StateFilter
               name="conflict"
               label="Metadata disagreement"
@@ -256,7 +288,7 @@ export function FilterPanel({
               negative="matched"
               change={change}
             />
-            {["unknownYear", "unknownSize"].map((k) => (
+            {["unknownYear"].map((k) => (
               <label class="check-field">
                 <input
                   type="checkbox"
@@ -265,13 +297,10 @@ export function FilterPanel({
                     change(k, e.currentTarget.checked ? ["true"] : [])
                   }
                 />
-                {k === "unknownYear"
-                  ? t("Unknown year")
-                  : t("Unknown file size")}
+                {t("Unknown year")}
               </label>
             ))}
-            <details class="filter-detail">
-              <summary>{t("Detailed Emby status")}</summary>
+            <div class="emby-match-field">
               <label>
                 <span>{t("Emby matching")}</span>
                 <select
@@ -298,15 +327,7 @@ export function FilterPanel({
                   ))}
                 </select>
               </label>
-            </details>
-            <details class="filter-detail">
-              <summary>{t("Filter logic")}</summary>
-              <p class="filter-help">
-                {t(
-                  "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
-                )}
-              </p>
-            </details>
+            </div>
           </section>
         </div>
       )}

@@ -24,6 +24,7 @@ export type Connection = {
   interval: number;
 };
 export type Settings = {
+  interfaceTheme: string;
   columnOrder: Record<Service, string[]>;
   visibleColumns: Record<Service, string[]>;
   warningColors: Record<string, string>;

@@ -40,6 +40,7 @@ type ServiceConfig struct {
 	Interval       int       `json:"interval"`
 }
 type Settings struct {
+	InterfaceTheme string              `json:"interfaceTheme"`
 	WarningColors  map[string]string   `json:"warningColors"`
 	ColumnOrder    map[string][]string `json:"columnOrder"`
 	VisibleColumns map[string][]string `json:"visibleColumns"`
@@ -134,7 +135,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {

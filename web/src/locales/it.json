@@ -627,6 +627,11 @@
     "Default presentation": "Presentazione predefinita",
     "Use tag color: {name}": "Usa colore del tag: {name}",
     "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.": "Colore del tag controlla solo la presentazione. Tutti i valori riconosciuti restano tag per filtri e sincronizzazione. Le caselle si applicano con Salva impostazioni; aggiunta ed eliminazione si salvano subito.",
-    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "L’anteprima usa la bozza attuale delle regole e solo il nome del file. Non include dati API o Emby."
+    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "L’anteprima usa la bozza attuale delle regole e solo il nome del file. Non include dati API o Emby.",
+    "Interface theme": "Tema dell’interfaccia",
+    "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.": "Applicato dopo il salvataggio. Ogni tema supporta le modalità scura e chiara; layout e colori dei tag restano invariati.",
+    "Turkish": "Turco",
+    "Nordic": "Nordic",
+    "Catppuccin": "Catppuccin"
   }
 }

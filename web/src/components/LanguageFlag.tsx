@@ -74,6 +74,17 @@ export function LanguageFlag({
               fill={color}
             />
           ))}
+          {flag === "tr" && (
+            <>
+              <rect width="30" height="20" fill="#e30a17" />
+              <circle cx="11" cy="10" r="5" fill="#fff" />
+              <circle cx="12.5" cy="10" r="4" fill="#e30a17" />
+              <path
+                d="M18 6.5L18.9 8.8L21.4 9L19.5 10.6L20.1 13L18 11.6L15.9 13L16.5 10.6L14.6 9L17.1 8.8Z"
+                fill="#fff"
+              />
+            </>
+          )}
           {flag === "jp" && (
             <>
               <rect width="30" height="20" fill="#fff" />

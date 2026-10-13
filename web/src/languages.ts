@@ -1,6 +1,11 @@
 // Aliases are display-only. Never substitute these for stored API/filter values.
 export const audioLanguages = [
   {
+    name: "Turkish",
+    flag: "tr",
+    aliases: ["Turkish", "Türkisch", "Türkçe", "Turco", "tr", "tur"],
+  },
+  {
     name: "German",
     flag: "de",
     aliases: ["Deutsch", "German", "de", "deu", "ger"],

@@ -1,3 +1,4 @@
+import { applyInterfaceTheme } from "../themes";
 import { TagInformation, TagVisibility } from "../ui";
 import { confirmDeletion } from "../confirmation";
 import { notify } from "../notifications";
@@ -215,6 +216,13 @@ export function Library({
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("scopearr-theme", theme);
   }, [theme]);
+  useEffect(() => {
+    applyInterfaceTheme(
+      document.documentElement,
+      settings?.interfaceTheme,
+      theme,
+    );
+  }, [settings?.interfaceTheme, theme]);
   useEffect(() => {
     localStorage.setItem("scopearr-filter-collapsed", String(collapsed));
   }, [collapsed]);
