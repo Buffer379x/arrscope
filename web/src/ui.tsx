@@ -1,6 +1,6 @@
 import { getLocale, t, useI18n } from "./i18n";
 import { colorStyle } from "./color";
-import { createContext } from "preact";
+import { createContext, type ComponentChildren } from "preact";
 import { useContext } from "preact/hooks";
 import type { Results, Service } from "./types";
 const translatedLabels = <T extends Record<string, string>>(values: T): T =>
@@ -86,6 +86,10 @@ export const date = (s: string | null | undefined) =>
         minute: "2-digit",
       })
     : t("Not synced yet");
+export const TagVisibility = createContext<Record<string, string[]> | null>(
+  null,
+);
+export const TagInformation = createContext<Record<string, string[]>>({});
 export const TagColors = createContext<Record<string, string>>({});
 export const TagTextColors = createContext<Record<string, string>>({});
 export const CustomTagNames = createContext<Record<string, string>>({});
@@ -95,6 +99,9 @@ export const colorFields = [
   "source",
   "processing",
   "hdr",
+  "bitDepth",
+  "channels",
+  "language",
   "audio",
   "custom",
 ];
@@ -121,8 +128,12 @@ export function Tag({
   colors,
   textColors,
   label,
+  forceTag = false,
+  children,
 }: {
   label?: string;
+  forceTag?: boolean;
+  children?: ComponentChildren;
   colors?: Record<string, string>;
   textColors?: Record<string, string>;
   value: string;
@@ -130,20 +141,41 @@ export function Tag({
   title?: string;
 }) {
   useI18n();
+  const visibility = useContext(TagVisibility);
+  const information = useContext(TagInformation);
   const names = useContext(CustomTagNames);
   const inherited = useContext(TagColors);
   const inheritedText = useContext(TagTextColors);
   const key = kind.split(" ")[0] + ":" + (value || "__unknown__");
-  const color = (colors || inherited)[key];
+  const color =
+    (colors || inherited)[key] ||
+    (["bitDepth", "channels", "language"].includes(kind)
+      ? defaultColor(kind, value)
+      : undefined);
+  const isTag =
+    forceTag ||
+    (!(information[kind.split(" ")[0]] || []).includes(value) &&
+      (!visibility ||
+        !Object.hasOwn(visibility, kind.split(" ")[0]) ||
+        (visibility[kind.split(" ")[0]] || []).includes(
+          value || "__unknown__",
+        )));
   return (
     <span
-      style={colorStyle(color, (textColors || inheritedText)[key])}
-      class={"tag " + kind + (!value ? " unknown" : "")}
+      style={
+        isTag
+          ? colorStyle(color, (textColors || inheritedText)[key])
+          : undefined
+      }
+      class={
+        isTag ? "tag " + kind + (!value ? " unknown" : "") : "tag-info-only"
+      }
       title={title}
     >
-      {kind === "custom"
-        ? names[value] || label || value || t("Unknown")
-        : value || t("Unknown")}
+      {children ||
+        (kind === "custom"
+          ? names[value] || label || value || t("Unknown")
+          : value || t("Unknown"))}
     </span>
   );
 }

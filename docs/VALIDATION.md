@@ -47,3 +47,5 @@ Frontend dependency audit reported no known vulnerabilities. Go symbol analysis 
 [English 0.2.0 dashboard screenshot](screenshots/dashboard-0.2.0-en.png) uses synthetic demo data only.
 
 Version 0.3.0 adds configurable recognition, atomic cache reprocessing, separate conflict states, Emby matching filters and unique language statistics. See the [0.3.0 validation record](VALIDATION-0.3.0.md). The synthetic container check also verifies rule reprocessing without upstream requests and retention of per-track Emby data.
+
+See [0.5.3 validation](VALIDATION-0.5.3.md) for removal previews, rule presentation, schema 9 and the final container fixture.

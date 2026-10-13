@@ -1,6 +1,6 @@
 # Filename recognition
 
-Open **Settings → System → Manage recognition rules**. The page edits a draft. Preview uses the draft and the filename only; Radarr, Sonarr and Emby enrichment is not included in preview.
+Open **Settings → Filename recognition**. The rule editor previews its draft; the preview above the table uses saved rules. Both evaluate the filename only, without Radarr, Sonarr or Emby enrichment.
 
 ## Rule modes and priority
 
@@ -38,7 +38,7 @@ Audio rules also expose an optional comparison expression. The default DTS-famil
 
 ## Saving and data safety
 
-**Apply to draft** changes the draft only. **Restore defaults** also changes the draft only. **Save settings** validates all rules, creates a backup and commits rules and the recomputed cache in one transaction. Failed or cancelled saves preserve the previous state. A revision check prevents a stale browser from overwriting another session's changes.
+Confirming an add/edit dialog, a deletion or a reset saves immediately. Enabled/Tag checkbox changes also save immediately. Each change validates rules, creates a backup and commits rules and the recomputed cache in one transaction. Failed or cancelled changes preserve the previous state. A revision check prevents a stale browser from overwriting another session's changes.
 
 Cache reprocessing makes no upstream reads or media scans. If optional outbound tag synchronization is enabled, a successful save queues tag reconciliation separately. API traits stay separate from filename evidence. Previously matched Emby tracks and HDR data are replayed from the cache. A sync that finishes after an edit uses the current rules at commit time. Library filters, CSV, facets and statistics all use the updated cache.
 
@@ -47,3 +47,13 @@ Rules are stored in SQLite, not in the application image. New installations rece
 ## UHDBD source default
 
 Version 0.5.2 adds a specific UHDBD → UHD source override, so a broad BluRay token does not override the more specific disc notation. Resolution stays independent; add a fallback rule if UHDBD should also imply 2160p in your installation. Equivalent existing rules, including customized/disabled rules, are preserved during upgrade.
+
+## UHD BluRay and presentation
+
+The editable `Source / UHD BluRay` default recognizes `UHD.BluRay`, `UHD BluRay` and `UHD-BluRay` as source UHD before generic BluRay. It does not infer a video resolution. Customized/disabled equivalent rules are preserved on upgrade. Standard rule IDs remain unchanged while untouched generated names use a slash separator.
+
+The sortable **Tag** checkbox controls the matching value's presentation and color availability, independently of recognition, filters and outbound categories. A rule without Tag still provides plain column information. A different rule for the same value does not override that choice unless it also matches the file. Manual custom assignments remain explicit tags. Removed or information-only values are excluded from color choices; API data and filters remain available.
+
+Adding/editing, confirmed deletion, restore and checkbox changes save atomically without a second page-level Save button. Cached evidence is reprocessed; failures restore the previous rule state, and revision conflicts reject stale edits. Preview uses saved rules.
+
+A token matches a fixed case-insensitive term at separator boundaries. A regular expression describes a pattern, such as `UHD[ ._-]+BluRay`, allowing alternate separators.

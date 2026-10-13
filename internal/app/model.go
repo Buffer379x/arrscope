@@ -74,10 +74,12 @@ type AudioTrack struct {
 	Default       bool   `json:"default"`
 }
 type CustomTag struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	Manual bool   `json:"manual,omitempty"`
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
 }
 type File struct {
+	InformationOnly      map[string][]string `json:"informationOnly,omitempty"`
 	comparisonEngine     *RecognitionEngine
 	Custom               []CustomTag           `json:"custom"`
 	RecognizedCustom     []int64               `json:"recognizedCustom,omitempty"`
@@ -231,7 +233,7 @@ func validateTagColors(colors map[string]string) error {
 	}
 	for key, color := range colors {
 		field, value, ok := strings.Cut(key, ":")
-		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio" || field == "custom"
+		valid := field == "resolution" || field == "codec" || field == "source" || field == "processing" || field == "hdr" || field == "audio" || field == "custom" || field == "bitDepth" || field == "channels" || field == "language"
 		if !ok || !valid || value == "" || len(key) > 200 || !tagColorPattern.MatchString(color) {
 			return fmt.Errorf("Invalid tag color")
 		}

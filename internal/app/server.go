@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -217,7 +218,6 @@ func (s *Server) Handler() http.Handler {
 			}
 			s.Store.DB.Exec("DELETE FROM sessions WHERE token=?", hash)
 			http.SetCookie(w, &http.Cookie{Name: "scopearr_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
-			http.SetCookie(w, &http.Cookie{Name: "arrscope_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 			jsonOut(w, 200, map[string]bool{"ok": true})
 			return
 
@@ -379,6 +379,19 @@ func (s *Server) Handler() http.Handler {
 				jsonOut(w, 200, out)
 				return
 			}
+		case "/api/display-tags":
+			if r.Method == "GET" {
+				out, e := s.Store.DisplayTags(r.Context())
+				if e != nil {
+					failure(w, r, 500, e)
+				} else {
+					jsonOut(w, 200, out)
+				}
+				return
+			}
+		case "/api/tag-preview", "/api/tag-approval":
+			s.tagPreviewHTTP(w, r)
+			return
 		case "/api/settings":
 			if r.Method == "GET" {
 				cfg := s.Config()
@@ -390,11 +403,15 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 			if r.Method == "PUT" {
-				var cfg Settings
-				if e := decode(w, r, &cfg); e != nil {
+				var in struct {
+					Settings
+					TagApprovals map[string]string `json:"tagApprovals"`
+				}
+				if e := decode(w, r, &in); e != nil {
 					failure(w, r, 400, e)
 					return
 				}
+				cfg := in.Settings
 				if e := normalizeWarningColors(&cfg); e != nil {
 					failure(w, r, 400, e)
 					return
@@ -418,7 +435,58 @@ func (s *Server) Handler() http.Handler {
 					failure(w, r, 400, errors.New("Invalid TV view"))
 					return
 				}
+
+				base := s.Config()
+				var plans []*tagPlan
+				changed := cfg.Radarr.TagSync != base.Radarr.TagSync || cfg.Sonarr.TagSync != base.Sonarr.TagSync || cfg.Radarr.TagSyncMode != base.Radarr.TagSyncMode || cfg.Sonarr.TagSyncMode != base.Sonarr.TagSyncMode || cfg.Radarr.URL != base.Radarr.URL && cfg.Radarr.TagSync.Active() || cfg.Sonarr.URL != base.Sonarr.URL && cfg.Sonarr.TagSync.Active()
+				if changed {
+					_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(130 * time.Second))
+					ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+					defer cancel()
+					select {
+					case s.Sync.gate <- struct{}{}:
+						defer func() { <-s.Sync.gate }()
+					case <-ctx.Done():
+						failure(w, r, 503, errors.New("Sync is busy. Try again after it completes"))
+						return
+					}
+					for service, pair := range map[string][2]ServiceConfig{"radarr": {base.Radarr, cfg.Radarr}, "sonarr": {base.Sonarr, cfg.Sonarr}} {
+						before, next := pair[0], pair[1]
+						if before.TagSync == next.TagSync && before.TagSyncMode == next.TagSyncMode && before.URL == next.URL {
+							continue
+						}
+						if e := mergeConnection(&next, before); e != nil {
+							failure(w, r, 400, e)
+							return
+						}
+						if e := validateTagPolicy(before, next); e != nil {
+							failure(w, r, 400, e)
+							return
+						}
+						plan, e := s.Store.BuildTagPlan(ctx, service, next, &before)
+						if e != nil {
+							failure(w, r, 400, e)
+							return
+						}
+						if plan.Waiting {
+							failure(w, r, 409, errors.New("Synchronize file data before reviewing outbound tags"))
+							return
+						}
+						if len(plan.Preview.Rows) > 0 {
+							if in.TagApprovals[service] != plan.Preview.Token {
+								failure(w, r, 409, ErrTagPreviewChanged)
+								return
+							}
+							plans = append(plans, plan)
+						}
+					}
+				}
 				s.mu.Lock()
+				if changed && !reflect.DeepEqual(s.settings, base) {
+					s.mu.Unlock()
+					failure(w, r, 409, ErrTagPreviewChanged)
+					return
+				}
 				old := s.settings
 				for i, connection := range cfg.Connections() {
 					if err := mergeConnection(connection, *old.Connections()[i]); err != nil {
@@ -454,7 +522,7 @@ func (s *Server) Handler() http.Handler {
 				for _, connection := range stored.Connections() {
 					connection.APIKey = s.Security.Seal(connection.APIKey)
 				}
-				if e := s.Store.saveSettingsWithTagPolicies(r.Context(), stored, old, cfg); e != nil {
+				if e := s.Store.saveSettingsWithTagPolicies(r.Context(), stored, old, cfg, plans...); e != nil {
 					s.mu.Unlock()
 					failure(w, r, 500, errors.New("Could not save settings"))
 					return

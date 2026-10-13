@@ -17,4 +17,3 @@ A dedicated container IP does not need host port mapping. Ensure the container c
 
 If pulling reports access denied, verify that the GHCR package is Public, independently of repository visibility. See [operations](OPERATIONS.md) for backup and recovery.
 
-For the 0.4.0 rename, keep the appdata mount from the existing installation. The legacy `ghcr.io/buffer379x/arrscope:stable` alias receives the same approved image; alternatively change Repository to `ghcr.io/buffer379x/scopearr:stable` during your manual update. The template's new default `/mnt/cache/appdata/scopearr` path is for new installations, not existing ones. See [upgrade notes](releases/0.4.0.md).

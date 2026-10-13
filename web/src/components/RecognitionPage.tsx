@@ -1,4 +1,4 @@
-import { confirmDeletion } from "../confirmation";
+import { confirmDeletion, confirmReset } from "../confirmation";
 import { matchesRuleSearch } from "../rule-search";
 import { newRuleID } from "../rule-id";
 import { notify } from "../notifications";
@@ -45,6 +45,7 @@ const modes = {
 const columns: [keyof RecognitionRule, string][] = [
   ["priority", "Priority"],
   ["enabled", "Enabled"],
+  ["tag", "Tag"],
   ["name", "Name"],
   ["field", "Attribute"],
   ["match", "Match type"],
@@ -113,15 +114,37 @@ export function RecognitionPage({
   useEffect(() => {
     void load();
   }, []);
-  const change = (next: RecognitionRule[]) => {
+  const change = async (next: RecognitionRule[]) => {
+    if (!config || busy) return false;
+    const previous = config.rules;
+    setBusy(true);
+    onDirty(true);
     setRules(next);
     setPreview(null);
-    setNotice("");
+    try {
+      const current = await api<RecognitionConfig>("recognition", "PUT", {
+        rules: next,
+        revision: config.revision,
+      });
+      setConfig(current);
+      setRules(current.rules);
+      notify(t("Rules saved. Cached filenames have been reprocessed."));
+      await saved();
+      return true;
+    } catch (e) {
+      setRules(previous);
+      setError((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+      onDirty(false);
+    }
   };
   const filtered = rules.filter((rule) =>
     matchesRuleSearch(ruleSearch, [
       String(rule.priority),
       t(rule.enabled ? "Enabled" : "Disabled"),
+      t(rule.tag !== false ? "Tag" : "Information only"),
       rule.name,
       labels[rule.field],
       t(rule.match === "token" ? "Token" : "Regular expression"),
@@ -136,13 +159,17 @@ export function RecognitionPage({
   );
   const sorted = [...filtered].sort((a, b) => {
     const x =
-        sort.field === "value" && a.field === "custom"
-          ? customNames[a.value] || a.value
-          : a[sort.field],
+        sort.field === "tag"
+          ? a.tag !== false
+          : sort.field === "value" && a.field === "custom"
+            ? customNames[a.value] || a.value
+            : a[sort.field],
       y =
-        sort.field === "value" && b.field === "custom"
-          ? customNames[b.value] || b.value
-          : b[sort.field];
+        sort.field === "tag"
+          ? b.tag !== false
+          : sort.field === "value" && b.field === "custom"
+            ? customNames[b.value] || b.value
+            : b[sort.field];
     const cmp =
       typeof x === "number" && typeof y === "number"
         ? x - y
@@ -198,6 +225,11 @@ export function RecognitionPage({
               "Custom rules add all matching tags; different tags are not conflicts.",
             )}
           </p>
+          <p class="quiet">
+            {t(
+              "Tag controls presentation and colors. Recognition, filters and outbound categories remain independent.",
+            )}
+          </p>
           <div class="recognition-actions">
             <label class="search-field recognition-rule-search">
               <span>{t("Search recognition rules")}</span>
@@ -239,8 +271,12 @@ export function RecognitionPage({
                 aria-label={t("Restore defaults")}
                 title={t("Restore defaults")}
                 disabled={busy || !defaults}
-                onClick={() => {
-                  if (confirm(t("Restore all default recognition rules?")))
+                onClick={async () => {
+                  if (
+                    await confirmDeletion(
+                      t("Restore all default recognition rules?"),
+                    )
+                  )
                     change(structuredClone(defaults!.rules));
                 }}
               >
@@ -314,6 +350,25 @@ export function RecognitionPage({
                       />
                     </td>
                     <td>
+                      <input
+                        type="checkbox"
+                        checked={rule.tag !== false}
+                        disabled={busy}
+                        aria-label={t("Show as tag: {name}", {
+                          name: rule.name,
+                        })}
+                        onChange={(e) =>
+                          void change(
+                            rules.map((r) =>
+                              r.id === rule.id
+                                ? { ...r, tag: e.currentTarget.checked }
+                                : r,
+                            ),
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
                       <b>{rule.name}</b>
                       {rule.id.startsWith("default-") && (
                         <small class="quiet">{t("Default rule")}</small>
@@ -375,7 +430,7 @@ export function RecognitionPage({
             {!rules.length && (
               <p class="quiet empty-rules">
                 {t(
-                  "No filename rules. Only API and Emby metadata will be used after saving.",
+                  "No filename rules. Only API and Emby metadata will be used.",
                 )}
               </p>
             )}
@@ -384,13 +439,13 @@ export function RecognitionPage({
             {t("{count} rules", { count: rules.length })}
             {ruleSearch.trim() &&
               " · " + t("{count} matching rules", { count: filtered.length })}
-            {dirty && " · " + t("Unsaved changes")}
+            {busy && " · " + t("Reprocessing cache …")}
           </p>
           <section class="recognition-preview">
             <h2>{t("Preview filename")}</h2>
             <p class="quiet">
               {t(
-                "Preview uses unsaved rules and the filename only. API and Emby enrichment is not included.",
+                "Preview uses saved rules and the filename only. API and Emby enrichment is not included.",
               )}
             </p>
             <form
@@ -489,56 +544,22 @@ export function RecognitionPage({
               )}
             </>
           </section>
-          <div class="settings-save-bar">
-            {" "}
-            <button
-              class="primary"
-              disabled={busy || !dirty}
-              onClick={async () => {
-                setBusy(true);
-                setError("");
-                try {
-                  const current = await api<RecognitionConfig>(
-                    "recognition",
-                    "PUT",
-                    { rules, revision: config.revision },
-                  );
-                  setConfig(current);
-                  setRules(current.rules);
-                  setPreview(null);
-                  onDirty(false);
-                  setNotice(
-                    t("Rules saved. Cached filenames have been reprocessed."),
-                  );
-                  await saved();
-                } catch (e) {
-                  setError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {busy ? (
-                <LoaderCircle class="spin" size={15} />
-              ) : (
-                <Check size={15} />
-              )}{" "}
-              {t(busy ? "Reprocessing cache …" : "Save settings")}
-            </button>
-          </div>
         </>
       )}
       {editing && (
         <RuleEditor
           rule={editing}
-          close={() => setEditing(null)}
-          save={(rule) => {
-            change(
+          busy={busy}
+          close={() => {
+            if (!busy) setEditing(null);
+          }}
+          save={async (rule) => {
+            const ok = await change(
               rules.some((r) => r.id === rule.id)
                 ? rules.map((r) => (r.id === rule.id ? rule : r))
                 : [...rules, rule],
             );
-            setEditing(null);
+            if (ok) setEditing(null);
           }}
         />
       )}
@@ -547,12 +568,14 @@ export function RecognitionPage({
 }
 function RuleEditor({
   rule,
+  busy,
   close,
   save,
 }: {
   rule: RecognitionRule;
+  busy: boolean;
   close: () => void;
-  save: (rule: RecognitionRule) => void;
+  save: (rule: RecognitionRule) => Promise<void>;
 }) {
   useI18n();
   const customNames = useContext(CustomTagNames);
@@ -563,14 +586,15 @@ function RuleEditor({
     <Modal title={t("Edit recognition rule")} close={close} wide>
       <form
         class="rule-editor"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          save(draft);
+          if (!busy) await save(draft);
         }}
       >
         <label>
           {t("Name")}
           <input
+            disabled={busy}
             required
             maxLength={80}
             value={draft.name}
@@ -580,6 +604,7 @@ function RuleEditor({
         <label>
           {t("Attribute")}
           <select
+            disabled={busy}
             value={draft.field}
             onChange={(e) =>
               patch({
@@ -605,6 +630,7 @@ function RuleEditor({
         <label>
           {t("Match type")}
           <select
+            disabled={busy}
             value={draft.match}
             onChange={(e) =>
               patch({
@@ -619,6 +645,7 @@ function RuleEditor({
         <label>
           {t("Pattern")}
           <input
+            disabled={busy}
             required
             maxLength={500}
             value={draft.pattern}
@@ -629,6 +656,7 @@ function RuleEditor({
           {t("Result")}
           {draft.field === "custom" ? (
             <select
+              disabled={busy}
               required
               value={draft.value}
               onChange={(e) => patch({ value: e.currentTarget.value })}
@@ -640,6 +668,7 @@ function RuleEditor({
             </select>
           ) : (
             <input
+              disabled={busy}
               required
               maxLength={80}
               value={draft.value}
@@ -651,7 +680,7 @@ function RuleEditor({
           {t("Mode")}
           <select
             value={draft.mode}
-            disabled={draft.field === "custom"}
+            disabled={busy || draft.field === "custom"}
             onChange={(e) =>
               patch({ mode: e.currentTarget.value as RecognitionRule["mode"] })
             }
@@ -664,6 +693,7 @@ function RuleEditor({
         <label>
           {t("Priority")}
           <input
+            disabled={busy}
             required
             type="number"
             min={0}
@@ -675,6 +705,7 @@ function RuleEditor({
         </label>
         <label class="check-field">
           <input
+            disabled={busy}
             type="checkbox"
             checked={draft.enabled}
             onChange={(e) => patch({ enabled: e.currentTarget.checked })}
@@ -692,6 +723,7 @@ function RuleEditor({
             <label>
               {t("Equivalent metadata codecs (regular expression)")}
               <input
+                disabled={busy}
                 maxLength={500}
                 value={draft.comparisonPattern || ""}
                 placeholder="^DTS(?:-HD(?: MA)?)?$"
@@ -709,6 +741,7 @@ function RuleEditor({
           <label>
             {t("Skip when filename matches this expression")}
             <input
+              disabled={busy}
               maxLength={500}
               value={draft.unless || ""}
               onInput={(e) => patch({ unless: e.currentTarget.value })}
@@ -716,6 +749,7 @@ function RuleEditor({
           </label>
           <label class="check-field">
             <input
+              disabled={busy}
               type="checkbox"
               checked={draft.consume}
               onChange={(e) => patch({ consume: e.currentTarget.checked })}

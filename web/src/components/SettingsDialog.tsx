@@ -1,3 +1,6 @@
+import { audioLanguageKey } from "../languages";
+import { LanguageFlag } from "./LanguageFlag";
+import { TagReview, type TagPreview, type TagReviewRequest } from "./TagReview";
 import { confirmDeletion } from "../confirmation";
 import { TagPolicyDialog } from "./TagPolicyDialog";
 import {
@@ -20,6 +23,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpRight,
+  Pencil,
   Check,
   Database,
   Film,
@@ -73,6 +77,12 @@ export function SettingsDialog({
   const settingsFormId = useId();
   const [customDirty, setCustomDirty] = useState(false);
   const [rulesDirty, setRulesDirty] = useState(false);
+  const [pendingReview, setPendingReview] = useState<Service | null>(null);
+  const [tagSaveReview, setTagSaveReview] = useState<{
+    next: Settings;
+    requests: TagReviewRequest[];
+    previews: TagPreview[];
+  } | null>(null);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const contentRef = useRef<HTMLDivElement>(null);
   const [cfg, setCfg] = useState<Settings>(structuredClone(settings)),
@@ -85,6 +95,7 @@ export function SettingsDialog({
     [recognized, setRecognized] = useState<Record<string, string[]>>({});
   useEffect(() => {
     Promise.all([
+      api<Record<string, string[]>>("display-tags"),
       api<Record<string, string[]>>("facets?service=radarr"),
       api<Record<string, string[]>>("facets?service=sonarr"),
     ])
@@ -94,9 +105,12 @@ export function SettingsDialog({
           values[field] = [
             ...new Set(
               all
+                .slice(1)
                 .flatMap((f) => f[field] || [])
                 .filter(
-                  (value) => field !== "custom" || value !== "__unknown__",
+                  (value) =>
+                    (all[0][field] || []).includes(value) &&
+                    (field !== "custom" || value !== "__unknown__"),
                 ),
             ),
           ].sort((a, b) =>
@@ -112,7 +126,12 @@ export function SettingsDialog({
         setRecognized(values);
       })
       .catch(() => {});
-  }, [customTags]);
+  }, [
+    customTags,
+    status.recognitionRevision,
+    status.sync?.radarr?.lastSuccess,
+    status.sync?.sonarr?.lastSuccess,
+  ]);
   const dirty =
     JSON.stringify(cfg) !== JSON.stringify(settings) || draftLocale !== locale;
   useEffect(() => {
@@ -200,16 +219,22 @@ export function SettingsDialog({
       ...current,
       [service]: { ...current[service], ...patch },
     }));
-  const saveSettings = async (next: Settings) => {
+  const saveSettings = async (
+    next: Settings,
+    tagApprovals: Record<string, string> = {},
+    propagate = false,
+  ) => {
     setBusy(true);
     try {
-      await api("settings", "PUT", next);
+      await api("settings", "PUT", { ...next, tagApprovals });
       setTagChanges(null);
+      setTagSaveReview(null);
       setCfg(await api<Settings>("settings"));
       await saved();
       setLocale(draftLocale);
       notify(t("Settings saved."));
-    } catch {
+    } catch (e) {
+      if (propagate) throw e;
     } finally {
       setBusy(false);
     }
@@ -232,12 +257,61 @@ export function SettingsDialog({
       if (choice?.mode) next[service].tagSyncMode = choice.mode;
       if (choice?.disable) next[service].tagSyncDisable = choice.disable;
     }
-    setCfg(next);
-    await saveSettings(next);
+    setBusy(true);
+    try {
+      const requests = (Object.keys(choices) as Service[]).map((service) => ({
+        service,
+        config: next[service],
+      }));
+      const previews: TagPreview[] = [];
+      for (const request of requests)
+        previews.push(await api<TagPreview>("tag-preview", "POST", request));
+      setCfg(next);
+      setTagChanges(null);
+      if (
+        previews.some((p) =>
+          p.rows.some((row) => row.assignments > 0 || row.deleteDefinition),
+        )
+      )
+        setTagSaveReview({ next, requests, previews });
+      else
+        await saveSettings(
+          next,
+          Object.fromEntries(previews.map((p) => [p.service, p.token])),
+        );
+    } catch {
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <section class="settings-page" aria-label={t("Settings")}>
+      {tagSaveReview && (
+        <TagReview
+          requests={tagSaveReview.requests}
+          initial={tagSaveReview.previews}
+          close={() => setTagSaveReview(null)}
+          confirm={(tokens) => saveSettings(tagSaveReview.next, tokens, true)}
+        />
+      )}
+      {pendingReview && (
+        <TagReview
+          requests={[
+            { service: pendingReview, config: settings[pendingReview] },
+          ]}
+          close={() => setPendingReview(null)}
+          confirm={async (tokens) => {
+            await api("tag-approval", "POST", {
+              service: pendingReview,
+              token: tokens[pendingReview],
+            });
+            setPendingReview(null);
+            await refresh();
+            notify(t("Tag changes approved."));
+          }}
+        />
+      )}
       {tagChanges && (
         <TagPolicyDialog
           changes={tagChanges}
@@ -254,7 +328,6 @@ export function SettingsDialog({
           {[
             ["connections", t("Services")],
             ["appearance", t("Display")],
-            ["colors", t("Colors")],
             ["custom", t("Custom tags")],
             ["recognition", t("Filename recognition")],
             ["system", t("System")],
@@ -319,6 +392,20 @@ export function SettingsDialog({
                         : "System",
                 )}
               </h2>
+              <button
+                type="submit"
+                form={settingsFormId}
+                class="primary"
+                disabled={busy || !dirty}
+                hidden={["system", "recognition", "custom"].includes(section)}
+              >
+                {busy ? (
+                  <LoaderCircle class="spin" size={16} />
+                ) : (
+                  <Check size={16} />
+                )}{" "}
+                {t("Save settings")}
+              </button>
               <p class="quiet">
                 {t(
                   section === "connections"
@@ -508,37 +595,53 @@ export function SettingsDialog({
                               service:
                                 service === "radarr" ? "Radarr" : "Sonarr",
                             })}
+                            {Object.values(cfg[service].tagSync || {}).some(
+                              Boolean,
+                            ) && (
+                              <button
+                                type="button"
+                                class="icon-button"
+                                disabled={demo || busy}
+                                aria-label={t(
+                                  "Configure tag handling for {service}",
+                                  {
+                                    service:
+                                      service === "radarr"
+                                        ? "Radarr"
+                                        : "Sonarr",
+                                  },
+                                )}
+                                title={t(
+                                  "Configure tag handling for {service}",
+                                  {
+                                    service:
+                                      service === "radarr"
+                                        ? "Radarr"
+                                        : "Sonarr",
+                                  },
+                                )}
+                                onClick={() =>
+                                  setTagChanges([
+                                    {
+                                      ...tagTransition(
+                                        service as Service,
+                                        settings[service],
+                                        cfg[service],
+                                      ),
+                                      needsMode: true,
+                                    },
+                                  ])
+                                }
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            )}
                           </h4>
                           <p class="quiet">
                             {t(
                               "Disabled by default. When saving changes, choose whether existing tags should be kept or overwritten, and whether disabled groups should be kept or deleted.",
                             )}
                           </p>
-                          <label>
-                            {t("Existing tag handling")}
-                            <select
-                              disabled={
-                                demo ||
-                                !Object.values(cfg[service].tagSync || {}).some(
-                                  Boolean,
-                                )
-                              }
-                              value={cfg[service].tagSyncMode || "replace"}
-                              onChange={(e) =>
-                                update(service, {
-                                  tagSyncMode: e.currentTarget.value as
-                                    "add" | "replace",
-                                })
-                              }
-                            >
-                              <option value="add">
-                                {t("Keep and only add")}
-                              </option>
-                              <option value="replace">
-                                {t("Overwrite assignments")}
-                              </option>
-                            </select>
-                          </label>
                           <div class="tag-group-options">
                             {[
                               "resolution",
@@ -808,7 +911,7 @@ export function SettingsDialog({
                 </div>
               </section>
             </div>
-            <div class="settings-section" hidden={section !== "colors"}>
+            <div class="settings-section" hidden={section !== "appearance"}>
               <section class="connection warning-color-settings">
                 <h3 class="card-title">{t("Warning colors")}</h3>
                 <p class="quiet">
@@ -895,7 +998,6 @@ export function SettingsDialog({
                 </div>
               </section>
               <section class="connection tag-color-settings">
-                <h3 class="card-title">{t("Tag colors")}</h3>
                 <p class="quiet">
                   {t(
                     "Custom colors apply to both libraries and themes. They remain saved until reset.",
@@ -929,11 +1031,13 @@ export function SettingsDialog({
                         const label =
                           value === "__unknown__"
                             ? t("Unknown")
-                            : colorField === "custom"
-                              ? customTags.find(
-                                  (tag) => String(tag.id) === value,
-                                )?.name || value
-                              : value;
+                            : colorField === "language"
+                              ? t(audioLanguageKey(value))
+                              : colorField === "custom"
+                                ? customTags.find(
+                                    (tag) => String(tag.id) === value,
+                                  )?.name || value
+                                : value;
                         return (
                           <tr>
                             <td>
@@ -942,7 +1046,13 @@ export function SettingsDialog({
                                 value={value === "__unknown__" ? "" : value}
                                 colors={cfg.tagColors || {}}
                                 textColors={cfg.tagTextColors || {}}
-                              />
+                              >
+                                {colorField === "language" ? (
+                                  <LanguageFlag tagged={false}
+                                    value={value === "__unknown__" ? "" : value}
+                                  />
+                                ) : undefined}
+                              </Tag>
                             </td>
                             <td>
                               <input
@@ -1055,32 +1165,14 @@ export function SettingsDialog({
                 demo={demo}
                 syncing={syncing}
                 manualSync={manualSync}
-              />
-            </div>
-            <div
-              hidden={section !== "system"}
-              class="settings-section maintenance-panel"
-            >
-              <p class="quiet">
-                {t(
-                  "Back up cache and settings. A complete Appdata backup also requires the local key.",
-                )}
-              </p>{" "}
-              <button
-                type="button"
-                class="button"
-                onClick={async () => {
-                  try {
-                    await api("backup", "POST");
-                    notify(
-                      t("Consistent backup created in the Appdata directory."),
-                    );
-                  } catch {}
+                reviewTags={(service) => setPendingReview(service)}
+                backup={async () => {
+                  await api("backup", "POST");
+                  notify(
+                    t("Consistent backup created in the Appdata directory."),
+                  );
                 }}
-              >
-                <Database size={15} />
-                {t("Back up cache")}
-              </button>
+              />
             </div>
           </form>
           <div hidden={section !== "system"}>
@@ -1126,18 +1218,6 @@ export function SettingsDialog({
             </details>
           </div>
         </div>
-      </div>
-      <div class="modal-actions settings-save-bar">
-        <button
-          type="submit"
-          form={settingsFormId}
-          class="primary"
-          disabled={busy}
-          hidden={["system", "recognition", "custom"].includes(section)}
-        >
-          {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}{" "}
-          {t("Save settings")}
-        </button>
       </div>
     </section>
   );

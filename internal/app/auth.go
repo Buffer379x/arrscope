@@ -186,9 +186,6 @@ func remoteIP(r *http.Request) string {
 func (s *Security) Session(r *http.Request) (string, string, bool) {
 	c, e := r.Cookie("scopearr_session")
 	if e != nil {
-		c, e = r.Cookie("arrscope_session")
-	}
-	if e != nil {
 		return "", "", false
 	}
 	hash := tokenHash(c.Value)
@@ -230,7 +227,7 @@ func (s *Security) createSession(w http.ResponseWriter, r *http.Request, verifie
 	} else if n != 1 {
 		return errCredentialsChanged
 	}
-	http.SetCookie(w, &http.Cookie{Name: "scopearr_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil || (os.Getenv("SCOPEARR_HTTPS") == "true" || (os.Getenv("SCOPEARR_HTTPS") == "" && os.Getenv("ARRSCOPE_HTTPS") == "true")), MaxAge: 86400})
+	http.SetCookie(w, &http.Cookie{Name: "scopearr_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil || os.Getenv("SCOPEARR_HTTPS") == "true", MaxAge: 86400})
 	return nil
 }
 func (s *Security) Reset(password string) error { return s.reset(password, "") }

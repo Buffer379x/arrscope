@@ -7,10 +7,12 @@ import { Modal } from "./Modal";
 import { count } from "../ui";
 export function CustomBulk({
   query,
+  single = false,
   close,
   saved,
 }: {
   query: string;
+  single?: boolean;
   close: () => void;
   saved: (total: number) => Promise<void>;
 }) {
@@ -34,7 +36,9 @@ export function CustomBulk({
       {selection && (
         <p class="quiet">
           {t(
-            "Changes apply to all {count} matching files, across every page.",
+            single
+              ? "Changes apply only to this file."
+              : "Changes apply to all {count} matching files, across every page.",
             {
               count: count(selection?.total || 0),
             },
@@ -53,9 +57,14 @@ export function CustomBulk({
             if (
               Object.values(changes).some((v) => !v) &&
               !(await confirmDeletion(
-                t("Remove selected tags from all {count} matching files?", {
-                  count: selection.total,
-                }),
+                t(
+                  single
+                    ? "Remove selected tags from this file?"
+                    : "Remove selected tags from all {count} matching files?",
+                  {
+                    count: selection.total,
+                  },
+                ),
               ))
             )
               return;

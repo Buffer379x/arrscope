@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { Trash2 } from "lucide-preact";
+import { RotateCcw, Trash2 } from "lucide-preact";
 import { t, useI18n } from "../i18n";
 import {
   currentConfirmation,
@@ -15,7 +15,7 @@ export function ConfirmationDialog() {
   if (!pending) return null;
   return (
     <Modal
-      title={t("Confirm deletion")}
+      title={t(pending.reset ? "Restore defaults" : "Confirm deletion")}
       close={() => answerConfirmation(false)}
       className="confirmation-dialog"
     >
@@ -30,11 +30,11 @@ export function ConfirmationDialog() {
         </button>
         <button
           type="button"
-          class="button danger-button"
+          class={pending.reset ? "button" : "button danger-button"}
           onClick={() => answerConfirmation(true)}
         >
-          <Trash2 size={16} />
-          {t("Delete")}
+          {pending.reset ? <RotateCcw size={16} /> : <Trash2 size={16} />}
+          {t(pending.reset ? "Restore defaults" : "Delete")}
         </button>
       </div>
     </Modal>

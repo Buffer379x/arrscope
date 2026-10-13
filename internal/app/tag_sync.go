@@ -20,6 +20,7 @@ import (
 const tagSyncSchema = `CREATE TABLE IF NOT EXISTS tag_sync_managed(service TEXT NOT NULL,endpoint TEXT NOT NULL,media_id INTEGER NOT NULL,PRIMARY KEY(service,endpoint,media_id));PRAGMA user_version=7;`
 
 type TagSyncStatus struct {
+	ApprovalRequired    bool       `json:"approvalRequired"`
 	Running             bool       `json:"running"`
 	Pending             bool       `json:"pending"`
 	LastSuccess         *time.Time `json:"lastSuccess"`
@@ -62,6 +63,7 @@ func (w *TagWriter) Queue(service string) {
 	_ = w.store.Put("tagSyncDirty:"+service, true)
 	st := w.status[service]
 	st.Pending = true
+	st.ApprovalRequired = false
 	w.status[service] = st
 	w.mu.Unlock()
 	select {
@@ -104,7 +106,10 @@ func (w *TagWriter) run() {
 }
 func (w *TagWriter) apply(service string) {
 	var dirty bool
-	if w.store.Get("tagSyncDirty:"+service, &dirty) != nil || !dirty {
+	w.mu.Lock()
+	paused := w.status[service].ApprovalRequired
+	w.mu.Unlock()
+	if paused || w.store.Get("tagSyncDirty:"+service, &dirty) != nil || !dirty {
 		return
 	}
 	ctx, cancel := context.WithTimeout(w.ctx, 5*time.Minute)
@@ -143,7 +148,11 @@ func (w *TagWriter) apply(service string) {
 	st.Running = false
 	st.Changed = changed
 	_ = w.store.Get("tagSyncRetained:"+service, &st.RetainedDefinitions)
-	if err != nil {
+	if errors.Is(err, ErrTagApproval) {
+		st.ApprovalRequired = true
+		st.Pending = true
+		st.Error = ""
+	} else if err != nil {
 		st.Error = err.Error()
 	} else if !waiting && gen == w.generations[service] {
 		_ = w.store.Put("tagSyncDirty:"+service, false)
@@ -194,8 +203,9 @@ type arrTag struct {
 	Label string `json:"label"`
 }
 type taggedMedia struct {
-	ID   int   `json:"id"`
-	Tags []int `json:"tags"`
+	Title string `json:"title,omitempty"`
+	ID    int    `json:"id"`
+	Tags  []int  `json:"tags"`
 }
 
 func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, out any) error {
@@ -257,204 +267,154 @@ func sameTagIDs(a, b []int) bool {
 	return len(set) == 0
 }
 
-// Reconciliation is authoritative only after explicit opt-in. A durable media
-// ledger permits removal on opt-out/restart without touching a different server.
+// Approved removals use targeted API operations. Concurrent foreign additions
+// survive even in overwrite mode and are reviewed on a later reconciliation.
 func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConfig, unchanged func() bool) (int, bool, error) {
-	if !serviceOK(service) {
-		return 0, false, errors.New("Invalid service")
+	p, e := s.BuildTagPlan(ctx, service, c, nil)
+	if e != nil {
+		return 0, false, e
 	}
-	endpoint := tagEndpoint(c)
-	managed := map[int]bool{}
-	rows, err := s.DB.QueryContext(ctx, "SELECT media_id FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint)
-	if err != nil {
-		return 0, false, err
-	}
-	for rows.Next() {
-		var id int
-		if err = rows.Scan(&id); err != nil {
-			rows.Close()
-			return 0, false, err
-		}
-		managed[id] = true
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return 0, false, err
-	}
-	policy, err := s.tagPolicies(ctx, service, endpoint, c.TagSync)
-	if err != nil {
-		return 0, false, err
-	}
-	var cleanupCount int
-	if err = s.DB.QueryRowContext(ctx, "SELECT count(*) FROM tag_sync_cleanup WHERE service=? AND endpoint=?", service, endpoint).Scan(&cleanupCount); err != nil {
-		return 0, false, err
-	}
-	if !c.TagSync.Active() && len(policy.remove) == 0 && cleanupCount == 0 && len(policy.keep) > 0 {
-		_, err = s.DB.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint)
-		return 0, false, err
-	}
-	if !c.TagSync.Active() && len(managed) == 0 && len(policy.remove) == 0 && cleanupCount == 0 {
-		return 0, false, nil
-	}
-	if !c.Enabled {
+	if p.Waiting {
 		return 0, true, nil
 	}
-	if err = ValidateConfig(c); err != nil {
-		return 0, false, err
+	if p.Preview.ApprovalRequired {
+		return 0, true, ErrTagApproval
 	}
-	if c.TagSync.Active() {
-		var snapshot SyncStatus
-		if s.Get("sync:"+service, &snapshot) != nil || snapshot.LastSuccess == nil || snapshot.Source != endpoint {
-			return 0, true, nil
-		}
+	if len(p.Operations) == 0 && len(p.Cleanup) == 0 {
+		return 0, false, nil
 	}
-	snap := tagSnapshot{map[int]map[string]bool{}, map[string]map[string]bool{}, map[int]map[string]bool{}}
-	desired := snap.desired
-	if c.TagSync.Active() {
-		snap, err = readTagSnapshot(ctx, s.DB, service, c.TagSync)
-		desired = snap.desired
-		if err != nil {
-			return 0, false, err
-		}
-	}
+	endpoint := p.Endpoint
 	client := NewArr(c)
-	var definitions []arrTag
-	if err = client.get(ctx, "tag", nil, &definitions); err != nil {
-		return 0, false, err
-	}
-	catalog := "movie"
-	editor := "movie/editor"
-	idsKey := "movieIds"
-	if service == "sonarr" {
-		catalog = "series"
-		editor = "series/editor"
-		idsKey = "seriesIds"
-	}
-	var media []taggedMedia
-	q := url.Values{}
-	if service == "radarr" {
-		q.Set("excludeLocalCovers", "true")
-	}
-	if err = client.get(ctx, catalog, q, &media); err != nil {
-		return 0, false, err
-	}
-	labels := map[string]int{}
-	names := map[int]string{}
-	for _, tag := range definitions {
-		if tag.ID <= 0 || tag.Label == "" {
-			return 0, false, errors.New("Invalid tag catalog")
-		}
-		key := strings.ToLower(tag.Label)
-		names[tag.ID] = key
-		if id, ok := labels[key]; !ok || tag.ID < id {
-			labels[key] = tag.ID
-		}
-	}
-	seen := map[int]bool{}
-	for _, item := range media {
-		if item.ID <= 0 || seen[item.ID] {
-			return 0, false, errors.New("Invalid tag media catalog")
-		}
-		seen[item.ID] = true
-		if c.TagSync.Active() || len(policy.remove) > 0 {
-			managed[item.ID] = true
-		}
-	}
-	// Persist intent before external mutations; an ambiguous response can then be
-	// repaired after a retry or process restart, including an immediate opt-out.
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, false, err
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return 0, false, e
 	}
 	defer tx.Rollback()
-	stmt, err := tx.PrepareContext(ctx, "INSERT OR IGNORE INTO tag_sync_managed VALUES(?,?,?)")
-	if err != nil {
-		return 0, false, err
-	}
-	for id := range managed {
-		if _, err = stmt.ExecContext(ctx, service, endpoint, id); err != nil {
-			stmt.Close()
-			return 0, false, err
-		}
-	}
-	stmt.Close()
-
 	if c.TagSync.Active() {
-		if err = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true); err != nil {
-			return 0, false, err
+		if e = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true); e != nil {
+			return 0, false, e
 		}
-		for field, on := range c.TagSync.fields() {
+		for f, on := range c.TagSync.fields() {
 			if on {
-				if _, err = tx.ExecContext(ctx, "INSERT INTO tag_sync_groups VALUES(?,?,?,'active') ON CONFLICT(service,endpoint,field) DO UPDATE SET state='active'", service, endpoint, field); err != nil {
-					return 0, false, err
+				if _, e = tx.ExecContext(ctx, "INSERT INTO tag_sync_groups VALUES(?,?,?,'active') ON CONFLICT(service,endpoint,field) DO UPDATE SET state='active'", service, endpoint, f); e != nil {
+					return 0, false, e
 				}
 			}
 		}
 	}
-	if err = tx.Commit(); err != nil {
-		return 0, false, err
-	}
-	oldCustom := policy.custom
-	policy, err = s.tagPolicies(ctx, service, endpoint, c.TagSync)
-	if err != nil {
-		return 0, false, err
-	}
-	for label := range policy.remove {
-		if err = s.stageTagCleanup(ctx, service, endpoint, label); err != nil {
-			return 0, false, err
+	for _, op := range p.Operations {
+		if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_managed VALUES(?,?,?)", service, endpoint, op.ID); e != nil {
+			return 0, false, e
 		}
 	}
-	required := map[string]bool{}
-	for id, tags := range desired {
-		if !seen[id] {
-			continue
-		}
-		for label := range tags {
-			required[label] = true
+	observed := "existing"
+	if p.Historical {
+		observed = "unknown"
+	}
+	for id, label := range p.Names {
+		if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_ownership VALUES(?,?,0,?,?,?)", service, endpoint, id, label, observed); e != nil {
+			return 0, false, e
 		}
 	}
-	sorted := []string{}
-	for label := range required {
-		sorted = append(sorted, label)
+	for l := range p.Cleanup {
+		if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_cleanup VALUES(?,?,?)", service, endpoint, l); e != nil {
+			return 0, false, e
+		}
 	}
-	sort.Strings(sorted)
-	for _, label := range sorted {
-		if labels[label] > 0 {
+	if e = tx.Commit(); e != nil {
+		return 0, false, e
+	}
+	wanted := []string{}
+	for l := range p.Required {
+		wanted = append(wanted, l)
+	}
+	sort.Strings(wanted)
+	for _, l := range wanted {
+		if p.Labels[l] != 0 {
 			continue
 		}
 		if !unchanged() {
 			return 0, true, nil
 		}
 		var created arrTag
-		if err = client.writeTags(ctx, "tag", "POST", map[string]string{"label": label}, &created); err != nil {
-			// POST is never blindly retried: it may have committed before a timeout.
+		confirmed := true
+		e = client.writeTags(ctx, "tag", "POST", map[string]string{"label": l}, &created)
+		if e != nil {
+			confirmed = false
 			var latest []arrTag
-			if readErr := client.get(ctx, "tag", nil, &latest); readErr == nil {
-				for _, tag := range latest {
-					if strings.EqualFold(tag.Label, label) {
-						created = tag
+			if re := client.get(ctx, "tag", nil, &latest); re == nil {
+				for _, t := range latest {
+					if strings.EqualFold(t.Label, l) {
+						created = t
 						break
 					}
 				}
 			}
 			if created.ID <= 0 {
-				return 0, false, err
+				return 0, false, e
 			}
 		}
-		if created.ID <= 0 || !strings.EqualFold(created.Label, label) {
+		if created.ID <= 0 || !strings.EqualFold(created.Label, l) {
 			return 0, false, errors.New("Invalid created tag")
 		}
-		labels[label] = created.ID
+		p.Labels[l] = created.ID
+		p.Names[created.ID] = l
+		kind := "unknown"
+		if confirmed {
+			kind = "created"
+		}
+		if _, e = s.DB.ExecContext(ctx, "INSERT OR REPLACE INTO tag_sync_ownership VALUES(?,?,0,?,?,?)", service, endpoint, created.ID, l, kind); e != nil {
+			return 0, false, e
+		}
 	}
-
+	for l := range p.Required {
+		id := p.Labels[l]
+		kind := p.Ownership[bindingKey(0, id, l)]
+		if kind == "created" || definitionControlled(kind) {
+			continue
+		}
+		var storedKind string
+		if e = s.DB.QueryRowContext(ctx, "SELECT kind FROM tag_sync_ownership WHERE service=? AND endpoint=? AND media_id=0 AND tag_id=? AND label=?", service, endpoint, id, l).Scan(&storedKind); e != nil {
+			return 0, false, e
+		}
+		if storedKind == "created" {
+			continue
+		}
+		adopted := "adopted-unknown"
+		if strings.HasSuffix(storedKind, "existing") {
+			adopted = "adopted-existing"
+		}
+		if _, e = s.DB.ExecContext(ctx, "UPDATE tag_sync_ownership SET kind=? WHERE service=? AND endpoint=? AND media_id=0 AND tag_id=? AND label=?", adopted, service, endpoint, id, l); e != nil {
+			return 0, false, e
+		}
+	}
+	// Persist desired assignment ownership before writes, so an ambiguous response
+	// remains recoverable. Existing desired assignments become explicitly managed.
+	tx, e = s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return 0, false, e
+	}
+	defer tx.Rollback()
+	for _, op := range p.Operations {
+		for _, l := range op.Want {
+			if p.Policy.keep[l] {
+				continue
+			}
+			if _, e = tx.ExecContext(ctx, "INSERT OR REPLACE INTO tag_sync_ownership VALUES(?,?,?,?,?,'managed')", service, endpoint, op.ID, p.Labels[l], l); e != nil {
+				return 0, false, e
+			}
+		}
+	}
+	if e = tx.Commit(); e != nil {
+		return 0, false, e
+	}
 	type batch struct {
 		ids, tags []int
 		op        string
 	}
 	batches := map[string]*batch{}
 	queue := func(id int, op string, tags []int) {
-		if len(tags) == 0 && op != "replace" {
+		if len(tags) == 0 {
 			return
 		}
 		sort.Ints(tags)
@@ -464,158 +424,116 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		}
 		batches[key].ids = append(batches[key].ids, id)
 	}
-	for _, item := range media {
-		if !managed[item.ID] {
-			continue
+	for _, op := range p.Operations {
+		queue(op.ID, "remove", op.Remove)
+		present := map[int]bool{}
+		for _, id := range op.Current {
+			present[id] = true
 		}
-		want := map[int]bool{}
-		for label := range desired[item.ID] {
-			want[labels[label]] = true
-		}
-		remove := []int{}
-		for _, id := range item.Tags {
-			label := names[id]
-			if policy.keep[label] {
-				want[id] = true
-				continue
-			}
-			if policy.remove[label] && !desired[item.ID][label] || c.TagSync.Custom && oldCustom[item.ID][label] && !desired[item.ID][label] {
-				remove = append(remove, id)
+		add := []int{}
+		for _, l := range op.Want {
+			if !present[p.Labels[l]] {
+				add = append(add, p.Labels[l])
 			}
 		}
-		if tagMode(c) == "replace" {
-			ids := []int{}
-			for id := range want {
-				ids = append(ids, id)
-			}
-			if sameTagIDs(ids, item.Tags) {
-				continue
-			}
-			for _, id := range item.Tags {
-				if !want[id] {
-					if err = s.stageTagCleanup(ctx, service, endpoint, names[id]); err != nil {
-						return 0, false, err
-					}
-				}
-			}
-			queue(item.ID, "replace", ids)
-		} else {
-			current := map[int]bool{}
-			for _, id := range item.Tags {
-				current[id] = true
-			}
-			for _, id := range remove {
-				if err = s.stageTagCleanup(ctx, service, endpoint, names[id]); err != nil {
-					return 0, false, err
-				}
-			}
-			queue(item.ID, "remove", remove)
-			add := []int{}
-			for id := range want {
-				if !current[id] {
-					add = append(add, id)
-				}
-			}
-			queue(item.ID, "add", add)
-		}
+		queue(op.ID, "add", add)
 	}
-	changed := 0
 	keys := []string{}
-	for key := range batches {
-		keys = append(keys, key)
+	for k := range batches {
+		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	for _, key := range keys {
-		b := batches[key]
+	changed := map[int]bool{}
+	editor := "movie/editor"
+	idsKey := "movieIds"
+	if service == "sonarr" {
+		editor = "series/editor"
+		idsKey = "seriesIds"
+	}
+	for _, k := range keys {
+		b := batches[k]
 		for start := 0; start < len(b.ids); start += 100 {
 			end := start + 100
 			if end > len(b.ids) {
 				end = len(b.ids)
 			}
 			if !unchanged() {
-				return changed, true, nil
+				return len(changed), true, nil
 			}
 			var applied []taggedMedia
-			if err = client.writeTags(ctx, editor, "PUT", map[string]any{idsKey: b.ids[start:end], "tags": b.tags, "applyTags": b.op, "moveFiles": false}, &applied); err != nil {
-				return changed, false, err
+			if e = client.writeTags(ctx, editor, "PUT", map[string]any{idsKey: b.ids[start:end], "tags": b.tags, "applyTags": b.op, "moveFiles": false}, &applied); e != nil {
+				return len(changed), false, e
 			}
 			expected := map[int]bool{}
 			for _, id := range b.ids[start:end] {
 				expected[id] = true
 			}
-			for _, item := range applied {
-				if !expected[item.ID] || !tagResponseMatches(b.op, item.Tags, b.tags) {
-					return changed, false, errors.New("Tag update could not be verified")
+			for _, m := range applied {
+				if !expected[m.ID] || !tagResponseMatches(b.op, m.Tags, b.tags) {
+					return len(changed), false, errors.New("Tag update could not be verified")
 				}
-				delete(expected, item.ID)
+				delete(expected, m.ID)
+				changed[m.ID] = true
 			}
 			if len(expected) > 0 {
-				return changed, false, errors.New("Tag update could not be verified")
+				return len(changed), false, errors.New("Tag update could not be verified")
 			}
-
-			changed += end - start
 		}
 	}
 	if !unchanged() {
-		return changed, true, nil
+		return len(changed), true, nil
 	}
-
-	blocked, cleanErr := s.cleanupTags(ctx, service, endpoint, client, labels, required, policy.keep, unchanged)
-	if cleanErr != nil {
-		return changed, false, cleanErr
+	blocked, e := s.cleanupTags(ctx, service, endpoint, client, p.Labels, p.Required, p.Policy.keep, unchanged)
+	if e != nil {
+		return len(changed), false, e
 	}
-	if err = s.Put("tagSyncRetained:"+service, blocked); err != nil {
-		return changed, false, err
+	if e = s.Put("tagSyncRetained:"+service, blocked); e != nil {
+		return len(changed), false, e
 	}
-	// Completed group retirements and custom ownership updates are atomic. Blocked
-	// definitions retain their independent cleanup intent for the next file sync.
 	finish, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
-		return changed, false, e
+		return len(changed), false, e
 	}
 	defer finish.Rollback()
-	for field, state := range policy.states {
-		if state == "delete" {
-			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field=?", service, endpoint, field); e != nil {
-				return changed, false, e
+	for _, op := range p.Operations {
+		for _, id := range op.Remove {
+			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_ownership WHERE service=? AND endpoint=? AND media_id=? AND tag_id=?", service, endpoint, op.ID, id); e != nil {
+				return len(changed), false, e
 			}
-			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_groups WHERE service=? AND endpoint=? AND field=?", service, endpoint, field); e != nil {
-				return changed, false, e
+		}
+	}
+	for f, st := range p.Policy.states {
+		if st == "delete" {
+			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field=?", service, endpoint, f); e != nil {
+				return len(changed), false, e
+			}
+			if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_groups WHERE service=? AND endpoint=? AND field=?", service, endpoint, f); e != nil {
+				return len(changed), false, e
 			}
 		}
 	}
 	if c.TagSync.Custom {
 		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field='custom' AND media_id>0", service, endpoint); e != nil {
-			return changed, false, e
+			return len(changed), false, e
 		}
-		for id, vals := range snap.custom {
-			for label := range vals {
-				if _, e = finish.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_values VALUES(?,?,'custom',?,?)", service, endpoint, label, id); e != nil {
-					return changed, false, e
+		for id, ls := range p.Snapshot.custom {
+			for l := range ls {
+				if _, e = finish.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_values VALUES(?,?,'custom',?,?)", service, endpoint, l, id); e != nil {
+					return len(changed), false, e
 				}
 			}
+		}
+	}
+	if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_approvals WHERE service=? AND endpoint=?", service, endpoint); e != nil {
+		return len(changed), false, e
+	}
+	if !c.TagSync.Active() {
+		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint); e != nil {
+			return len(changed), false, e
 		}
 	}
 	if e = finish.Commit(); e != nil {
-		return changed, false, e
+		return len(changed), false, e
 	}
-	if !c.TagSync.Active() {
-		_, err = s.DB.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint)
-	} else {
-		// Deleted upstream titles no longer need a local cleanup intent.
-		tx, e := s.DB.BeginTx(ctx, nil)
-		if e != nil {
-			return changed, false, e
-		}
-		defer tx.Rollback()
-		for id := range managed {
-			if !seen[id] {
-				if _, e = tx.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=? AND media_id=?", service, endpoint, id); e != nil {
-					return changed, false, e
-				}
-			}
-		}
-		err = tx.Commit()
-	}
-	return changed, false, err
+	return len(changed), false, nil
 }

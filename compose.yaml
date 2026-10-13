@@ -1,18 +1,18 @@
 services:
   scopearr:
-    image: ghcr.io/buffer379x/scopearr:${SCOPEARR_TAG:-${ARRSCOPE_TAG:-stable}}
+    image: ghcr.io/buffer379x/scopearr:${SCOPEARR_TAG:-stable}
     container_name: scopearr
     restart: unless-stopped
-    user: "${SCOPEARR_UID:-${ARRSCOPE_UID:-99}}:${SCOPEARR_GID:-${ARRSCOPE_GID:-100}}"
+    user: "${SCOPEARR_UID:-99}:${SCOPEARR_GID:-100}"
     ports:
-      - "${SCOPEARR_BIND:-${ARRSCOPE_BIND:-0.0.0.0}}:${SCOPEARR_PORT:-${ARRSCOPE_PORT:-8080}}:8080"
+      - "${SCOPEARR_BIND:-0.0.0.0}:${SCOPEARR_PORT:-8080}:8080"
     environment:
       SCOPEARR_DATA_DIR: /data
-      SCOPEARR_HTTPS: "${SCOPEARR_HTTPS:-${ARRSCOPE_HTTPS:-false}}"
+      SCOPEARR_HTTPS: "${SCOPEARR_HTTPS:-false}"
       GOMEMLIMIT: 64MiB
       GOMAXPROCS: "2"
     volumes:
-      - "${SCOPEARR_APPDATA:-${ARRSCOPE_APPDATA:-./appdata}}:/data"
+      - "${SCOPEARR_APPDATA:-./appdata}:/data"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m

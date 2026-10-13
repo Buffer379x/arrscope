@@ -88,15 +88,6 @@ jobs:
         run: |
           docker pull --platform linux/amd64 "$IMAGE:$VERSION"
           python3 docs/scripts/containercheck.py --image "$IMAGE:$VERSION"
-      - name: Verify the legacy package update path after validation
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: docker buildx imagetools create --tag "ghcr.io/buffer379x/arrscope:$VERSION" "$IMAGE@$DIGEST"
-      - name: Copy unchanged historic version aliases after validation
-        run: |
-          for version in 0.1.0 0.2.0 0.2.1 0.2.3 0.3.0 0.3.1 0.3.2 0.3.3; do
-            docker buildx imagetools create --tag "$IMAGE:$version" "ghcr.io/buffer379x/arrscope:$version"
-          done
       - name: Publish version and release notes
         run: |
           gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Scopearr $VERSION" --notes-file "docs/releases/$VERSION.md"
@@ -105,7 +96,3 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: docker buildx imagetools create --tag "$IMAGE:stable" "$IMAGE@$DIGEST"
 
-      - name: Keep the existing installation update channel compatible
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: docker buildx imagetools create --tag ghcr.io/buffer379x/arrscope:stable "$IMAGE@$DIGEST"

@@ -13,6 +13,7 @@ import (
 
 // Rules affect filenames only. API normalization and Emby track attribution remain separate.
 type RecognitionRule struct {
+	Tag               *bool  `json:"tag,omitempty"`
 	ID                string `json:"id"`
 	Name              string `json:"name"`
 	Field             string `json:"field"`
@@ -41,10 +42,12 @@ type compiledRule struct {
 	re, unless, comparison *regexp.Regexp
 }
 type RecognitionEngine struct {
-	config      RecognitionConfig
-	groups      map[string][]compiledRule
-	names       map[string]string
-	comparisons map[string]*regexp.Regexp
+	hasInformationRules bool
+	ruleCatalog         map[string]compiledRule
+	config              RecognitionConfig
+	groups              map[string][]compiledRule
+	names               map[string]string
+	comparisons         map[string]*regexp.Regexp
 }
 type RecognitionResult struct {
 	Values    map[string]string     `json:"values"`
@@ -68,6 +71,7 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		return rules[i].ID < rules[j].ID
 	})
 	engine := &RecognitionEngine{config: RecognitionConfig{Rules: rules}, groups: map[string][]compiledRule{}, names: map[string]string{}, comparisons: map[string]*regexp.Regexp{}}
+	engine.ruleCatalog = map[string]compiledRule{}
 	ids := map[string]bool{}
 	for _, r := range rules {
 		validField := false
@@ -118,6 +122,8 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		}
 		compiled := compiledRule{r, re, unless, comparison}
 		engine.names[r.ID] = r.Name
+		engine.ruleCatalog[r.ID] = compiled
+		engine.hasInformationRules = engine.hasInformationRules || r.Enabled && !ruleIsTag(r)
 		if r.Enabled {
 			if comparison != nil {
 				engine.comparisons[r.ID] = comparison
@@ -272,7 +278,7 @@ func (e *RecognitionEngine) Recognize(filename string) RecognitionResult {
 func DefaultRecognitionRules() []RecognitionRule {
 	rules := []RecognitionRule{}
 	add := func(field, pattern, value string, priority int) {
-		rules = append(rules, RecognitionRule{ID: fmt.Sprintf("default-%s-%d", field, len(rules)), Name: field + " · " + value, Field: field, Match: "regex", Pattern: pattern, Value: value, Mode: "direct", Priority: priority, Enabled: true})
+		rules = append(rules, RecognitionRule{ID: fmt.Sprintf("default-%s-%d", field, len(rules)), Name: ruleFieldName(field) + " / " + value, Field: field, Match: "regex", Pattern: pattern, Value: value, Mode: "direct", Priority: priority, Enabled: true})
 	}
 	for _, v := range []string{"480p", "480i", "576p", "576i", "720p", "1080p", "1080i", "1440p", "2160p", "4320p", "4k", "8k"} {
 		add("resolution", token(regexp.QuoteMeta(v)).String(), normResolution(v), 100)
@@ -312,7 +318,7 @@ func DefaultRecognitionRules() []RecognitionRule {
 		marker := `(?:subbed|subs?|subtitles|hard[ ._-]?subbed|soft[ ._-]?subbed)`
 		rules[len(rules)-1].Unless = `(?:^|[ ._\[\]()-])(?:(?:` + aliases + `)[ ._-]+` + marker + `|` + marker + `[ ._-]+(?:` + aliases + `))(?:$|[ ._\[\]()-])`
 	}
-	rules = append(rules, uhdbdDefaultRule())
+	rules = append(rules, uhdbdDefaultRule(), uhdBluRayDefaultRule())
 	return rules
 }
 
@@ -360,7 +366,9 @@ func upgradeDefaultRules(rules []RecognitionRule) ([]RecognitionRule, bool) {
 			continue
 		}
 		for i, rule := range next {
-			if rule == old {
+			historical := old
+			historical.Name = old.Field + " · " + old.Value
+			if rule == old || rule == historical {
 				next[i] = updated
 				changed = true
 			}
@@ -370,7 +378,7 @@ func upgradeDefaultRules(rules []RecognitionRule) ([]RecognitionRule, bool) {
 }
 
 func uhdbdDefaultRule() RecognitionRule {
-	return RecognitionRule{ID: "default-source-uhdbd", Name: "source · UHD (UHDBD)", Field: "source", Match: "token", Pattern: "UHDBD", Value: "UHD", Mode: "override", Priority: 95, Enabled: true}
+	return RecognitionRule{ID: "default-source-uhdbd", Name: "Source / UHD (UHDBD)", Field: "source", Match: "token", Pattern: "UHDBD", Value: "UHD", Mode: "override", Priority: 95, Enabled: true}
 }
 func addUHDBDDefault(rules []RecognitionRule) ([]RecognitionRule, bool) {
 	for _, r := range rules {

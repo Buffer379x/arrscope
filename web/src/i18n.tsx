@@ -23,8 +23,7 @@ function initialLocale() {
   let saved: string | null = null;
   try {
     saved =
-      localStorage.getItem("scopearr-language") ||
-      localStorage.getItem("arrscope-language");
+      localStorage.getItem("scopearr-language");
   } catch {}
   return resolveLocale(
     saved ? [saved] : navigator.languages,
