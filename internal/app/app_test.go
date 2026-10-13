@@ -351,6 +351,7 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	check(request("/api/settings", "PUT", `{}`, false), 403)
 	check(request("/api/statistics", "GET", "", false), 200)
 	cfg := DefaultSettings()
+	cfg.InterfaceTheme = "catppuccin"
 	cfg.Radarr.APIKey = "keep-this-secret"
 	cfg.Emby.APIKey = "emby-fake-secret"
 	cfg.Emby.URL = "http://emby.example"
@@ -365,6 +366,16 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	}
 	var stored Settings
 	s.Get("settings", &stored)
+	if stored.InterfaceTheme != "catppuccin" || !strings.Contains(raw, `"interfaceTheme":"catppuccin"`) {
+		t.Fatal("interface theme not persisted or returned")
+	}
+	invalidTheme := cfg
+	invalidTheme.InterfaceTheme = "external-theme"
+	b, _ = json.Marshal(invalidTheme)
+	check(request("/api/settings", "PUT", string(b), true), 400)
+	if server.Config().InterfaceTheme != "catppuccin" {
+		t.Fatal("invalid palette altered configuration")
+	}
 	if stored.TagTextColors["codec:x264"] != "#ffffff" || !strings.Contains(raw, `"tagTextColors":{"codec:x264":"#ffffff"}`) {
 		t.Fatal("tag text color not saved or returned")
 	}

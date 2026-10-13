@@ -627,6 +627,11 @@
     "Default presentation": "Default presentation",
     "Use tag color: {name}": "Use tag color: {name}",
     "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.": "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.",
-    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included."
+    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.",
+    "Interface theme": "Interface theme",
+    "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.": "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.",
+    "Turkish": "Turkish",
+    "Nordic": "Nordic",
+    "Catppuccin": "Catppuccin"
   }
 }

@@ -53,6 +53,9 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		if e != nil {
 			return nil, e
 		}
+		if e := normalizeInterfaceTheme(&cfg); e != nil {
+			return nil, e
+		}
 		if cfg.TagColors == nil {
 			cfg.TagColors = map[string]string{}
 		}
@@ -421,6 +424,10 @@ func (s *Server) Handler() http.Handler {
 					return
 				}
 				cfg := in.Settings
+				if e := normalizeInterfaceTheme(&cfg); e != nil {
+					failure(w, r, 400, e)
+					return
+				}
 				if e := normalizeWarningColors(&cfg); e != nil {
 					failure(w, r, 400, e)
 					return

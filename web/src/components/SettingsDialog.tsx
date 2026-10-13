@@ -1,3 +1,4 @@
+import { interfaceThemes, themeLabels } from "../themes";
 import { audioLanguageKey } from "../languages";
 import { LanguageFlag } from "./LanguageFlag";
 import { TagReview, type TagPreview, type TagReviewRequest } from "./TagReview";
@@ -679,15 +680,39 @@ export function SettingsDialog({
               )}
             </div>
             <div class="settings-section" hidden={section !== "appearance"}>
-              <section class="connection">
-                <h3 class="card-title">{t("Interface language")}</h3>
-                <LanguageSelect value={draftLocale} onChange={setDraftLocale} />
-                <small>
-                  {t(
-                    "Applied after saving in this browser. Media names and filter values stay unchanged.",
-                  )}
-                </small>
-              </section>
+              <div class="appearance-preferences">
+                <section class="connection">
+                  <h3 class="card-title">{t("Interface language")}</h3>
+                  <LanguageSelect
+                    value={draftLocale}
+                    onChange={setDraftLocale}
+                  />
+                  <small>
+                    {t(
+                      "Applied after saving in this browser. Media names and filter values stay unchanged.",
+                    )}
+                  </small>
+                </section>
+                <section class="connection">
+                  <h3 class="card-title">{t("Interface theme")}</h3>
+                  <select
+                    aria-label={t("Interface theme")}
+                    value={cfg.interfaceTheme || "default"}
+                    onChange={(e) =>
+                      setCfg({ ...cfg, interfaceTheme: e.currentTarget.value })
+                    }
+                  >
+                    {interfaceThemes.map((theme) => (
+                      <option value={theme}>{t(themeLabels[theme])}</option>
+                    ))}
+                  </select>
+                  <small>
+                    {t(
+                      "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.",
+                    )}
+                  </small>
+                </section>
+              </div>
               <section class="connection">
                 <h3 class="card-title">
                   <Layers size={16} />

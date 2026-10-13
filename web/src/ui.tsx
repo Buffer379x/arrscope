@@ -101,7 +101,6 @@ export const colorFields = [
   "hdr",
   "bitDepth",
   "channels",
-  "language",
   "audio",
   "custom",
 ];

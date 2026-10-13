@@ -10,7 +10,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 
 ## Features
 
-- Separate movie and TV libraries, a default dashboard, responsive layouts, dark and light themes.
+- Separate movie and TV libraries, a default dashboard, responsive layouts, dark and light modes with saved Default, Nordic and Catppuccin interface palettes.
 - English, German, Spanish and Italian interfaces, with a browser-specific language preference and straightforward [translation contributions](docs/TRANSLATING.md).
 - Filename-first resolution, codec/encoder and source detection, supplemented by existing API metadata. Inspect provenance and conflicting values in each file’s details.
 - Combined resolution, codec family, source, processing, year, size, HDR, bit depth, audio codec, channels and audio language filters. Search titles and filenames; select unknown and incomplete metadata.
@@ -66,7 +66,7 @@ Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=t
 
 Manage rules in **Settings → Tag rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
 
-The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
+The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language flags are bundled locally, including Turkish; custom rules use known aliases and unsupported languages show a neutral icon. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
 
 ## Development
 
