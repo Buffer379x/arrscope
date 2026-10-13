@@ -768,7 +768,7 @@ function RuleEditor({
           </button>
           <button class="primary">
             <Check size={15} />
-            {t("Apply to draft")}
+            {t("Save rule")}
           </button>
         </div>
       </form>

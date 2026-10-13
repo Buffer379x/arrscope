@@ -461,7 +461,7 @@
     "Skip when filename matches this expression": "Skip when filename matches this expression",
     "Consume matched text before subsequent rules": "Consume matched text before subsequent rules",
     "Useful for audio variants such as DTS-HD before DTS. Applies within the same attribute and mode.": "Useful for audio variants such as DTS-HD before DTS. Applies within the same attribute and mode.",
-    "Apply to draft": "Apply to draft",
+    "Save rule": "Save rule",
     "Recognition conflicts": "Recognition conflicts",
     "Languages:": "Languages:",
     "Codecs:": "Codecs:",
