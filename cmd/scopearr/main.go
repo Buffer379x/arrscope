@@ -90,9 +90,4 @@ func main() {
 	server.Sync.Shutdown()
 }
 
-func settingEnv(key string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return os.Getenv(strings.Replace(key, "SCOPEARR_", "ARRSCOPE_", 1))
-}
+func settingEnv(key string) string { return os.Getenv(key) }

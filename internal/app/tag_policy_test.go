@@ -194,7 +194,13 @@ func TestTagChoicesValidatedAndUHDBDDefault(t *testing.T) {
 		t.Fatal(result)
 	}
 	legacy := DefaultRecognitionRules()
-	legacy = legacy[:len(legacy)-1]
+	filtered := []RecognitionRule{}
+	for _, r := range legacy {
+		if r.ID != "default-source-uhdbd" {
+			filtered = append(filtered, r)
+		}
+	}
+	legacy = filtered
 	with, changed := addUHDBDDefault(legacy)
 	if !changed || len(with) != len(legacy)+1 {
 		t.Fatal("missing upgrade default")

@@ -22,7 +22,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
 - A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.
-- Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. Unused affected definitions are cleaned up after checking service references.
+- Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. A read-only removal preview shows provenance, affected titles and definition cleanup before confirmation; newly encountered foreign assignments pause for review.
 
 ## Install
 
@@ -58,7 +58,7 @@ Flags are representative language symbols, not claims about a file’s country o
 
 Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag`. Optional outbound synchronization can create/delete affected tag definitions and add/remove/replace movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
+Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag`. Optional outbound synchronization can create/delete affected tag definitions and add/remove movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
 
 Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 
@@ -98,18 +98,18 @@ The generated Scopearr PNG icon, favicons and Apple touch icon are included unde
 
 ## Custom tags
 
-Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
+Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, a tag icon in each Custom cell edits that single file. Use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
 
 Custom filters support OR, exclusion, contains-all and does-not-contain-all. Colors and filters list tags in use; the administration catalog also keeps unused tags available for future assignment. Filename rules can select Custom and an existing tag. All matching Custom rules add their tags; multiple tags are not conflicts. Manual additions survive synchronization and rule edits. Removed automatic tags may reappear after the next successful service sync.
 
 ## Upgrading existing installations
 
-Keep the existing appdata mount and `secret.key`. Schema 6 migration makes a backup; Scopearr consistently clones the legacy database to `scopearr.db` while retaining the original for rollback. Accounts, encrypted API keys, presets, recognition rules and cached media remain available. The previous image's `arrscope:stable` channel is also promoted to the approved Scopearr image so existing Unraid containers can update normally. New deployments use `scopearr:stable` and `deploy/scopearr.xml`. See [0.4.0 upgrade notes](docs/releases/0.4.0.md).
+Keep the existing appdata mount and `secret.key`. Database upgrades create a consistent backup and preserve accounts, encrypted API keys, presets, recognition rules and cached media. Use `ghcr.io/buffer379x/scopearr:stable` and `deploy/scopearr.xml`; see [operations](docs/OPERATIONS.md).
 
 Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=true` and `SCOPEARR_DEMO_DISCS=true`; the latter fixture presents BluRay, DVD and UHD sources consistent with displayed resolutions. It does not change production recognition defaults.
 
 ## Settings and dashboard
 
-Each settings section has an explicit Save action. Language, colors, display preferences, custom-tag administration and filename rules remain drafts until saved; leaving a section warns about unsaved edits. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
+Settings Save actions sit beside the section heading. Language, colors, display preferences and custom-tag administration remain drafts until saved; leaving a section warns about unsaved edits. Filename rules save after their individual dialog confirmation or checkbox change. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
 
 Dashboard distribution widgets show the top five entries. More/Less expands or collapses the remaining values without changing totals or percentages. Clicking an entry selects the existing library filters without saving a preset. Feedback appears as automatically dismissed bottom-right toasts.

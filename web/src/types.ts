@@ -42,13 +42,14 @@ export type Evidence = {
   conflict: boolean;
   rules?: string[];
 };
-export type CustomTag = { id: number; name: string };
+export type CustomTag = { id: number; name: string; manual?: boolean };
 export type CustomSelection = {
   total: number;
   counts: Record<string, number>;
   tags: CustomTag[];
 };
 export type MediaFile = {
+  informationOnly?: Record<string, string[]>;
   custom: CustomTag[];
   id: number;
   service: Service;
@@ -114,6 +115,7 @@ export type Status = {
       lastSuccess?: string;
       changed: number;
       retainedDefinitions?: number;
+      approvalRequired?: boolean;
     }
   >;
   initialized: boolean;
@@ -147,6 +149,7 @@ export type Statistics = {
 export type FilmSort = { field: string; direction: "asc" | "desc" };
 
 export type RecognitionRule = {
+  tag?: boolean;
   id: string;
   name: string;
   field: string;

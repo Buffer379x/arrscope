@@ -73,15 +73,19 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 	if g.Custom {
 		custom = customJSON
 	}
-	rows, err := q.QueryContext(ctx, "SELECT f.media_id,f.resolution,f.codec,f.source,f.processing,f.hdr,f.bitDepth,f.audio,f.channels,f.language,"+custom+" FROM files f WHERE f.service=?", service)
+	uncertainty := "'[]'"
+	if g.Audio || g.Language {
+		uncertainty = "coalesce(json_extract(f.data,'$.unknownTraits'),'[]')"
+	}
+	rows, err := q.QueryContext(ctx, "SELECT f.media_id,f.resolution,f.codec,f.source,f.processing,f.hdr,f.bitDepth,f.audio,f.channels,f.language,"+custom+","+uncertainty+" FROM files f WHERE f.service=?", service)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id int
-		var resolution, codec, source, processing, hdr, depth, audio, channels, language, raw string
-		if err = rows.Scan(&id, &resolution, &codec, &source, &processing, &hdr, &depth, &audio, &channels, &language, &raw); err != nil {
+		var resolution, codec, source, processing, hdr, depth, audio, channels, language, raw, unknown string
+		if err = rows.Scan(&id, &resolution, &codec, &source, &processing, &hdr, &depth, &audio, &channels, &language, &raw, &unknown); err != nil {
 			return out, err
 		}
 		if out.desired[id] == nil {
@@ -93,6 +97,9 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 			}
 			if out.groups[field] == nil {
 				out.groups[field] = map[string]bool{}
+			}
+			if value == "" && field != "custom" {
+				value = unknownTagLabel(field)
 			}
 			for _, v := range strings.Split(value, sep) {
 				label, exists := intern[v]
@@ -115,12 +122,23 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 		add("resolution", resolution, " + ")
 		add("codec", codec, " + ")
 		add("source", source, " + ")
-		add("source", processing, " + ")
+		if processing != "" {
+			add("source", processing, " + ")
+		}
 		add("hdr", hdr, " + ")
 		add("bitDepth", depth, " + ")
 		add("audio", audio, " + ")
 		add("channels", channels, " + ")
 		add("language", language, ", ")
+		var missing []string
+		if e := json.Unmarshal([]byte(unknown), &missing); e != nil {
+			return out, e
+		}
+		for _, field := range missing {
+			if field == "audio" || field == "language" {
+				add(field, unknownTagLabel(field), "\x00")
+			}
+		}
 		if g.Custom {
 			var tags []CustomTag
 			if err = json.Unmarshal([]byte(raw), &tags); err != nil {
@@ -145,6 +163,9 @@ func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint
 		if snap.groups[field] == nil {
 			snap.groups[field] = map[string]bool{}
 		}
+		if field != "custom" {
+			snap.groups[field][unknownTagLabel(field)] = true
+		}
 	}
 	for _, rule := range s.recognition.config.Rules {
 		field := rule.Field
@@ -152,7 +173,7 @@ func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint
 			field = "source"
 		}
 		if g.fields()[field] && field != "custom" && !strings.Contains(rule.Value, "$") {
-			if label := tagLabel(rule.Value); label != "" {
+			if label := tagLabel(normalizeRuleValue(rule.Field, rule.Value)); label != "" {
 				snap.groups[field][label] = true
 			}
 		}
@@ -196,7 +217,7 @@ func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint
 	}
 	return nil
 }
-func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings, old, next Settings) error {
+func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings, old, next Settings, approved ...*tagPlan) error {
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -219,7 +240,7 @@ func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings
 			if _, err = tx.ExecContext(ctx, "UPDATE tag_sync_groups SET state='keep' WHERE service=? AND endpoint=?", service, endpoint); err != nil {
 				return err
 			}
-			for _, table := range []string{"tag_sync_cleanup", "tag_sync_managed"} {
+			for _, table := range []string{"tag_sync_cleanup", "tag_sync_managed", "tag_sync_approvals"} {
 				if _, err = tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE service=? AND endpoint=?", service, endpoint); err != nil {
 					return err
 				}
@@ -254,6 +275,11 @@ func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings
 			}
 		}
 		if _, err = tx.ExecContext(ctx, "INSERT INTO kv VALUES(?, 'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", "tagSyncDirty:"+service); err != nil {
+			return err
+		}
+	}
+	for _, plan := range approved {
+		if err = approveTagPlan(ctx, tx, plan); err != nil {
 			return err
 		}
 	}
@@ -393,11 +419,13 @@ func (s *Store) cleanupTags(ctx context.Context, service, endpoint string, c *Ar
 		}
 		id := labels[label]
 		done := id == 0 || required[label] || kept[label]
+		gone := id == 0
 		if !done {
 			var detail map[string]json.RawMessage
 			if e = c.get(ctx, "tag/detail/"+strconv.Itoa(id), nil, &detail); e != nil {
 				if strings.Contains(e.Error(), "HTTP 404") {
 					done = true
+					gone = true
 				} else {
 					return blocked, e
 				}
@@ -422,6 +450,12 @@ func (s *Store) cleanupTags(ctx context.Context, service, endpoint string, c *Ar
 					return blocked, err
 				}
 				done = true
+				gone = true
+			}
+		}
+		if gone {
+			if _, e = s.DB.ExecContext(ctx, "DELETE FROM tag_sync_ownership WHERE service=? AND endpoint=? AND label=?", service, endpoint, label); e != nil {
+				return blocked, e
 			}
 		}
 		if done {
@@ -438,6 +472,9 @@ func tagResponseMatches(op string, got, want []int) bool {
 	}
 	set := map[int]bool{}
 	for _, id := range got {
+		if id <= 0 || set[id] {
+			return false
+		}
 		set[id] = true
 	}
 	for _, id := range want {

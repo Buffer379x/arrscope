@@ -31,8 +31,18 @@ func OpenStore(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	if err := migrateLegacyDatabase(dir); err != nil {
-		return nil, err
+	// Never silently initialize an empty account over an existing differently
+	// named database. Current deployments use scopearr.db.
+	if _, e := os.Stat(filepath.Join(dir, "scopearr.db")); os.IsNotExist(e) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".db") {
+				return nil, fmt.Errorf("Existing database found. Restore the active database as scopearr.db before starting")
+			}
+		}
 	}
 	db, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=cache_size(-1024)&_pragma=temp_store(FILE)")
 	if err != nil {
@@ -49,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 8 {
+	if version > 9 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -271,6 +281,49 @@ PRAGMA user_version=1;COMMIT;`)
 		}
 	}
 
+	if originalVersion < 9 {
+		if originalVersion == 8 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		var cfg RecognitionConfig
+		loaded := s.Get("recognition", &cfg) == nil
+		upgraded, changed := upgradeRules053(cfg.Rules)
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if _, e = tx.Exec(tagApprovalSchema); e == nil && loaded && changed {
+			var engine *RecognitionEngine
+			engine, e = CompileRecognition(upgraded)
+			if e == nil {
+				raw, _ := json.Marshal(engine.Config())
+				_, e = tx.Exec("UPDATE kv SET value=? WHERE key='recognition'", string(raw))
+			}
+			if e == nil {
+				e = reparseCached(context.Background(), tx, engine)
+			}
+		}
+		var settings Settings
+		if e == nil && s.Get("settings", &settings) == nil {
+			for service, c := range map[string]ServiceConfig{"radarr": settings.Radarr, "sonarr": settings.Sonarr} {
+				if c.TagSync.Active() {
+					_, e = tx.Exec("INSERT INTO kv VALUES(?, 'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", "tagSyncDirty:"+service)
+					if e != nil {
+						break
+					}
+				}
+			}
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
 	var recognition RecognitionConfig
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.
@@ -448,6 +501,14 @@ func where(q url.Values) (string, []any, error) {
 	}
 	w := []string{"f.service=?"}
 	a := []any{service}
+	if values, ok := q["fileId"]; ok {
+		id, e := strconv.Atoi(q.Get("fileId"))
+		if len(values) != 1 || e != nil || id <= 0 {
+			return "", nil, fmt.Errorf("Invalid file ID")
+		}
+		w = append(w, "f.id=?")
+		a = append(a, id)
+	}
 	if search := strings.TrimSpace(q.Get("q")); search != "" {
 		var terms []string
 		for _, v := range strings.Fields(search) {

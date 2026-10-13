@@ -215,8 +215,21 @@ func seedTags(t *testing.T, s *Store, service string, c ServiceConfig, files []F
 		t.Fatal(err)
 	}
 }
+func approveFixturePlan(t *testing.T, s *Store, service string, c ServiceConfig) {
+	t.Helper()
+	p, e := s.BuildTagPlan(context.Background(), service, c, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if p.Preview.ApprovalRequired {
+		if e = s.ApproveTagPlan(context.Background(), p); e != nil {
+			t.Fatal(e)
+		}
+	}
+}
 func reconcile(t *testing.T, s *Store, service string, c ServiceConfig) {
 	t.Helper()
+	approveFixturePlan(t, s, service, c)
 	if _, wait, err := s.ReconcileTags(context.Background(), service, c, func() bool { return true }); err != nil || wait {
 		t.Fatal(wait, err)
 	}
@@ -308,6 +321,7 @@ func TestOutboundIntentSurvivesAmbiguousResponseAndRestart(t *testing.T) {
 	a := sample(1, "Movie.1080p.x264.mkv")
 	a.MediaID = 10
 	seedTags(t, s, "radarr", c, []File{a})
+	approveFixturePlan(t, s, "radarr", c)
 	f.failWrite = true
 	if _, _, err := s.ReconcileTags(context.Background(), "radarr", c, func() bool { return true }); err == nil {
 		t.Fatal("write failure ignored")
@@ -351,6 +365,10 @@ func TestOutboundAfterFileSyncAndFailedWritesKeepCache(t *testing.T) {
 	}
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
+		if server.Tags.Statuses()["radarr"].ApprovalRequired {
+			approveFixturePlan(t, store, "radarr", c)
+			server.Tags.Queue("radarr")
+		}
 		if server.Tags.Statuses()["radarr"].Error != "" {
 			break
 		}

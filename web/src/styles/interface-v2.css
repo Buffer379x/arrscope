@@ -729,23 +729,6 @@ select {
 }
 
 /* Consistent destructive actions, compact filters and settings language width. */
-.button.danger-button,
-.icon-button.danger-button {
-  color: #d96c73;
-  background: #6e283033;
-  border-color: #a4455055;
-}
-.button.danger-button:hover:not(:disabled),
-.icon-button.danger-button:hover:not(:disabled) {
-  color: #ef9299;
-  background: #852f394d;
-  border-color: #b84f5b;
-}
-[data-theme="light"] .danger-button {
-  color: #a33743;
-  background: #a3374312;
-  border-color: #a3374340;
-}
 .filter-panel.collapsed .filter-footer {
   border-top: 0;
 }
@@ -773,8 +756,83 @@ select {
   gap: 10px;
 }
 
-[data-theme="light"] .danger-button:hover:not(:disabled) {
-  color: #8d2230;
-  background: #8d22301f;
-  border-color: #a33743;
+.danger-button svg {
+  color: #c7666e;
+}
+[data-theme="light"] .danger-button svg {
+  color: #a33743;
+}
+.tag-policy-options input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 16px;
+  appearance: auto;
+}
+.tag-policy-options label {
+  flex-direction: row;
+}
+.settings-section-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.settings-section-heading > .quiet {
+  grid-column: 1/-1;
+}
+.settings-section-heading > button {
+  justify-self: end;
+}
+.outbound-tag-settings .tag-group-options {
+  margin-top: 16px;
+}
+.system-services {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.system-service-card {
+  padding: 20px;
+  margin-top: 20px;
+}
+@media (max-width: 850px) {
+  .system-services {
+    grid-template-columns: 1fr;
+  }
+}
+.tag-info-only {
+  font-size: inherit;
+  color: var(--text);
+}
+.single-tag-button {
+  flex-shrink: 0;
+}
+.tag-preview-table td {
+  vertical-align: top;
+}
+.tag-preview-dialog {
+  width: min(900px, calc(100vw - 28px));
+}
+.tag-preview-table details {
+  max-width: 260px;
+}
+.tag-preview-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.tag-preview-dialog .table-wrap {
+  min-height: 0;
+}
+.outbound-tag-settings h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }

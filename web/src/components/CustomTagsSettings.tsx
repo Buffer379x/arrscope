@@ -62,6 +62,15 @@ export function CustomTagsSettings({
     <section class="custom-tags-settings" aria-label={t("Custom tags")}>
       <header class="settings-section-heading">
         <h2>{t("Custom tags")}</h2>
+        <button
+          type="button"
+          class="primary"
+          disabled={busy || !dirty}
+          onClick={() => void save()}
+        >
+          {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}
+          {t("Save settings")}
+        </button>
         <p class="quiet">
           {t(
             "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
@@ -155,17 +164,6 @@ export function CustomTagsSettings({
           )}
         </div>
       </section>
-      <div class="settings-save-bar">
-        <button
-          type="button"
-          class="primary"
-          disabled={busy || !dirty}
-          onClick={() => void save()}
-        >
-          {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}
-          {t("Save settings")}
-        </button>
-      </div>
     </section>
   );
 }

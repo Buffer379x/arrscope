@@ -84,7 +84,7 @@ func TestSchemaSevenUpgradesOnlyUntouchedRecognitionDefaults(t *testing.T) {
 	defer fresh.DB.Close()
 	var version int
 	fresh.DB.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 8 {
+	if version != 9 {
 		t.Fatal(version)
 	}
 	for _, rule := range fresh.Recognition().Rules {

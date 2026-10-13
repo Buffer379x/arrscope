@@ -1,3 +1,4 @@
+import { Tag } from "../ui";
 import { Languages } from "lucide-preact";
 import { t, useI18n } from "../i18n";
 import { audioLanguage, audioLanguageKey } from "../languages";
@@ -16,15 +17,17 @@ const vertical: Record<string, string[]> = {
 export function LanguageFlag({
   value,
   focusable = true,
+  tagged = true,
 }: {
   value: string;
   focusable?: boolean;
+  tagged?: boolean;
 }) {
   useI18n();
   const language = audioLanguage(value),
     label = t(audioLanguageKey(value));
   const flag = language?.flag;
-  return (
+  const renderedFlag = (
     <span
       class="language-flag"
       role="img"
@@ -91,6 +94,13 @@ export function LanguageFlag({
         {label}
       </span>
     </span>
+  );
+  return tagged ? (
+    <Tag kind="language" value={value}>
+      {renderedFlag}
+    </Tag>
+  ) : (
+    renderedFlag
   );
 }
 export function LanguageFlags({ value }: { value: string }) {

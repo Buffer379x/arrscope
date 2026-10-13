@@ -230,6 +230,7 @@ func EnrichWithRules(f *File, api APIInfo, engine *RecognitionEngine) {
 	f.comparisonEngine = engine
 	f.APIInfo = &api
 	result := engine.Recognize(f.Filename)
+	f.InformationOnly = engine.informationOnly(f.Filename, result)
 	f.RecognizedCustom = nil
 	for _, v := range strings.Split(result.Values["custom"], " + ") {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {

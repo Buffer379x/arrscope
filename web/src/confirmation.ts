@@ -1,5 +1,6 @@
 export type Confirmation = {
   message: string;
+  reset?: boolean;
   resolve: (accepted: boolean) => void;
 };
 let active: Confirmation | null = null;
@@ -14,10 +15,13 @@ export function subscribeConfirmation(listener: () => void) {
     listeners.delete(listener);
   };
 }
-export function confirmDeletion(message: string): Promise<boolean> {
+export function confirmDeletion(
+  message: string,
+  reset = false,
+): Promise<boolean> {
   if (active) return Promise.resolve(false);
   return new Promise((resolve) => {
-    active = { message, resolve };
+    active = { message, reset, resolve };
     emit();
   });
 }
@@ -27,4 +31,8 @@ export function answerConfirmation(accepted: boolean) {
   active = null;
   emit();
   pending.resolve(accepted);
+}
+
+export function confirmReset(message: string) {
+  return confirmDeletion(message, true);
 }

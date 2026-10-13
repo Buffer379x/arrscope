@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS file_custom_auto(file_rowid INTEGER REFERENCES files(
 CREATE TABLE IF NOT EXISTS file_custom(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,tag_id INTEGER REFERENCES custom_tags(id) ON DELETE CASCADE,PRIMARY KEY(file_rowid,tag_id));
 CREATE INDEX IF NOT EXISTS file_custom_value ON file_custom(tag_id,file_rowid);
 PRAGMA user_version=6;`
-const customJSON = `coalesce((SELECT json_group_array(json_object('id',id,'name',name)) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id)),'[]')`
+const customJSON = `coalesce((SELECT json_group_array(json_object('id',id,'name',name,'manual',json(CASE WHEN EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=id AND o.state=1) THEN 'true' ELSE 'false' END))) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id)),'[]')`
 
 func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
 	out := []CustomTag{}

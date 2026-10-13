@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.5.3
+
+Reviewed tag-removal plans with provenance and protection for new foreign assignments; category-scoped unknown output tags; editable UHD BluRay recognition; rule presentation flags and atomic autosave; per-file custom assignment; unified Display controls and settings header actions. SQLite schema 9 preserves existing data. See [release notes](docs/releases/0.5.3.md).
+
 ## 0.5.2
 
 Default UHDBD-to-UHD source recognition; confirmed append/replace and keep/delete tag policies; durable group retention and safe unused-definition cleanup; deletion confirmations and muted-red controls; compact collapsed filters and full-width language selection. SQLite schema 8 preserves existing data and customized rules. See [release notes](docs/releases/0.5.2.md).
