@@ -1,5 +1,5 @@
-import { t, useI18n } from "../i18n";
-import { audioLanguageKey, sameAudioLanguage } from "../languages";
+import { t, useI18n, getLocale } from "../i18n";
+import { audioLanguageLabel, sameAudioLanguage } from "../languages";
 import { OperatorButton } from "./OperatorButton";
 import { ChevronDown } from "lucide-preact";
 import { useEffect, useRef, useState, useContext } from "preact/hooks";
@@ -103,7 +103,7 @@ export function MultiFilter({
                     v === "__unknown__"
                       ? t(name === "custom" ? "No custom tags" : "Unknown")
                       : name === "language"
-                        ? t(audioLanguageKey(v))
+                        ? t(audioLanguageLabel(v, getLocale()))
                         : name === "custom"
                           ? names[v] || v
                           : v,
@@ -148,7 +148,7 @@ export function MultiFilter({
                 {v === "__unknown__"
                   ? t(name === "custom" ? "No custom tags" : "Unknown")
                   : name === "language"
-                    ? t(audioLanguageKey(v))
+                    ? t(audioLanguageLabel(v, getLocale()))
                     : name === "custom"
                       ? names[v] || v
                       : v}

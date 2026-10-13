@@ -1,8 +1,8 @@
 import { TagColors, TagVisibility, TagInformation } from "../ui";
 import { useContext } from "preact/hooks";
 import { Languages } from "lucide-preact";
-import { t, useI18n } from "../i18n";
-import { audioLanguage, audioLanguageKey } from "../languages";
+import { t, useI18n, getLocale } from "../i18n";
+import { audioLanguage, audioLanguageLabel } from "../languages";
 const horizontal: Record<string, string[]> = {
   de: ["#151515", "#dc2525", "#f8ce38"],
   es: ["#b81c31", "#f6cc3a", "#b81c31"],
@@ -26,7 +26,7 @@ export function LanguageFlag({
 }) {
   useI18n();
   const language = audioLanguage(value),
-    label = t(audioLanguageKey(value));
+    label = t(audioLanguageLabel(value, getLocale()));
   const flag = language?.flag;
   const inherited = useContext(TagColors),
     visibility = useContext(TagVisibility),
@@ -47,7 +47,22 @@ export function LanguageFlag({
       title={label}
       tabIndex={focusable ? 0 : undefined}
     >
-      {flag ? (
+      {flag &&
+      ![
+        "de",
+        "gb",
+        "es",
+        "it",
+        "fr",
+        "jp",
+        "pt",
+        "nl",
+        "ru",
+        "pl",
+        "tr",
+      ].includes(flag) ? (
+        <img src={"/flags/" + flag + ".svg"} alt="" aria-hidden="true" />
+      ) : flag ? (
         <svg
           viewBox="0 0 30 20"
           aria-hidden="true"

@@ -1,4 +1,4 @@
-import { audioLanguage } from "./languages.ts";
+import { audioLanguage, isUnknownAudioLanguage } from "./languages.ts";
 const fields = [
   "resolution",
   "codec",
@@ -24,9 +24,7 @@ export function canonicalPresetQuery(query: string): string {
             !v || v === "__unknown__"
               ? "__unknown__"
               : field === "language"
-                ? ["und", "unknown", "undefined", "n/a"].includes(
-                    v.trim().toLowerCase(),
-                  )
+                ? isUnknownAudioLanguage(v)
                   ? "__unknown__"
                   : audioLanguage(v)?.aliases[0] || v.trim()
                 : v,

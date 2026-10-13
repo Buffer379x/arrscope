@@ -66,7 +66,7 @@ Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=t
 
 Manage rules in **Settings → Tag rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
 
-The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language flags are bundled locally, including Turkish; custom rules use known aliases and unsupported languages show a neutral icon. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
+The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language flags and a full ISO 639-1/2/3 code registry are bundled locally; [language metadata](docs/LANGUAGES.md) uses readable names and known flag mappings, with neutral icons for unmapped languages. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
 
 ## Development
 

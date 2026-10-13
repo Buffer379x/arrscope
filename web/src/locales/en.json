@@ -649,6 +649,12 @@
     "Linen": "Linen",
     "Charcoal": "Charcoal",
     "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.": "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.",
-    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators."
+    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.",
+    "Really cancel?": "Really cancel?",
+    "Discard changes": "Discard changes",
+    "Discard your unsaved rule changes?": "Discard your unsaved rule changes?",
+    "Saving rule…": "Saving rule…",
+    "Saving rule and updating the cached library. Keep this dialog open until saving completes.": "Saving rule and updating the cached library. Keep this dialog open until saving completes.",
+    "Names are saved when you press Enter or leave the field.": "Names are saved when you press Enter or leave the field."
   }
 }

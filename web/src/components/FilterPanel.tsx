@@ -1,6 +1,6 @@
 import { useState, useId } from "preact/hooks";
-import { t, useI18n } from "../i18n";
-import { audioLanguageKey } from "../languages";
+import { t, useI18n, getLocale } from "../i18n";
+import { audioLanguageLabel } from "../languages";
 import {
   CircleHelp,
   RotateCcw,
@@ -396,7 +396,7 @@ export function FilterPanel({
                                 ? t("incomplete")
                                 : t("complete")
                               : k === "language"
-                                ? t(audioLanguageKey(value))
+                                ? t(audioLanguageLabel(value, getLocale()))
                                 : value,
                     )
                     .join(" + ")}

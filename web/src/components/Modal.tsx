@@ -5,12 +5,14 @@ import { useEffect, useId, useRef } from "preact/hooks";
 export function Modal({
   title,
   close,
+  closeDisabled = false,
   children,
   wide = false,
   className = "",
 }: {
   title: string;
   close: () => void;
+  closeDisabled?: boolean;
   children: preact.ComponentChildren;
   wide?: boolean;
   className?: string;
@@ -29,10 +31,10 @@ export function Modal({
       aria-labelledby={headingId}
       onCancel={(e) => {
         e.preventDefault();
-        close();
+        if (!closeDisabled) close();
       }}
       onClick={(e) => {
-        if (e.target === ref.current) {
+        if (!closeDisabled && e.target === ref.current) {
           const box = ref.current!.getBoundingClientRect();
           if (
             e.clientX < box.left ||
@@ -46,7 +48,12 @@ export function Modal({
     >
       <div class="modal-heading">
         <h2 id={headingId}>{title}</h2>
-        <button class="icon-button" aria-label={t("Close")} onClick={close}>
+        <button
+          class="icon-button"
+          aria-label={t("Close")}
+          disabled={closeDisabled}
+          onClick={close}
+        >
           <X size={20} />
         </button>
       </div>

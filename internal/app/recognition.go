@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"scopearr/internal/langdata"
 	"sort"
 	"strconv"
 	"strings"
@@ -141,7 +142,7 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		}
 	}
 	raw, _ := json.Marshal(rules)
-	sum := sha256.Sum256(raw)
+	sum := sha256.Sum256(append(raw, []byte("\nISO:"+langdata.Revision)...))
 	engine.config.Revision = hex.EncodeToString(sum[:])
 	return engine, nil
 }

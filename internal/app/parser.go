@@ -2,6 +2,7 @@ package app
 
 import (
 	"regexp"
+	"scopearr/internal/langdata"
 	"sort"
 	"strconv"
 	"strings"
@@ -180,30 +181,15 @@ func normLanguage(s string) string {
 	seen := map[string]bool{}
 	for _, v := range values {
 		v = strings.TrimSpace(v)
-		switch strings.ToLower(v) {
-		case "und", "unknown", "undefined", "n/a":
+		if langdata.IsUnknown(v) {
 			v = ""
-		case "german", "deutsch", "de", "deu", "ger":
-			v = "Deutsch"
-		case "english", "englisch", "en", "eng":
-			v = "Englisch"
-		case "french", "französisch", "fr", "fra", "fre":
-			v = "Französisch"
-		case "spanish", "spanisch", "español", "es", "spa":
-			v = "Spanisch"
-		case "italian", "italienisch", "italiano", "it", "ita":
-			v = "Italienisch"
-		case "portuguese", "portugiesisch", "pt", "por":
-			v = "Portugiesisch"
-		case "dutch", "niederländisch", "nl", "nld", "dut":
-			v = "Niederländisch"
-		case "russian", "russisch", "ru", "rus":
-			v = "Russisch"
-		case "polish", "polnisch", "pl", "pol":
-			v = "Polnisch"
-		case "japanese", "japanisch", "ja", "jpn":
-			v = "Japanisch"
+		} else if canonical := langdata.Canonical(v); canonical != "" {
+			v = canonical
+			if langdata.IsUnknown(v) {
+				v = ""
+			}
 		}
+
 		if v != "" && !seen[v] {
 			out = append(out, v)
 			seen[v] = true
