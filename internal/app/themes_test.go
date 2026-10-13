@@ -11,7 +11,7 @@ func TestInterfaceThemeCompatibilityValidationAndRestart(t *testing.T) {
 	if err := normalizeInterfaceTheme(&cfg); err != nil || cfg.InterfaceTheme != "default" {
 		t.Fatal("existing installations must retain Default", err)
 	}
-	for _, value := range []string{"default", "nord", "catppuccin"} {
+	for _, value := range []string{"default", "nord", "catppuccin", "graphite", "slate", "ocean", "atlantic", "forest", "sage", "sandstone", "copper", "coffee", "midnight", "ink", "steel", "mist", "linen", "charcoal"} {
 		cfg.InterfaceTheme = value
 		if err := normalizeInterfaceTheme(&cfg); err != nil {
 			t.Fatal(err)

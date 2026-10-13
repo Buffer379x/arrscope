@@ -632,6 +632,23 @@
     "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.": "Se aplica al guardar. Todos los temas admiten los modos oscuro y claro; el diseño y los colores de las etiquetas no cambian.",
     "Turkish": "Turco",
     "Nordic": "Nordic",
-    "Catppuccin": "Catppuccin"
+    "Catppuccin": "Catppuccin",
+    "Graphite": "Graphite",
+    "Slate": "Slate",
+    "Ocean": "Ocean",
+    "Atlantic": "Atlantic",
+    "Forest": "Forest",
+    "Sage": "Sage",
+    "Sandstone": "Sandstone",
+    "Copper": "Copper",
+    "Coffee": "Coffee",
+    "Midnight": "Midnight",
+    "Ink": "Ink",
+    "Steel": "Steel",
+    "Mist": "Mist",
+    "Linen": "Linen",
+    "Charcoal": "Charcoal",
+    "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.": "La prioridad se aplica dentro de cada modo. Solo si falta conserva los resultados existentes; usa Sobrescritura explícita para reemplazar un valor reconocido.",
+    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Los tokens buscan texto literal, incluidos separadores como .Ultra.HD. Usa una expresión regular para otras grafías o separadores."
   }
 }
