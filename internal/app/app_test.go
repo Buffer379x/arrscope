@@ -356,7 +356,7 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	cfg.Emby.APIKey = "emby-fake-secret"
 	cfg.Emby.URL = "http://emby.example"
 	cfg.VisibleColumns["radarr"] = []string{"title", "size"}
-	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][5] = cfg.ColumnOrder["radarr"][5], cfg.ColumnOrder["radarr"][0]
+	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][6] = cfg.ColumnOrder["radarr"][6], cfg.ColumnOrder["radarr"][0]
 	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff"}
 	b, _ = json.Marshal(cfg)
 	check(request("/api/settings", "PUT", string(b), true), 200)
@@ -769,8 +769,8 @@ func TestPermanentPresetsAndTagColors(t *testing.T) {
 	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff", "resolution:1080p": "#000000"}
 	cfg.VisibleColumns["radarr"] = []string{"title", "size", "audio"}
 	cfg.VisibleColumns["sonarr"] = []string{"title", "codec"}
-	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][5] = cfg.ColumnOrder["radarr"][5], cfg.ColumnOrder["radarr"][0]
-	cfg.ColumnOrder["sonarr"][0], cfg.ColumnOrder["sonarr"][3] = cfg.ColumnOrder["sonarr"][3], cfg.ColumnOrder["sonarr"][0]
+	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][6] = cfg.ColumnOrder["radarr"][6], cfg.ColumnOrder["radarr"][0]
+	cfg.ColumnOrder["sonarr"][0], cfg.ColumnOrder["sonarr"][4] = cfg.ColumnOrder["sonarr"][4], cfg.ColumnOrder["sonarr"][0]
 	if err := validateTagColors(cfg.TagColors); err != nil {
 		t.Fatal(err)
 	}
@@ -928,7 +928,7 @@ func TestStatisticsUniqueMediaAndEpisodes(t *testing.T) {
 func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.VisibleColumns = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "title,year,resolution,codec,source,custom" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "info,title,year,resolution,codec,source,custom" {
 		t.Fatal("legacy defaults missing", err)
 	}
 	for _, columns := range []map[string][]string{
@@ -941,7 +941,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		}
 	}
 	cfg.VisibleColumns = map[string][]string{"sonarr": {"title"}}
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 6 || len(cfg.VisibleColumns["sonarr"]) != 1 {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 7 || len(cfg.VisibleColumns["sonarr"]) != 1 {
 		t.Fatal("partial choices not normalized", err)
 	}
 	s := testStore(t)
@@ -956,7 +956,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().VisibleColumns["radarr"]) != 6 {
+	if len(server.Config().VisibleColumns["radarr"]) != 7 {
 		t.Fatal("legacy server layout missing")
 	}
 }
@@ -964,11 +964,11 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 func TestColumnOrderLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.ColumnOrder = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 11 || cfg.ColumnOrder["radarr"][0] != "title" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 12 || cfg.ColumnOrder["radarr"][0] != "info" {
 		t.Fatal("missing legacy column order", err)
 	}
 	duplicate := defaultColumnOrder()["radarr"]
-	duplicate[1] = "title"
+	duplicate[1] = duplicate[0]
 	unknown := defaultColumnOrder()["radarr"]
 	unknown[1] = "password"
 	for _, order := range []map[string][]string{
@@ -980,8 +980,8 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		}
 	}
 	cfg.ColumnOrder = map[string][]string{"sonarr": defaultColumnOrder()["sonarr"]}
-	cfg.ColumnOrder["sonarr"][0], cfg.ColumnOrder["sonarr"][3] = cfg.ColumnOrder["sonarr"][3], cfg.ColumnOrder["sonarr"][0]
-	if err := normalizeVisibleColumns(&cfg); err != nil || cfg.ColumnOrder["sonarr"][0] != "codec" || cfg.ColumnOrder["radarr"][0] != "title" {
+	cfg.ColumnOrder["sonarr"][0], cfg.ColumnOrder["sonarr"][4] = cfg.ColumnOrder["sonarr"][4], cfg.ColumnOrder["sonarr"][0]
+	if err := normalizeVisibleColumns(&cfg); err != nil || cfg.ColumnOrder["sonarr"][0] != "codec" || cfg.ColumnOrder["radarr"][0] != "info" {
 		t.Fatal("partial order lost", err)
 	}
 	store := testStore(t)
@@ -996,7 +996,7 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().ColumnOrder["sonarr"]) != 11 {
+	if len(server.Config().ColumnOrder["sonarr"]) != 12 {
 		t.Fatal("legacy server order missing")
 	}
 }

@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.6.3
+
+Configurable Info action column with new-tab Radarr/Sonarr links, file details and both warning indicators; persistent icon visibility/order and per-library Info column ordering. Existing layouts and cache rows remain compatible. No database schema migration. See [release notes](docs/releases/0.6.3.md).
+
 ## 0.6.2
 
 Shared ISO 639-1/2/3 metadata registry, localized language labels and bundled flags; immediate custom-tag writes; guarded rule-dialog dismissal and visible cache-save progress. Schema 11 reprocesses cached language evidence with a consistent backup. See [release notes](docs/releases/0.6.2.md).

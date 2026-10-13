@@ -1,0 +1,108 @@
+import {
+  AlertTriangle,
+  FileVideo2,
+  Film,
+  Link2,
+  OctagonAlert,
+} from "lucide-preact";
+import type { MediaFile, Settings } from "../types";
+import { defaultWarningColors } from "../ui";
+import { entryLink } from "../entry-link";
+import { t, useI18n } from "../i18n";
+export const infoOrder = ["link", "details", "metadata", "recognition"];
+export function RowInfo({
+  file,
+  settings,
+  details,
+}: {
+  file: MediaFile;
+  settings: Settings | null;
+  details: () => void;
+}) {
+  useI18n();
+  const href = entryLink(settings?.[file.service], file);
+  const linkLabel = t("Open {service} entry in a new tab", {
+    service: file.service === "radarr" ? "Radarr" : "Sonarr",
+  });
+  const tooltipID = "filename-" + file.service + "-" + file.id;
+  const visible = settings?.listInfoVisible || infoOrder;
+  const buttons = {
+    link: href ? (
+      <a
+        class="row-icon info-action"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        referrerPolicy="no-referrer"
+        title={linkLabel}
+        aria-label={linkLabel}
+      >
+        <Link2 size={15} />
+      </a>
+    ) : (
+      <button
+        class="row-icon info-action"
+        disabled
+        aria-label={linkLabel}
+        title={t(
+          "Entry link unavailable. Configure the service and synchronize the library.",
+        )}
+      >
+        <Link2 size={15} />
+      </button>
+    ),
+    details: (
+      <button
+        class="row-icon file-button info-action"
+        aria-label={t("Filename and metadata: {title}", { title: file.title })}
+        aria-describedby={tooltipID}
+        onClick={details}
+      >
+        {file.service === "radarr" ? (
+          <Film size={15} />
+        ) : (
+          <FileVideo2 size={15} />
+        )}
+        <span class="filename-tooltip" role="tooltip" id={tooltipID}>
+          {file.filename}
+        </span>
+      </button>
+    ),
+    metadata: file.conflict ? (
+      <button
+        class="row-icon info-action info-warning"
+        title={t("Metadata disagreement")}
+        style={{
+          color:
+            settings?.warningColors.metadata || defaultWarningColors.metadata,
+        }}
+        aria-label={t("Show conflicting metadata")}
+        onClick={details}
+      >
+        <AlertTriangle size={15} />
+      </button>
+    ) : null,
+    recognition: file.ruleConflict ? (
+      <button
+        class="row-icon info-action info-warning"
+        title={t("Conflicting recognition rules")}
+        style={{
+          color:
+            settings?.warningColors.recognition ||
+            defaultWarningColors.recognition,
+        }}
+        aria-label={t("Show recognition conflicts")}
+        onClick={details}
+      >
+        <OctagonAlert size={15} />
+      </button>
+    ) : null,
+  };
+  return (
+    <div class="info-actions">
+      {(settings?.listInfoOrder || infoOrder)
+        .filter((key) => visible.includes(key))
+        .map((key) => buttons[key as keyof typeof buttons])}
+    </div>
+  );
+}

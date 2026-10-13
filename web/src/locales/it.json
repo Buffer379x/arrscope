@@ -655,6 +655,15 @@
     "Discard your unsaved rule changes?": "Vuoi scartare le modifiche non salvate alla regola?",
     "Saving rule…": "Salvataggio regola…",
     "Saving rule and updating the cached library. Keep this dialog open until saving completes.": "Salvataggio della regola e aggiornamento della libreria in cache. Attendi il completamento.",
-    "Names are saved when you press Enter or leave the field.": "I nomi vengono salvati premendo Invio o uscendo dal campo."
+    "Names are saved when you press Enter or leave the field.": "I nomi vengono salvati premendo Invio o uscendo dal campo.",
+    "Info": "Info",
+    "List display": "Visualizzazione elenchi",
+    "Show link to Radarr / Sonarr entry": "Mostra link alla voce Radarr / Sonarr",
+    "Show file details": "Mostra dettagli del file",
+    "Show metadata disagreement warning": "Mostra avviso di discrepanza dei metadati",
+    "Show recognition conflict warning": "Mostra avviso di conflitti di riconoscimento",
+    "Choose the icons in the Info column. Move them with the arrows to set their left-to-right order in both libraries. Warnings appear only for affected files.": "Scegli le icone nella colonna Info. Le frecce impostano l’ordine da sinistra a destra in entrambe le librerie. Gli avvisi appaiono solo per i file interessati.",
+    "Open {service} entry in a new tab": "Apri voce {service} in una nuova scheda",
+    "Entry link unavailable. Configure the service and synchronize the library.": "Link non disponibile. Configura il servizio e sincronizza la libreria."
   }
 }

@@ -41,6 +41,8 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 	var cfg Settings
 	e = store.Get("settings", &cfg)
 	if e == nil {
+		legacyInfo := cfg.ListInfoOrder == nil
+		encryptedKeys := [3]string{cfg.Radarr.APIKey, cfg.Sonarr.APIKey, cfg.Emby.APIKey}
 		cfg.Radarr.APIKey, e = sec.Open(cfg.Radarr.APIKey)
 		if e != nil {
 			return nil, e
@@ -67,6 +69,18 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		}
 		if e := normalizeVisibleColumns(&cfg); e != nil {
 			return nil, e
+		}
+		if legacyInfo {
+			// Persist the additive layout upgrade once; a pre-upgrade backup also
+			// allows older versions to restore their supported column settings.
+			if e := store.Backup(); e != nil {
+				return nil, e
+			}
+			persisted := cfg
+			persisted.Radarr.APIKey, persisted.Sonarr.APIKey, persisted.Emby.APIKey = encryptedKeys[0], encryptedKeys[1], encryptedKeys[2]
+			if e := store.Put("settings", persisted); e != nil {
+				return nil, e
+			}
 		}
 		s.settings = cfg
 	}
@@ -665,6 +679,9 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 			jsonOut(w, 202, map[string]bool{"ok": true})
+			return
+		case "/api/open-entry":
+			s.openEntry(w, r)
 			return
 		case "/api/files":
 			if r.Method != "GET" {

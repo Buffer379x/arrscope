@@ -278,7 +278,7 @@ func TestVersion3MigrationRetainsEmbyMetadata(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.TagColors = map[string]string{"audio:DTS": "#777777"}
 	cfg.VisibleColumns["radarr"] = []string{"title", "audio"}
-	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][5] = cfg.ColumnOrder["radarr"][5], cfg.ColumnOrder["radarr"][0]
+	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][6] = cfg.ColumnOrder["radarr"][6], cfg.ColumnOrder["radarr"][0]
 	if err = s.Put("settings", cfg); err != nil {
 		t.Fatal(err)
 	}

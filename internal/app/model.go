@@ -40,16 +40,18 @@ type ServiceConfig struct {
 	Interval       int       `json:"interval"`
 }
 type Settings struct {
-	InterfaceTheme string              `json:"interfaceTheme"`
-	WarningColors  map[string]string   `json:"warningColors"`
-	ColumnOrder    map[string][]string `json:"columnOrder"`
-	VisibleColumns map[string][]string `json:"visibleColumns"`
-	TagColors      map[string]string   `json:"tagColors"`
-	TagTextColors  map[string]string   `json:"tagTextColors"`
-	Radarr         ServiceConfig       `json:"radarr"`
-	Sonarr         ServiceConfig       `json:"sonarr"`
-	Emby           ServiceConfig       `json:"emby"`
-	SeasonMode     string              `json:"seasonMode"`
+	ListInfoOrder   []string            `json:"listInfoOrder"`
+	ListInfoVisible []string            `json:"listInfoVisible"`
+	InterfaceTheme  string              `json:"interfaceTheme"`
+	WarningColors   map[string]string   `json:"warningColors"`
+	ColumnOrder     map[string][]string `json:"columnOrder"`
+	VisibleColumns  map[string][]string `json:"visibleColumns"`
+	TagColors       map[string]string   `json:"tagColors"`
+	TagTextColors   map[string]string   `json:"tagTextColors"`
+	Radarr          ServiceConfig       `json:"radarr"`
+	Sonarr          ServiceConfig       `json:"sonarr"`
+	Emby            ServiceConfig       `json:"emby"`
+	SeasonMode      string              `json:"seasonMode"`
 }
 type Evidence struct {
 	Rules    []string `json:"rules,omitempty"`
@@ -91,6 +93,7 @@ type File struct {
 	ID                   int                   `json:"id"`
 	Service              string                `json:"service"`
 	MediaID              int                   `json:"mediaId"`
+	TitleSlug            string                `json:"titleSlug,omitempty"`
 	Title                string                `json:"title"`
 	Series               string                `json:"series"`
 	Season               int                   `json:"season"`
@@ -135,7 +138,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
@@ -156,21 +159,24 @@ func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 
 func defaultColumnOrder() map[string][]string {
 	return map[string][]string{
-		"radarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
-		"sonarr": {"title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
+		"radarr": {"info", "title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
+		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
 	}
 }
 
 func defaultVisibleColumns() map[string][]string {
 	return map[string][]string{
-		"radarr": {"title", "year", "resolution", "codec", "source", "custom"},
-		"sonarr": {"title", "year", "resolution", "codec", "source", "custom"},
+		"radarr": {"info", "title", "year", "resolution", "codec", "source", "custom"},
+		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "custom"},
 	}
 }
 
 // Missing selections preserve the original layout for existing installations.
 func normalizeVisibleColumns(cfg *Settings) error {
 	migrateAudioColumns(cfg)
+	if err := normalizeListInfo(cfg); err != nil {
+		return err
+	}
 	for service, order := range cfg.ColumnOrder {
 		if !containsColumn(order, "custom") {
 			cfg.ColumnOrder[service] = append(order, "custom")
@@ -179,7 +185,7 @@ func normalizeVisibleColumns(cfg *Settings) error {
 	if cfg.VisibleColumns == nil {
 		cfg.VisibleColumns = defaultVisibleColumns()
 	}
-	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "custom": true}
+	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "custom": true, "info": true}
 	for service, columns := range cfg.VisibleColumns {
 		if service != "radarr" && service != "sonarr" {
 			return fmt.Errorf("Invalid service for column selection")
