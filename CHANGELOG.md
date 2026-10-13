@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.6.1
+
+18 saved, contrast-tested interface palettes in both modes; Tag color checkbox and mode guidance in rule dialogs; literal separator token fix; clarify local language-flag mappings and the distinction between language and country tokens. No database migration. See [release notes](docs/releases/0.6.1.md).
+
 ## 0.6.0
 
 Saved Default/Nordic/Catppuccin interface palettes in both modes; simplified status filters and accessible filter help; compact language color settings and bundled Turkish flags. No database schema migration. See [release notes](docs/releases/0.6.0.md).

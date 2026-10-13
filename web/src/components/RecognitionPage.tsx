@@ -666,8 +666,19 @@ function RuleEditor({
             required
             maxLength={500}
             value={draft.pattern}
+            aria-label={t("Pattern")}
+            aria-describedby={
+              draft.match === "token" ? "rule-pattern-help" : undefined
+            }
             onInput={(e) => patch({ pattern: e.currentTarget.value })}
           />
+          {draft.match === "token" && (
+            <small id="rule-pattern-help">
+              {t(
+                "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.",
+              )}
+            </small>
+          )}
         </label>
         <label>
           {t("Result")}
@@ -697,6 +708,8 @@ function RuleEditor({
           {t("Mode")}
           <select
             value={draft.mode}
+            aria-label={t("Mode")}
+            aria-describedby="rule-mode-help"
             disabled={busy || draft.field === "custom"}
             onChange={(e) =>
               patch({ mode: e.currentTarget.value as RecognitionRule["mode"] })
@@ -706,6 +719,11 @@ function RuleEditor({
               <option value={mode}>{t(label)}</option>
             ))}
           </select>
+          <small id="rule-mode-help">
+            {t(
+              "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.",
+            )}
+          </small>
         </label>
         <label>
           {t("Priority")}
@@ -720,15 +738,26 @@ function RuleEditor({
             onInput={(e) => patch({ priority: Number(e.currentTarget.value) })}
           />
         </label>
-        <label class="check-field">
-          <input
-            disabled={busy}
-            type="checkbox"
-            checked={draft.enabled}
-            onChange={(e) => patch({ enabled: e.currentTarget.checked })}
-          />
-          {t("Enabled")}
-        </label>
+        <div class="rule-editor-options">
+          <label class="check-field">
+            <input
+              disabled={busy}
+              type="checkbox"
+              checked={draft.enabled}
+              onChange={(e) => patch({ enabled: e.currentTarget.checked })}
+            />
+            {t("Enabled")}
+          </label>
+          <label class="check-field">
+            <input
+              disabled={busy}
+              type="checkbox"
+              checked={draft.tag !== false}
+              onChange={(e) => patch({ tag: e.currentTarget.checked })}
+            />
+            {t("Tag color")}
+          </label>
+        </div>
         <p class="quiet rule-editor-help">
           {t(
             "Matching is case-insensitive. Tokens require separators. Regular expressions use Go RE2 syntax; capture groups can be referenced with $1 in the result.",

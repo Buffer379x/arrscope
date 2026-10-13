@@ -10,7 +10,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 
 ## Features
 
-- Separate movie and TV libraries, a default dashboard, responsive layouts, dark and light modes with saved Default, Nordic and Catppuccin interface palettes.
+- Separate movie and TV libraries, a default dashboard, responsive layouts, dark and light modes with 18 saved interface palettes, including Default, Nordic and Catppuccin.
 - English, German, Spanish and Italian interfaces, with a browser-specific language preference and straightforward [translation contributions](docs/TRANSLATING.md).
 - Filename-first resolution, codec/encoder and source detection, supplemented by existing API metadata. Inspect provenance and conflicting values in each file’s details.
 - Combined resolution, codec family, source, processing, year, size, HDR, bit depth, audio codec, channels and audio language filters. Search titles and filenames; select unknown and incomplete metadata.

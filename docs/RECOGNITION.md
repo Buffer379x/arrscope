@@ -59,3 +59,11 @@ Adding/editing, confirmed deletion and restore save atomically. Checkbox changes
 A token matches a fixed case-insensitive term at separator boundaries. A regular expression describes a pattern, such as `UHD[ ._-]+BluRay`, allowing alternate separators.
 
 The standalone UHD override excludes explicit WEB-DL, WEBRip, HDTV and DVD tokens. In `UHD.WEB-DL`, UHD is a quality indication and the known source remains WEB-DL. The exclusion expression is editable, and an existing user-defined exclusion is preserved during migration.
+
+## Priorities and literal separators
+
+Built-in and user rules share the same priority ordering. Priorities apply within each mode: direct detection runs first, fallback only fills missing values, and explicit override can replace earlier results. Lower numbers run first within the same mode; ID breaks ties. Multiple conflicting single-value results remain visible as a recognition warning.
+
+For `Movie.Ultra.HD.BluRay.mkv`, a Source token `Ultra.HD` returning UHD with priority 95 and Explicit override replaces BluRay. With Only if missing, BluRay remains because the direct rule already found it. A direct UHD rule at priority 95 chooses UHD before the broader BluRay rule but still reports the contradictory direct results.
+
+From 0.6.1, explicit edge separators such as `.Ultra.HD.` supply their own boundaries rather than requiring a second adjacent separator. Interior text stays literal: `Ultra.HD` does not match `Ultra-HD`; use regex for alternative spellings. Existing rule definitions, priorities and modes are preserved. Apply the new matching to cached files by saving a rule or completing the next file-data sync.

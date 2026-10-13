@@ -94,7 +94,16 @@ func CompileRecognition(rules []RecognitionRule) (*RecognitionEngine, error) {
 		pattern := r.Pattern
 		switch r.Match {
 		case "token":
-			pattern = `(?:^|[ ._\[\]()/,;|+-])` + regexp.QuoteMeta(pattern) + `(?:$|[ ._\[\]()/,;|+-])`
+			// A separator already written into a literal token supplies its boundary.
+			// Do not require an additional dot around tokens such as .Ultra.HD.
+			prefix, suffix := `(?:^|[ ._\[\]()/,;|+-])`, `(?:$|[ ._\[\]()/,;|+-])`
+			if strings.ContainsRune(" ._[]()/,;|+-", rune(pattern[0])) {
+				prefix = ""
+			}
+			if strings.ContainsRune(" ._[]()/,;|+-", rune(pattern[len(pattern)-1])) {
+				suffix = ""
+			}
+			pattern = prefix + regexp.QuoteMeta(pattern) + suffix
 		case "regex":
 		default:
 			return nil, fmt.Errorf("Invalid recognition match type")

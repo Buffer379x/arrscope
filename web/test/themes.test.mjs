@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { themePalettes, applyInterfaceTheme } from "../src/themes.ts";
+import {
+  interfaceThemes,
+  themePalettes,
+  applyInterfaceTheme,
+} from "../src/themes.ts";
 import { audioLanguage, sameAudioLanguage } from "../src/languages.ts";
 const luminance = (hex) => {
   const rgb = hex
@@ -13,7 +17,7 @@ const luminance = (hex) => {
 const contrast = (a, b) =>
   (Math.max(luminance(a), luminance(b)) + 0.05) /
   (Math.min(luminance(a), luminance(b)) + 0.05);
-test("both new palettes keep normal text and primary actions readable in each mode", () => {
+test("all additional palettes keep normal text and primary actions readable in each mode", () => {
   for (const [name, modes] of Object.entries(themePalettes))
     for (const [mode, palette] of Object.entries(modes)) {
       for (const surface of ["bg", "panel", "panel2"])
@@ -57,4 +61,21 @@ test("Turkish aliases resolve locally while unrelated languages retain neutral f
     assert.equal(audioLanguage(value)?.flag, "tr");
   assert.ok(sameAudioLanguage("tur", "Turkish"));
   assert.equal(audioLanguage("unsupported-new-language"), undefined);
+});
+
+test("all 18 theme choices are accepted by the server and have both modes", async () => {
+  const { readFileSync } = await import("node:fs");
+  const server = readFileSync(
+    new URL("../../internal/app/themes.go", import.meta.url),
+    "utf8",
+  );
+  assert.equal(interfaceThemes.length, 18);
+  for (const name of interfaceThemes) {
+    assert.ok(server.includes('"' + name + '"'));
+    if (name !== "default")
+      assert.deepEqual(Object.keys(themePalettes[name]).sort(), [
+        "dark",
+        "light",
+      ]);
+  }
 });

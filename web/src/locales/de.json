@@ -632,6 +632,23 @@
     "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.": "Nach dem Speichern angewendet. Jedes Theme unterstützt den dunklen und hellen Modus; Layout und Tag-Farben bleiben unverändert.",
     "Turkish": "Türkisch",
     "Nordic": "Nordic",
-    "Catppuccin": "Catppuccin"
+    "Catppuccin": "Catppuccin",
+    "Graphite": "Graphite",
+    "Slate": "Slate",
+    "Ocean": "Ocean",
+    "Atlantic": "Atlantic",
+    "Forest": "Forest",
+    "Sage": "Sage",
+    "Sandstone": "Sandstone",
+    "Copper": "Copper",
+    "Coffee": "Coffee",
+    "Midnight": "Midnight",
+    "Ink": "Ink",
+    "Steel": "Steel",
+    "Mist": "Mist",
+    "Linen": "Linen",
+    "Charcoal": "Charcoal",
+    "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.": "Die Priorität gilt innerhalb jedes Modus. Nur wenn unbekannt behält vorhandene Ergebnisse; zum Ersetzen eines erkannten Werts nutze Explizit überschreiben.",
+    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Tokens suchen festen Text, auch mit Trennzeichen wie .Ultra.HD. Für andere Schreibweisen oder Trennzeichen nutze einen regulären Ausdruck."
   }
 }
