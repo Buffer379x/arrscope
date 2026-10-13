@@ -64,7 +64,7 @@ Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=t
 
 ## Filename recognition
 
-Manage rules in **Settings → Filename recognition**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
+Manage rules in **Settings → Tag rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
 
 The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
 
@@ -98,7 +98,7 @@ The generated Scopearr PNG icon, favicons and Apple touch icon are included unde
 
 ## Custom tags
 
-Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, a tag icon in each Custom cell edits that single file. Use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
+Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, a tag icon in each Custom cell edits that single file; empty cells show no placeholder dash. Use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
 
 Custom filters support OR, exclusion, contains-all and does-not-contain-all. Colors and filters list tags in use; the administration catalog also keeps unused tags available for future assignment. Filename rules can select Custom and an existing tag. All matching Custom rules add their tags; multiple tags are not conflicts. Manual additions survive synchronization and rule edits. Removed automatic tags may reappear after the next successful service sync.
 
@@ -110,6 +110,6 @@ Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=t
 
 ## Settings and dashboard
 
-Settings Save actions sit beside the section heading. Language, colors, display preferences and custom-tag administration remain drafts until saved; leaving a section warns about unsaved edits. Filename rules save after their individual dialog confirmation or checkbox change. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
+Settings Save actions sit beside the section heading. Language, colors, display preferences and custom-tag administration remain drafts until saved; leaving a section warns about unsaved edits. Rule additions/deletions save after their individual confirmation; checkbox edits are batched until Save settings. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
 
 Dashboard distribution widgets show the top five entries. More/Less expands or collapses the remaining values without changing totals or percentages. Clicking an entry selects the existing library filters without saving a preset. Feedback appears as automatically dismissed bottom-right toasts.

@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.5.4
+
+Fixed-size language flags without tag badges; Tag rules/Tag color naming; batched checkbox drafts with explicit Save and independent immediate CRUD; serialized cache reprocessing and immediate SQLite writes; standalone/regional UHD source recognition preserving custom rules; simpler tag-sync settings; clean empty Custom cells; host-compatible Unraid RAM parameters. Schema 10 makes a consistent backup. See [release notes](docs/releases/0.5.4.md).
+
 ## 0.5.3
 
 Reviewed tag-removal plans with provenance and protection for new foreign assignments; category-scoped unknown output tags; editable UHD BluRay recognition; rule presentation flags and atomic autosave; per-file custom assignment; unified Display controls and settings header actions. SQLite schema 9 preserves existing data. See [release notes](docs/releases/0.5.3.md).

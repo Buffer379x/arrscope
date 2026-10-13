@@ -22,7 +22,7 @@ func unknownTagLabel(f string) string {
 	return f + "-unknown"
 }
 func uhdBluRayDefaultRule() RecognitionRule {
-	return RecognitionRule{ID: "default-source-uhd-bluray", Name: "Source / UHD BluRay", Field: "source", Match: "regex", Pattern: `(?:^|[ ._\[\]()-])UHD[ ._-]+BluRay(?:$|[ ._\[\]()-])`, Value: "UHD", Mode: "override", Priority: 94, Enabled: true}
+	return RecognitionRule{ID: "default-source-uhd-bluray", Name: "Source / UHD", Field: "source", Match: "regex", Pattern: `(?:^|[ ._\[\]()-])UHD(?:$|[ ._\[\]()-])`, Value: "UHD", Mode: "override", Priority: 94, Enabled: true}
 }
 func upgradeRules053(rules []RecognitionRule) ([]RecognitionRule, bool) {
 	next := append([]RecognitionRule{}, rules...)

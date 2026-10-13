@@ -621,6 +621,12 @@
     "No filename rules. Only API and Emby metadata will be used.": "No hay reglas. Solo se usarán los metadatos de API y Emby.",
     "Tag controls presentation and colors. Recognition, filters and outbound categories remain independent.": "«Etiqueta» controla la presentación y los colores. La detección, los filtros y las categorías salientes son independientes.",
     "Tag removals need review in Settings → System.": "Las eliminaciones de etiquetas requieren revisión en Ajustes → Sistema.",
-    "Configure tag handling for {service}": "Configurar etiquetas para {service}"
+    "Configure tag handling for {service}": "Configurar etiquetas para {service}",
+    "Tag rules": "Reglas de etiquetas",
+    "Tag color": "Color de etiqueta",
+    "Default presentation": "Presentación predeterminada",
+    "Use tag color: {name}": "Usar color de etiqueta: {name}",
+    "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.": "Color de etiqueta controla solo la presentación. Todos los valores reconocidos siguen siendo etiquetas para filtros y sincronización. Los cambios en casillas se aplican al guardar ajustes; añadir y eliminar se guarda inmediatamente.",
+    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "La vista previa usa el borrador actual de reglas y solo el nombre del archivo. No incluye datos de API ni de Emby."
   }
 }

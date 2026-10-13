@@ -4,7 +4,7 @@ Under **Settings → Services**, select outbound groups independently for Radarr
 
 ## Review before removal
 
-The obsolete handling dropdown is replaced by the decision popup. An edit icon beside active tag controls opens that same popup to change the persistent handling mode.
+The tag-handling decision popup appears when saving synchronization configuration changes. There is no separate handling dropdown or edit icon.
 
 After choosing removal/overwrite, a fresh read-only preview lists each affected tag, origin, assignment count, paginated title list and whether the definition can be deleted or must remain referenced. Confirming the preview binds consent to the current service, settings, recognition result and remote usage. Changed relevant data requires a refreshed preview. No writes occur while confirmation is pending.
 

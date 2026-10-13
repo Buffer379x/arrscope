@@ -86,3 +86,6 @@
     min-width: 8rem;
   }
 }
+
+/* Neutral language icons have no flag edge or tag frame. */
+.language-flag:not(.known-language) > svg { width: 18px; height: 18px; border-radius: 0; box-shadow: none; }

@@ -366,6 +366,15 @@ func (s *Server) Handler() http.Handler {
 				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(190 * time.Second))
 				ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 				defer cancel()
+
+				// Serialize long cache rewrites with file/tag reconciliation.
+				select {
+				case s.Sync.gate <- struct{}{}:
+					defer func() { <-s.Sync.gate }()
+				case <-ctx.Done():
+					failure(w, r, 503, errors.New("Sync is busy. Try again after it completes"))
+					return
+				}
 				out, err := s.Store.SaveRecognition(ctx, in.Rules, in.Revision)
 				if err != nil {
 					status := 500

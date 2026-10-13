@@ -621,6 +621,12 @@
     "No filename rules. Only API and Emby metadata will be used.": "Keine Dateinamensregeln. Es werden nur API- und Emby-Metadaten verwendet.",
     "Tag controls presentation and colors. Recognition, filters and outbound categories remain independent.": "„Tag“ steuert Darstellung und Farben. Erkennung, Filter und ausgehende Kategorien bleiben unabhängig.",
     "Tag removals need review in Settings → System.": "Tag-Entfernungen benötigen eine Prüfung unter Einstellungen → System.",
-    "Configure tag handling for {service}": "Tag-Verhalten für {service} konfigurieren"
+    "Configure tag handling for {service}": "Tag-Verhalten für {service} konfigurieren",
+    "Tag rules": "Tag Regeln",
+    "Tag color": "Tag Farbe",
+    "Default presentation": "Standarddarstellung",
+    "Use tag color: {name}": "Tag Farbe verwenden: {name}",
+    "Tag color controls colored presentation only. All recognized values remain tags for filters and synchronization. Checkbox changes apply together with Save settings; adding and deleting save immediately.": "Tag Farbe steuert nur die farbige Darstellung. Alle erkannten Werte bleiben Tags für Filter und Synchronisierung. Checkbox-Änderungen gelten nach Einstellungen speichern; Hinzufügen und Löschen speichern sofort.",
+    "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.": "Die Vorschau nutzt den aktuellen Regelentwurf und nur den Dateinamen. API- und Emby-Ergänzungen sind nicht enthalten."
   }
 }
