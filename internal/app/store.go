@@ -59,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 10 {
+	if version > 11 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -363,6 +363,55 @@ PRAGMA user_version=1;COMMIT;`)
 		}
 		if e == nil {
 			_, e = tx.Exec("PRAGMA user_version=10")
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
+
+	if originalVersion < 11 {
+		if originalVersion == 10 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		engine := defaultRecognitionEngine
+		var config RecognitionConfig
+		if s.Get("recognition", &config) == nil {
+			engine, err = CompileRecognition(config.Rules)
+			if err != nil {
+				return fail(err)
+			}
+		}
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		e = reparseCached(context.Background(), tx, engine)
+		if e == nil {
+			raw, _ := json.Marshal(engine.Config())
+			_, e = tx.Exec("INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(raw))
+		}
+		if e == nil {
+			var settings Settings
+			if s.Get("settings", &settings) == nil {
+				for service, cfg := range map[string]ServiceConfig{"radarr": settings.Radarr, "sonarr": settings.Sonarr} {
+					if cfg.TagSync.Active() {
+						_, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?, 'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", "tagSyncDirty:"+service)
+						if e != nil {
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if e == nil {
+			_, e = tx.Exec("PRAGMA user_version=11")
 		}
 		if e != nil {
 			tx.Rollback()

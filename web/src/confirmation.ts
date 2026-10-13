@@ -1,6 +1,7 @@
 export type Confirmation = {
   message: string;
   reset?: boolean;
+  discard?: boolean;
   resolve: (accepted: boolean) => void;
 };
 let active: Confirmation | null = null;
@@ -35,4 +36,12 @@ export function answerConfirmation(accepted: boolean) {
 
 export function confirmReset(message: string) {
   return confirmDeletion(message, true);
+}
+
+export function confirmDiscard(message: string): Promise<boolean> {
+  if (active) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    active = { message, discard: true, resolve };
+    emit();
+  });
 }

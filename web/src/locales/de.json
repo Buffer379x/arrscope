@@ -649,6 +649,12 @@
     "Linen": "Linen",
     "Charcoal": "Charcoal",
     "Priority applies within each mode. Only if missing keeps existing results; use Explicit override to replace an already recognized value.": "Die Priorität gilt innerhalb jedes Modus. Nur wenn unbekannt behält vorhandene Ergebnisse; zum Ersetzen eines erkannten Werts nutze Explizit überschreiben.",
-    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Tokens suchen festen Text, auch mit Trennzeichen wie .Ultra.HD. Für andere Schreibweisen oder Trennzeichen nutze einen regulären Ausdruck."
+    "Tokens match literal text, including separators such as .Ultra.HD. Use a regular expression for alternate spellings or separators.": "Tokens suchen festen Text, auch mit Trennzeichen wie .Ultra.HD. Für andere Schreibweisen oder Trennzeichen nutze einen regulären Ausdruck.",
+    "Really cancel?": "Wirklich abbrechen?",
+    "Discard changes": "Eingaben verwerfen",
+    "Discard your unsaved rule changes?": "Möchtest du deine nicht gespeicherten Eingaben zur Regel wirklich verwerfen?",
+    "Saving rule…": "Regel wird gespeichert…",
+    "Saving rule and updating the cached library. Keep this dialog open until saving completes.": "Regel wird gespeichert und die Bibliothek im Cache aktualisiert. Bitte warte, bis das Speichern abgeschlossen ist.",
+    "Names are saved when you press Enter or leave the field.": "Namen werden mit Enter oder beim Verlassen des Feldes gespeichert."
   }
 }

@@ -1,6 +1,6 @@
 import { confirmDeletion } from "../confirmation";
-import { useEffect, useState } from "preact/hooks";
-import { Plus, Check, Trash2, LoaderCircle } from "lucide-preact";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { Plus, Trash2, LoaderCircle } from "lucide-preact";
 import type { CustomTag } from "../types";
 import { api } from "../api";
 import { notify } from "../notifications";
@@ -16,61 +16,96 @@ export function CustomTagsSettings({
 }) {
   useI18n();
   const [drafts, setDrafts] = useState<CustomTag[]>(structuredClone(tags));
+  const baseline = useRef<CustomTag[]>(structuredClone(tags));
+  const pending = useRef(false);
   const [name, setName] = useState(""),
     [busy, setBusy] = useState(false);
   const dirty =
-    !!name.trim() || JSON.stringify(tags) !== JSON.stringify(drafts);
-  useEffect(() => onDirty(dirty), [dirty]);
+    !!name.trim() ||
+    JSON.stringify(baseline.current) !== JSON.stringify(drafts);
+  useEffect(() => onDirty(dirty || busy), [dirty, busy]);
   useEffect(() => () => onDirty(false), []);
-  const add = () => {
+  const commit = async (
+    next: CustomTag[],
+    changedID?: number,
+  ): Promise<boolean> => {
+    if (pending.current) return false;
+    pending.current = true;
+    setBusy(true);
+    const previous = baseline.current;
+    try {
+      const saved = await api<CustomTag[]>("custom-tags/batch", "PUT", {
+        original: previous,
+        tags: next,
+      });
+      baseline.current = saved;
+      setDrafts((current) =>
+        saved.map((tag) => {
+          const draft = current.find((r) => r.id === tag.id),
+            old = previous.find((r) => r.id === tag.id);
+          return tag.id !== changedID && draft && old && draft.name !== old.name
+            ? { ...tag, name: draft.name }
+            : tag;
+        }),
+      );
+      notify(t("Settings saved."));
+      try {
+        await changed();
+      } catch {
+        /* The committed snapshot stays authoritative if a refresh fails. */
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+  const add = async () => {
     const value = name.trim();
-    if (!value) return;
+    if (!value || pending.current) return;
     if (
-      drafts.some(
+      baseline.current.some(
         (tag) => tag.name.toLocaleLowerCase() === value.toLocaleLowerCase(),
       )
     ) {
       notify(t("A custom tag with this name already exists"), "warning");
       return;
     }
-    setDrafts([
-      ...drafts,
-      { id: Math.min(0, ...drafts.map((tag) => tag.id)) - 1, name: value },
-    ]);
-    setName("");
+    if (await commit([...baseline.current, { id: -1, name: value }], -1))
+      setName("");
   };
-  const save = async () => {
-    if (name.trim()) {
-      notify(t("Add the entered tag to the list before saving."), "warning");
-      return;
-    }
-    setBusy(true);
-    try {
-      const saved = await api<CustomTag[]>("custom-tags/batch", "PUT", {
-        original: tags,
-        tags: drafts,
-      });
-      setDrafts(saved);
-      await changed();
-      notify(t("Settings saved."));
-    } catch {
-    } finally {
-      setBusy(false);
+  const rename = async (tag: CustomTag, value: string) => {
+    const old = baseline.current.find((r) => r.id === tag.id);
+    if (!old || value === old.name) return;
+    if (
+      !value.trim() ||
+      !(await commit(
+        baseline.current.map((r) =>
+          r.id === tag.id ? { ...r, name: value.trim() } : r,
+        ),
+        tag.id,
+      ))
+    ) {
+      setDrafts((current) =>
+        current.map((r) =>
+          r.id === tag.id
+            ? {
+                ...r,
+                name:
+                  baseline.current.find((b) => b.id === tag.id)?.name ||
+                  old.name,
+              }
+            : r,
+        ),
+      );
     }
   };
   return (
     <section class="custom-tags-settings" aria-label={t("Custom tags")}>
       <header class="settings-section-heading">
         <h2>{t("Custom tags")}</h2>
-        <button
-          type="button"
-          class="primary"
-          disabled={busy || !dirty}
-          onClick={() => void save()}
-        >
-          {busy ? <LoaderCircle class="spin" size={16} /> : <Check size={16} />}
-          {t("Save settings")}
-        </button>
         <p class="quiet">
           {t(
             "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
@@ -82,7 +117,7 @@ export function CustomTagsSettings({
           class="custom-tag-create"
           onSubmit={(e) => {
             e.preventDefault();
-            add();
+            void add();
           }}
         >
           <label>
@@ -96,10 +131,17 @@ export function CustomTagsSettings({
             />
           </label>
           <button class="button" disabled={busy || !name.trim()}>
-            <Plus size={16} />
+            {busy ? (
+              <LoaderCircle size={16} class="spin" />
+            ) : (
+              <Plus size={16} />
+            )}{" "}
             {t("Add tag")}
           </button>
         </form>
+        <p class="quiet">
+          {t("Names are saved when you press Enter or leave the field.")}
+        </p>
         <div class="table-wrap custom-tags-table">
           <table>
             <thead>
@@ -118,15 +160,21 @@ export function CustomTagsSettings({
                       required
                       value={tag.name}
                       disabled={busy}
-                      onInput={(e) =>
-                        setDrafts(
-                          drafts.map((current) =>
-                            current.id === tag.id
-                              ? { ...current, name: e.currentTarget.value }
-                              : current,
+                      onInput={(e) => {
+                        const value = e.currentTarget.value;
+                        setDrafts((current) =>
+                          current.map((r) =>
+                            r.id === tag.id ? { ...r, name: value } : r,
                           ),
-                        )
-                      }
+                        );
+                      }}
+                      onBlur={(e) => void rename(tag, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        }
+                      }}
                     />
                   </td>
                   <td>
@@ -138,6 +186,7 @@ export function CustomTagsSettings({
                         aria-label={t("Delete tag: {name}", { name: tag.name })}
                         title={t("Delete tag: {name}", { name: tag.name })}
                         onClick={async () => {
+                          if (pending.current) return;
                           if (
                             await confirmDeletion(
                               t(
@@ -146,8 +195,9 @@ export function CustomTagsSettings({
                               ),
                             )
                           )
-                            setDrafts(
-                              drafts.filter((current) => current.id !== tag.id),
+                            await commit(
+                              baseline.current.filter((r) => r.id !== tag.id),
+                              tag.id,
                             );
                         }}
                       >

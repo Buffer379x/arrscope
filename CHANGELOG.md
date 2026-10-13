@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.6.2
+
+Shared ISO 639-1/2/3 metadata registry, localized language labels and bundled flags; immediate custom-tag writes; guarded rule-dialog dismissal and visible cache-save progress. Schema 11 reprocesses cached language evidence with a consistent backup. See [release notes](docs/releases/0.6.2.md).
+
 ## 0.6.1
 
 18 saved, contrast-tested interface palettes in both modes; Tag color checkbox and mode guidance in rule dialogs; literal separator token fix; clarify local language-flag mappings and the distinction between language and country tokens. No database migration. See [release notes](docs/releases/0.6.1.md).

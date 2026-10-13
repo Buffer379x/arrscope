@@ -12,7 +12,7 @@ import { useContext, useEffect, useState } from "preact/hooks";
 import type { Statistics, Status } from "../types";
 
 import { LanguageFlag } from "./LanguageFlag";
-import { audioLanguageKey } from "../languages";
+import { audioLanguageLabel } from "../languages";
 import { api } from "../api";
 import { count, labels, Tag, TagColors } from "../ui";
 const chartPalette = [
@@ -334,7 +334,7 @@ function LanguageDistribution({
       {total ? (
         <ul class="distribution-list">
           {(expanded ? ranked : ranked.slice(0, 5)).map((bucket, i) => {
-            const label = t(audioLanguageKey(bucket.value)),
+            const label = t(audioLanguageLabel(bucket.value, getLocale())),
               percentage = (bucket.count / total) * 100;
             return (
               <li>

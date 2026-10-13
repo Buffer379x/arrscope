@@ -1,4 +1,4 @@
-import { confirmDeletion, confirmReset } from "../confirmation";
+import { confirmDeletion, confirmReset, confirmDiscard } from "../confirmation";
 import { mergeRuleDraft, sameRuleDraft } from "../rule-draft";
 import { matchesRuleSearch } from "../rule-search";
 import { newRuleID } from "../rule-id";
@@ -597,10 +597,29 @@ function RuleEditor({
   useI18n();
   const customNames = useContext(CustomTagNames);
   const [draft, setDraft] = useState(rule);
+  const [asking, setAsking] = useState(false);
+  const requestClose = async () => {
+    if (busy || asking) return;
+    if (sameRuleDraft([draft], [rule])) {
+      close();
+      return;
+    }
+    setAsking(true);
+    const accepted = await confirmDiscard(
+      t("Discard your unsaved rule changes?"),
+    );
+    setAsking(false);
+    if (accepted) close();
+  };
   const patch = (value: Partial<RecognitionRule>) =>
     setDraft({ ...draft, ...value });
   return (
-    <Modal title={t("Edit recognition rule")} close={close} wide>
+    <Modal
+      title={t("Edit recognition rule")}
+      close={() => void requestClose()}
+      closeDisabled={busy || asking}
+      wide
+    >
       <form
         class="rule-editor"
         onSubmit={async (e) => {
@@ -808,13 +827,32 @@ function RuleEditor({
             )}
           </p>
         </details>
+        {busy && (
+          <div class="rule-save-status" role="status" aria-live="polite">
+            <LoaderCircle class="spin" size={20} />
+            <span>
+              {t(
+                "Saving rule and updating the cached library. Keep this dialog open until saving completes.",
+              )}
+            </span>
+          </div>
+        )}
         <div class="modal-actions">
-          <button type="button" class="button" onClick={close}>
+          <button
+            type="button"
+            class="button"
+            disabled={busy || asking}
+            onClick={() => void requestClose()}
+          >
             {t("Cancel")}
           </button>
-          <button class="primary">
-            <Check size={15} />
-            {t("Save rule")}
+          <button class="primary" disabled={busy || asking} aria-busy={busy}>
+            {busy ? (
+              <LoaderCircle class="spin" size={15} />
+            ) : (
+              <Check size={15} />
+            )}
+            {t(busy ? "Saving rule…" : "Save rule")}
           </button>
         </div>
       </form>

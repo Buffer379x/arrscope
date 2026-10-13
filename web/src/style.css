@@ -88,4 +88,30 @@
 }
 
 /* Neutral language icons have no flag edge or tag frame. */
-.language-flag:not(.known-language) > svg { width: 18px; height: 18px; border-radius: 0; box-shadow: none; }
+.language-flag:not(.known-language) > svg {
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.language-flag > img {
+  width: 27px;
+  height: 18px;
+  object-fit: contain;
+  flex: none;
+  border: 0;
+  background: transparent;
+}
+.rule-save-status {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.flag-tooltip { width:max-content; max-width:min(340px, calc(100vw - 32px)); white-space:normal; overflow-wrap:anywhere; }

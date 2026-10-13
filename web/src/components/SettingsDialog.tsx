@@ -1,5 +1,5 @@
 import { interfaceThemes, themeLabels } from "../themes";
-import { audioLanguageKey } from "../languages";
+import { audioLanguageLabel } from "../languages";
 import { LanguageFlag } from "./LanguageFlag";
 import { TagReview, type TagPreview, type TagReviewRequest } from "./TagReview";
 import { confirmDeletion } from "../confirmation";
@@ -12,7 +12,7 @@ import {
 import { notify } from "../notifications";
 import { CustomTagsSettings } from "./CustomTagsSettings";
 import type { CustomTag } from "../types";
-import { LanguageSelect, t, useI18n } from "../i18n";
+import { LanguageSelect, t, useI18n, getLocale } from "../i18n";
 import { SystemInfo } from "./SystemInfo";
 import { RecognitionPage } from "./RecognitionPage";
 
@@ -1015,7 +1015,7 @@ export function SettingsDialog({
                             value === "__unknown__"
                               ? t("Unknown")
                               : colorField === "language"
-                                ? t(audioLanguageKey(value))
+                                ? t(audioLanguageLabel(value, getLocale()))
                                 : colorField === "custom"
                                   ? customTags.find(
                                       (tag) => String(tag.id) === value,
