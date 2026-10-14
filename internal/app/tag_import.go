@@ -562,7 +562,20 @@ func (s *Store) ResolveExternal(ctx context.Context, service string, c ServiceCo
 		return errors.New("This tag is controlled by an external auto-tag rule")
 	}
 	if local {
-		_, e = tx.ExecContext(ctx, `UPDATE external_tag_pending SET baseline=?,label=?,conflict=0 WHERE service=? AND endpoint=? AND media_id=? AND remote_id=?`, on, label, service, endpoint, mid, tid)
+		var exists bool
+		if e = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM external_tag_defs WHERE service=? AND endpoint=? AND remote_id=?)`, service, endpoint, tid).Scan(&exists); e != nil {
+			return e
+		}
+		if !exists {
+			// The retained local assignment recreates a missing definition with a new
+			// remote ID. Do not carry its old ID intent into future reconciliations.
+			if !cid.Valid {
+				return errors.New("Refresh tag conflicts before resolving")
+			}
+			_, e = tx.ExecContext(ctx, `DELETE FROM external_tag_pending WHERE service=? AND endpoint=? AND media_id=? AND remote_id=?`, service, endpoint, mid, tid)
+		} else {
+			_, e = tx.ExecContext(ctx, `UPDATE external_tag_pending SET baseline=?,label=?,conflict=0 WHERE service=? AND endpoint=? AND media_id=? AND remote_id=?`, on, label, service, endpoint, mid, tid)
+		}
 	} else {
 		if cid.Valid {
 			_, e = tx.ExecContext(ctx, `DELETE FROM custom_overrides WHERE service=? AND tag_id=? AND file_id IN(SELECT id FROM files WHERE service=? AND media_id=?)`, service, cid.Int64, service, mid)

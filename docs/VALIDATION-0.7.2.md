@@ -4,7 +4,7 @@ Validated on 2026-10-14 using macOS/OrbStack ARM64; CI repeats checks on Linux A
 
 ## Automated checks
 
-- Full Go race suite and `go vet` pass. External-tag tests cover ordinary imports, durable removal intents, re-additions, series-wide external assignments, preserved local episode granularity, external removals, global deletion, concurrent rename/deletion review, auto-rule protection, rule-reference removal, source-scoped protection, server URL changes and undo during an in-flight write.
+- Full Go race suite and `go vet` pass. External-tag tests cover ordinary imports, durable removal intents, re-additions, series-wide external assignments, preserved local episode granularity, external removals, global deletion, concurrent rename/deletion review, retained local additions after remote definition deletion without stale-ID replay, auto-rule protection, rule-reference removal, source-scoped protection, server URL changes and undo during an in-flight write.
 - Failed and null catalog reads and unreadable referenced rules retain the prior snapshot and block writes. Backend protection rejects editing/removing protected tags even when UI restrictions are bypassed.
 - All 27 frontend tests, TypeScript checks and production build pass, including four-catalog key/parameter parity. Version, package, Docker defaults and English release notes agree.
 - Local `govulncheck` reports no reachable vulnerabilities; one required-module advisory is not called by this application. Required CI includes dependency audit and a high/critical runtime-image scan.
