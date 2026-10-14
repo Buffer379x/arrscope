@@ -1,3 +1,4 @@
+import { ExternalTagStatus } from "./ExternalTagStatus";
 import { Database, RefreshCw } from "lucide-preact";
 import type { ConnectionService } from "../ui";
 import { t, useI18n } from "../i18n";
@@ -114,6 +115,13 @@ export function SystemInfo({
                       })}
                     </small>
                   </div>
+                )}
+                {settings[service].tagImport && (
+                  <ExternalTagStatus
+                    service={service}
+                    status={status}
+                    disabled={demo || !settings[service].enabled}
+                  />
                 )}
                 <small>
                   {count(sync?.count || 0)} {t("files in cache")}

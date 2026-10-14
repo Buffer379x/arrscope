@@ -20,13 +20,16 @@ import (
 const tagSyncSchema = `CREATE TABLE IF NOT EXISTS tag_sync_managed(service TEXT NOT NULL,endpoint TEXT NOT NULL,media_id INTEGER NOT NULL,PRIMARY KEY(service,endpoint,media_id));PRAGMA user_version=7;`
 
 type TagSyncStatus struct {
-	ApprovalRequired    bool       `json:"approvalRequired"`
-	Running             bool       `json:"running"`
-	Pending             bool       `json:"pending"`
-	LastSuccess         *time.Time `json:"lastSuccess"`
-	Error               string     `json:"error"`
-	Changed             int        `json:"changed"`
-	RetainedDefinitions int        `json:"retainedDefinitions"`
+	LastTagCheck        *time.Time         `json:"lastTagCheck,omitempty"`
+	ImportConflicts     []ExternalConflict `json:"importConflicts,omitempty"`
+	ImportPending       int                `json:"importPending,omitempty"`
+	ApprovalRequired    bool               `json:"approvalRequired"`
+	Running             bool               `json:"running"`
+	Pending             bool               `json:"pending"`
+	LastSuccess         *time.Time         `json:"lastSuccess"`
+	Error               string             `json:"error"`
+	Changed             int                `json:"changed"`
+	RetainedDefinitions int                `json:"retainedDefinitions"`
 }
 type TagWriter struct {
 	store       *Store
@@ -50,6 +53,15 @@ func NewTagWriter(ctx context.Context, store *Store, config func() Settings, gat
 			w.status[service] = TagSyncStatus{RetainedDefinitions: retained}
 		}
 	}
+	for _, service := range []string{"radarr", "sonarr"} {
+		var at time.Time
+		if store.Get("tagImportCheck:"+service, &at) == nil {
+			st := w.status[service]
+			st.LastTagCheck = &at
+			w.status[service] = st
+		}
+	}
+
 	go w.run()
 	return w
 }
@@ -109,9 +121,25 @@ func (w *TagWriter) apply(service string) {
 	w.mu.Lock()
 	paused := w.status[service].ApprovalRequired
 	w.mu.Unlock()
-	if paused || w.store.Get("tagSyncDirty:"+service, &dirty) != nil || !dirty {
+	cfgBefore := w.config()
+	before := cfgBefore.Radarr
+	if service == "sonarr" {
+		before = cfgBefore.Sonarr
+	}
+	w.mu.Lock()
+	last := w.status[service].LastTagCheck
+	w.mu.Unlock()
+	due := before.Enabled && before.TagImport && before.TagImportInterval > 0 && (last == nil || time.Since(*last) >= time.Duration(before.TagImportInterval)*time.Minute)
+	if w.store.Get("tagSyncDirty:"+service, &dirty) != nil {
+		dirty = false
+	}
+	if !due && !dirty {
 		return
 	}
+	if paused && !due {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(w.ctx, 5*time.Minute)
 	defer cancel()
 	select {
@@ -141,12 +169,34 @@ func (w *TagWriter) apply(service string) {
 		}
 		return next == c
 	}
-	changed, waiting, err := w.store.ReconcileTags(ctx, service, c, unchanged)
+	var changed int
+	var waiting bool
+	var err error
+	if paused {
+		err = w.store.ImportTags(ctx, service, c, unchanged)
+		waiting = true
+	} else {
+		changed, waiting, err = w.store.ReconcileTags(ctx, service, c, unchanged)
+	}
+	conflicts, conflictErr := w.store.ExternalConflicts(ctx, service)
+	if err == nil && conflictErr != nil {
+		err = conflictErr
+	}
+	var pending int
+	w.store.DB.QueryRowContext(ctx, "SELECT count(*) FROM external_tag_pending WHERE service=?", service).Scan(&pending)
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	st = w.status[service]
 	st.Running = false
 	st.Changed = changed
+	st.ImportConflicts = conflicts
+	st.ImportPending = pending
+	var lastCheck time.Time
+	if w.store.Get("tagImportCheck:"+service, &lastCheck) == nil {
+		st.LastTagCheck = &lastCheck
+	}
+
 	_ = w.store.Get("tagSyncRetained:"+service, &st.RetainedDefinitions)
 	if errors.Is(err, ErrTagApproval) {
 		st.ApprovalRequired = true
@@ -270,6 +320,17 @@ func sameTagIDs(a, b []int) bool {
 // Approved removals use targeted API operations. Concurrent foreign additions
 // survive even in overwrite mode and are reviewed on a later reconciliation.
 func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConfig, unchanged func() bool, target ...int) (int, bool, error) {
+	if c.TagImport {
+		if e := s.ImportTags(ctx, service, c, unchanged); e != nil {
+			return 0, false, e
+		}
+		if conflicts, e := s.ExternalConflicts(ctx, service); e != nil {
+			return 0, false, e
+		} else if len(conflicts) > 0 {
+			return 0, true, ErrExternalConflict
+		}
+	}
+
 	p, e := s.BuildTagPlan(ctx, service, c, nil, target...)
 	if e != nil {
 		return 0, false, e
@@ -312,7 +373,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		observed = "unknown"
 	}
 	for id, label := range p.Names {
-		if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_ownership VALUES(?,?,0,?,?,?)", service, endpoint, id, label, observed); e != nil {
+		if _, e = tx.ExecContext(ctx, "INSERT INTO tag_sync_ownership VALUES(?,?,0,?,?,?) ON CONFLICT(service,endpoint,media_id,tag_id) DO UPDATE SET label=excluded.label,kind=CASE WHEN tag_sync_ownership.label<>excluded.label THEN excluded.kind ELSE tag_sync_ownership.kind END", service, endpoint, id, label, observed); e != nil {
 			return 0, false, e
 		}
 	}
@@ -369,6 +430,9 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	}
 	for l := range p.Required {
 		id := p.Labels[l]
+		if p.AutoProtected[id] {
+			continue
+		}
 		kind := p.Ownership[bindingKey(0, id, l)]
 		if kind == "created" || definitionControlled(kind) {
 			continue
@@ -397,7 +461,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	defer tx.Rollback()
 	for _, op := range p.Operations {
 		for _, l := range op.Want {
-			if p.Policy.keep[l] {
+			if p.Policy.keep[l] || p.AutoProtected[p.Labels[l]] {
 				continue
 			}
 			if _, e = tx.ExecContext(ctx, "INSERT OR REPLACE INTO tag_sync_ownership VALUES(?,?,?,?,?,'managed')", service, endpoint, op.ID, p.Labels[l], l); e != nil {
@@ -472,6 +536,11 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 				if !expected[m.ID] || !tagResponseMatches(b.op, m.Tags, b.tags) {
 					return len(changed), false, errors.New("Tag update could not be verified")
 				}
+				if c.TagImport {
+					if e = s.recordExternalWrite(ctx, service, endpoint, m.ID, b.tags, b.op == "add"); e != nil {
+						return len(changed), false, e
+					}
+				}
 				delete(expected, m.ID)
 				changed[m.ID] = true
 			}
@@ -540,8 +609,20 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 			return len(changed), false, e
 		}
 	}
+	if c.TagImport && c.TagSync.Custom {
+		if _, e = finish.ExecContext(ctx, `DELETE FROM external_tag_pending AS p WHERE p.service=? AND p.endpoint=? AND p.desired=0 AND p.conflict=0 AND NOT EXISTS(SELECT 1 FROM external_tag_bindings b WHERE b.service=p.service AND b.endpoint=p.endpoint AND b.media_id=p.media_id AND b.remote_id=p.remote_id AND b.present=1)`, service, endpoint); e != nil {
+			return len(changed), false, e
+		}
+	}
+
 	if e = finish.Commit(); e != nil {
 		return len(changed), false, e
 	}
+	if c.TagImport {
+		if e = s.ImportTags(ctx, service, c, unchanged); e != nil {
+			return len(changed), false, e
+		}
+	}
+
 	return len(changed), false, nil
 }

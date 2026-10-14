@@ -12,6 +12,8 @@ export type TagGroups = Record<
   boolean
 >;
 export type Connection = {
+  tagImport?: boolean;
+  tagImportInterval?: number;
   syncStart?: string;
   webhookEnabled?: boolean;
   tagSyncMode?: "add" | "replace";
@@ -49,7 +51,15 @@ export type Evidence = {
   conflict: boolean;
   rules?: string[];
 };
-export type CustomTag = { id: number; name: string; manual?: boolean };
+export type CustomTag = {
+  id: number;
+  name: string;
+  manual?: boolean;
+  protected?: boolean;
+  rules?: string[];
+  sources?: string[];
+  localRule?: boolean;
+};
 export type CustomSelection = {
   total: number;
   counts: Record<string, number>;
@@ -165,6 +175,15 @@ export type Status = {
   tagSync?: Record<
     Service,
     {
+      lastTagCheck?: string;
+      importPending?: number;
+      importConflicts?: {
+        service: Service;
+        mediaId: number;
+        remoteId: number;
+        label: string;
+        desired: boolean;
+      }[];
       running: boolean;
       pending: boolean;
       error: string;

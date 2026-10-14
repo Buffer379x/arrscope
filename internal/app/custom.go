@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS file_custom_auto(file_rowid INTEGER REFERENCES files(
 CREATE TABLE IF NOT EXISTS file_custom(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,tag_id INTEGER REFERENCES custom_tags(id) ON DELETE CASCADE,PRIMARY KEY(file_rowid,tag_id));
 CREATE INDEX IF NOT EXISTS file_custom_value ON file_custom(tag_id,file_rowid);
 PRAGMA user_version=6;`
-const customJSON = `coalesce((SELECT json_group_array(json_object('id',id,'name',name,'manual',json(CASE WHEN EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=id AND o.state=1) THEN 'true' ELSE 'false' END))) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id)),'[]')`
+const customJSON = `coalesce((SELECT json_group_array(json_object('id',ct.id,'name',ct.name,'protected',json(CASE WHEN EXISTS(SELECT 1 FROM external_tag_defs d WHERE d.custom_id=ct.id AND d.service=f.service AND d.rules<>'[]') THEN 'true' ELSE 'false' END),'rules',json(coalesce((SELECT json_group_array(d.service||' · '||r.value) FROM external_tag_defs d,json_each(d.rules) r WHERE d.custom_id=ct.id AND d.service=f.service),'[]')),'manual',json(CASE WHEN EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=ct.id AND o.state=1) THEN 'true' ELSE 'false' END))) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id) ct),'[]')`
 
 func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
 	out := []CustomTag{}
@@ -34,11 +34,25 @@ func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
 		}
 		out = append(out, t)
 	}
-	return out, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err = s.decorateCustom(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 func (s *Store) SaveCustomTag(ctx context.Context, tag CustomTag) (CustomTag, error) {
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
+	if tag.ID > 0 {
+		if on, e := protectedCustom(ctx, s.DB, tag.ID); e != nil {
+			return tag, e
+		} else if on {
+			return tag, fmt.Errorf("This tag is controlled by an external auto-tag rule")
+		}
+	}
 	tag.Name = strings.TrimSpace(tag.Name)
 	if tag.Name == "" || len([]rune(tag.Name)) > 80 || strings.ContainsFunc(tag.Name, unicode.IsControl) {
 		return tag, fmt.Errorf("Enter a tag name between 1 and 80 characters")
@@ -79,6 +93,12 @@ func (s *Store) SaveCustomTag(ctx context.Context, tag CustomTag) (CustomTag, er
 func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
+	if on, e := protectedCustom(ctx, s.DB, id); e != nil {
+		return e
+	} else if on {
+		return fmt.Errorf("This tag is controlled by an external auto-tag rule")
+	}
+
 	rules := []RecognitionRule{}
 	for _, r := range s.recognition.config.Rules {
 		if r.Field != "custom" || r.Value != strconv.FormatInt(id, 10) {
@@ -94,6 +114,11 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	for _, service := range []string{"radarr", "sonarr"} {
+		if err = queueExternalIntent(ctx, tx, service, id, "1=1", nil, false); err != nil {
+			return err
+		}
+	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM custom_tags WHERE id=?", id); err != nil {
 		return err
 	}
@@ -204,7 +229,11 @@ func replaceFileCustom(ctx context.Context, tx *sql.Tx, rowid int64, f File, syn
 			return err
 		}
 	}
-	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO file_custom SELECT a.file_rowid,a.tag_id FROM file_custom_auto a WHERE a.file_rowid=? AND NOT EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=? AND o.file_id=? AND o.tag_id=a.tag_id AND o.state=-1) UNION SELECT ?,tag_id FROM custom_overrides WHERE service=? AND file_id=? AND state=1`, rowid, f.Service, f.ID, rowid, f.Service, f.ID)
+	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO file_custom SELECT a.file_rowid,a.tag_id FROM file_custom_auto a WHERE a.file_rowid=? AND NOT EXISTS(SELECT 1 FROM external_tag_defs d WHERE d.custom_id=a.tag_id AND d.service=(SELECT service FROM files WHERE rowid=a.file_rowid) AND d.rules<>'[]') AND NOT EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=? AND o.file_id=? AND o.tag_id=a.tag_id AND o.state=-1) UNION SELECT ?,tag_id FROM custom_overrides WHERE service=? AND file_id=? AND state=1 AND NOT EXISTS(SELECT 1 FROM external_tag_defs d WHERE d.custom_id=custom_overrides.tag_id AND d.service=custom_overrides.service AND d.rules<>'[]')`, rowid, f.Service, f.ID, rowid, f.Service, f.ID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO file_custom "+externalCustomSelect+" AND f.rowid=?", rowid)
 	return err
 }
 
@@ -250,6 +279,15 @@ func (s *Store) CustomSelection(ctx context.Context, q url.Values) (CustomSelect
 		return out, err
 	}
 	out.Tags, err = s.CustomTags(ctx)
+	if err == nil && serviceOK(q.Get("service")) {
+		for i := range out.Tags {
+			on, e := protectedCustom(ctx, s.DB, out.Tags[i].ID, q.Get("service"))
+			if e != nil {
+				return out, e
+			}
+			out.Tags[i].Protected = on
+		}
+	}
 	return out, err
 }
 func (s *Store) ApplyCustom(ctx context.Context, q url.Values, changes map[string]bool) (int, error) {
@@ -290,6 +328,26 @@ func (s *Store) ApplyCustom(ctx context.Context, q url.Values, changes map[strin
 		if !exists {
 			return 0, fmt.Errorf("Custom tag no longer exists")
 		}
+		for _, svc := range []string{"radarr", "sonarr"} {
+			var selected bool
+			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM custom_targets ct JOIN files f ON f.rowid=ct.rowid WHERE f.service=?)`, svc).Scan(&selected); err != nil {
+				return 0, err
+			}
+			if selected {
+				if on, e := protectedCustom(ctx, tx, id, svc); e != nil {
+					return 0, e
+				} else if on {
+					return 0, fmt.Errorf("This tag is controlled by an external auto-tag rule")
+				}
+			}
+		}
+
+		for _, service := range []string{"radarr", "sonarr"} {
+			if err = queueExternalIntent(ctx, tx, service, id, "b.media_id IN(SELECT f.media_id FROM files f JOIN custom_targets ct ON ct.rowid=f.rowid WHERE f.service=?)", []any{service}, add); err != nil {
+				return 0, err
+			}
+		}
+
 		state := -1
 		if add {
 			state = 1
@@ -306,6 +364,25 @@ func (s *Store) ApplyCustom(ctx context.Context, q url.Values, changes map[strin
 			return 0, err
 		}
 	}
+	for _, service := range []string{"radarr", "sonarr"} {
+		if err = rebuildExternalCustom(ctx, tx, service); err != nil {
+			return 0, err
+		}
+	}
+	// Existing independent file/rule assignments preserve the series/movie union.
+	if _, err = tx.ExecContext(ctx, `UPDATE external_tag_pending AS p SET desired=1 WHERE desired=0 AND EXISTS(SELECT 1 FROM external_tag_defs d JOIN files f ON f.service=p.service AND f.media_id=p.media_id JOIN file_custom c ON c.file_rowid=f.rowid AND c.tag_id=d.custom_id WHERE d.service=p.service AND d.endpoint=p.endpoint AND d.remote_id=p.remote_id)`); err != nil {
+		return 0, err
+	}
+	for _, service := range []string{"radarr", "sonarr"} {
+		if err = rebuildExternalCustom(ctx, tx, service); err != nil {
+			return 0, err
+		}
+	}
+
+	if err = revisionCustom(ctx, tx); err != nil {
+		return 0, err
+	}
+
 	if _, err = tx.ExecContext(ctx, "DROP TABLE custom_targets"); err != nil {
 		return 0, err
 	}
@@ -367,6 +444,20 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 			delete(deleted, tag.ID)
 		}
 	}
+	for _, tag := range current {
+		if tag.Protected {
+			found := false
+			for _, next := range tags {
+				if next.ID == tag.ID && next.Name == tag.Name {
+					found = true
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("This tag is controlled by an external auto-tag rule")
+			}
+		}
+	}
+
 	rules := []RecognitionRule{}
 	for _, rule := range s.recognition.config.Rules {
 		id, _ := strconv.ParseInt(rule.Value, 10, 64)
@@ -383,6 +474,28 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 		return nil, err
 	}
 	defer tx.Rollback()
+	for _, tag := range current {
+		changed := deleted[tag.ID]
+		for _, next := range tags {
+			if next.ID == tag.ID && next.Name != tag.Name {
+				changed = true
+			}
+		}
+		if changed {
+			// Preserve the current file intent across an upstream label rename.
+			if !deleted[tag.ID] {
+				if _, err = tx.ExecContext(ctx, `INSERT INTO custom_overrides(service,file_id,tag_id,state) SELECT f.service,f.id,c.tag_id,1 FROM file_custom c JOIN files f ON f.rowid=c.file_rowid WHERE c.tag_id=? ON CONFLICT(service,file_id,tag_id) DO UPDATE SET state=1`, tag.ID); err != nil {
+					return nil, err
+				}
+			}
+			for _, service := range []string{"radarr", "sonarr"} {
+				if err = queueExternalIntent(ctx, tx, service, tag.ID, "1=1", nil, false); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	for _, tag := range current {
 		if _, err = tx.ExecContext(ctx, "UPDATE custom_tags SET name_key=? WHERE id=?", "\x00draft:"+strconv.FormatInt(tag.ID, 10), tag.ID); err != nil {
 			return nil, err

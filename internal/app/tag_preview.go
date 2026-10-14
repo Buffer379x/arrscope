@@ -48,21 +48,22 @@ type tagOperation struct {
 	Want    []string
 }
 type tagPlan struct {
-	Historical bool
-	Preview    TagPreview
-	Config     ServiceConfig
-	Endpoint   string
-	Snapshot   tagSnapshot
-	Policy     tagPolicyState
-	Labels     map[string]int
-	Names      map[int]string
-	Required   map[string]bool
-	Operations []tagOperation
-	Cleanup    map[string]bool
-	Ownership  map[string]string
-	Grants     map[string]bool
-	Retained   int
-	Waiting    bool
+	AutoProtected map[int]bool
+	Historical    bool
+	Preview       TagPreview
+	Config        ServiceConfig
+	Endpoint      string
+	Snapshot      tagSnapshot
+	Policy        tagPolicyState
+	Labels        map[string]int
+	Names         map[int]string
+	Required      map[string]bool
+	Operations    []tagOperation
+	Cleanup       map[string]bool
+	Ownership     map[string]string
+	Grants        map[string]bool
+	Retained      int
+	Waiting       bool
 }
 
 func bindingKey(mid, tid int, label string) string { return fmt.Sprintf("%d/%d/%s", mid, tid, label) }
@@ -306,6 +307,52 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 	} else if e = client.get(ctx, catalog, q, &media); e != nil {
 		return nil, e
 	}
+	p.AutoProtected = map[int]bool{}
+	pending := map[int]map[string]bool{}
+	if c.TagImport {
+		var details []externalDetail
+		if e = client.get(ctx, "tag/detail", nil, &details); e != nil {
+			return nil, e
+		}
+		for _, d := range details {
+			if d.ID <= 0 {
+				return nil, errors.New("Invalid tag catalog")
+			}
+			if len(d.Auto) > 0 {
+				p.AutoProtected[d.ID] = true
+			}
+		}
+		pending, e = s.pendingForPlan(ctx, service, p.Endpoint)
+		if c.TagSync.Custom {
+			for _, ls := range pending {
+				for l, on := range ls {
+					if !on {
+						p.Cleanup[l] = true
+					}
+				}
+			}
+		}
+		if e != nil {
+			return nil, e
+		}
+	}
+
+	if c.TagImport && c.TagSync.Custom {
+		for _, ls := range pending {
+			for label, on := range ls {
+				if !on && p.Labels[label] > 0 {
+					var localDefinition bool
+					if e = s.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM external_tag_defs WHERE service=? AND endpoint=? AND label=? AND custom_id IS NOT NULL)`, service, p.Endpoint, label).Scan(&localDefinition); e != nil {
+						return nil, e
+					}
+					if localDefinition {
+						p.Required[label] = true
+					}
+				}
+			}
+		}
+	}
+
 	sort.Slice(media, func(i, j int) bool { return media[i].ID < media[j].ID })
 	var historical int
 	if e = s.DB.QueryRowContext(ctx, "SELECT (SELECT count(*) FROM tag_sync_values WHERE service=? AND endpoint=?)+(SELECT count(*) FROM tag_sync_managed WHERE service=? AND endpoint=?)", service, p.Endpoint, service, p.Endpoint).Scan(&historical); e != nil {
@@ -335,6 +382,45 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 			want[l] = true
 			p.Required[l] = true
 		}
+		// Import-only assignments survive technical overwrite; explicit group Delete still wins.
+		if c.TagImport && !c.TagSync.Custom {
+			rs, err := s.DB.QueryContext(ctx, `SELECT d.label FROM external_tag_defs d JOIN external_tag_bindings b ON b.service=d.service AND b.endpoint=d.endpoint AND b.remote_id=d.remote_id WHERE b.service=? AND b.endpoint=? AND b.media_id=? AND b.present=1 AND b.imported=1`, service, p.Endpoint, m.ID)
+			if err != nil {
+				return nil, err
+			}
+			for rs.Next() {
+				var l string
+				if err = rs.Scan(&l); err != nil {
+					rs.Close()
+					return nil, err
+				}
+				if !p.Policy.remove[l] {
+					want[l] = true
+					p.Required[l] = true
+				}
+			}
+			err = rs.Err()
+			rs.Close()
+			if err != nil {
+				return nil, err
+			}
+		}
+		if c.TagImport && c.TagSync.Custom {
+			for l, on := range pending[m.ID] {
+				if on {
+					want[l] = true
+					p.Required[l] = true
+				} else {
+					delete(want, l)
+				}
+			}
+		}
+		for id := range p.AutoProtected {
+			if l := p.Names[id]; l != "" {
+				delete(want, l)
+			}
+		}
+
 		op := tagOperation{ID: m.ID, Title: m.Title, Current: append([]int{}, m.Tags...)}
 		sort.Ints(op.Current)
 		assigned := map[int]bool{}
@@ -347,10 +433,16 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 			if !ok {
 				return nil, errors.New("Invalid tag assignment")
 			}
+			if p.AutoProtected[id] {
+				want[l] = true
+				p.Required[l] = true
+				continue
+			}
 			if p.Policy.keep[l] {
 				want[l] = true
 			}
-			remove := !want[l] && (tagMode(c) == "replace" || p.Policy.remove[l] || c.TagSync.Custom && p.Policy.custom[m.ID][l])
+			intent, explicit := pending[m.ID][l]
+			remove := !want[l] && (c.TagSync.Custom && explicit && !intent || tagMode(c) == "replace" || p.Policy.remove[l] || c.TagSync.Custom && p.Policy.custom[m.ID][l])
 			if !remove {
 				continue
 			}
@@ -370,7 +462,7 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 			if len(row.Targets) < 10 {
 				row.Targets = append(row.Targets, TagTarget{m.ID, m.Title})
 			}
-			if p.Ownership[bindingKey(m.ID, id, l)] != "managed" && !p.Grants[bindingKey(m.ID, id, l)] {
+			if !(c.TagSync.Custom && explicit && !intent) && p.Ownership[bindingKey(m.ID, id, l)] != "managed" && !p.Grants[bindingKey(m.ID, id, l)] {
 				p.Preview.ApprovalRequired = true
 			}
 		}
@@ -382,6 +474,9 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 		p.Operations = append(p.Operations, op)
 	}
 	for l := range p.Policy.remove {
+		if p.AutoProtected[p.Labels[l]] {
+			continue
+		}
 		p.Cleanup[l] = true
 	}
 	cleanupNames := []string{}
@@ -392,7 +487,7 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 	details := map[int]map[string]json.RawMessage{}
 	for _, l := range cleanupNames {
 		id := p.Labels[l]
-		if id == 0 || p.Required[l] || p.Policy.keep[l] {
+		if id == 0 || p.AutoProtected[id] || p.Required[l] || p.Policy.keep[l] {
 			continue
 		}
 		var detail map[string]json.RawMessage

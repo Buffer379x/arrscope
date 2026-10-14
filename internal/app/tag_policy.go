@@ -236,6 +236,20 @@ func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings
 		if before == after {
 			continue
 		}
+		if tagEndpoint(before) != tagEndpoint(after) {
+			for _, table := range []string{"external_tag_bindings", "external_tag_defs", "external_tag_pending"} {
+				if _, err = tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE service=?", service); err != nil {
+					return err
+				}
+			}
+			if err = rebuildExternalCustom(ctx, tx, service); err != nil {
+				return err
+			}
+			if err = revisionCustom(ctx, tx); err != nil {
+				return err
+			}
+		}
+
 		endpoint := tagEndpoint(after)
 		if tagEndpoint(before) == endpoint && before.TagSync.Active() {
 			if err = s.seedTagValues(ctx, tx, service, endpoint, before.TagSync, false); err != nil {

@@ -154,7 +154,7 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 		debug.FreeOSMemory()
 		m.status[service] = st
 		delete(m.cancels, service)
-		if err == nil && m.AfterSync != nil {
+		if err == nil && m.AfterSync != nil && !(c.TagImport && c.TagImportInterval == 0 && !c.TagSync.Active()) {
 			m.AfterSync(service)
 		}
 	}()
