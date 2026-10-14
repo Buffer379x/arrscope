@@ -3,62 +3,61 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"sort"
 	"strings"
 )
 
+// Read compact index groups once; never repeatedly decode every full file record.
 func addAudioStatistics(ctx context.Context, tx *sql.Tx, out *Statistics) error {
-	out.FileTotals = map[string]int{}
-	for _, scope := range []string{"all", "radarr", "sonarr"} {
-		filter := ""
-		args := []any{}
-		if scope != "all" {
-			filter = " WHERE service=?"
-			args = append(args, scope)
-		}
-		var total int
-		if e := tx.QueryRowContext(ctx, "SELECT count(*) FROM files"+filter, args...).Scan(&total); e != nil {
+	out.FileTotals = map[string]int{"all": 0, "radarr": 0, "sonarr": 0}
+	counts := map[string]map[string]int{"all": {}, "radarr": {}, "sonarr": {}}
+	rows, e := tx.QueryContext(ctx, `SELECT service,audio,CASE WHEN json_valid(data) THEN json_extract(data,'$.unknownTraits') END,count(*) FROM files INDEXED BY files_audio_statistics GROUP BY 1,2,3`)
+	if e != nil {
+		return e
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var service, value string
+		var traits sql.NullString
+		var n int
+		if e = rows.Scan(&service, &value, &traits, &n); e != nil {
 			return e
 		}
-		out.FileTotals[scope] = total
-		counts := map[string]int{}
-		rows, e := tx.QueryContext(ctx, "SELECT audio,count(*) FROM files"+filter+" GROUP BY audio", args...)
-		if e != nil {
-			return e
-		}
-		for rows.Next() {
-			var value string
-			var n int
-			if e = rows.Scan(&value, &n); e != nil {
-				rows.Close()
+		unknown := value == ""
+		if traits.Valid {
+			var fields []string
+			if e = json.Unmarshal([]byte(traits.String), &fields); e != nil {
 				return e
 			}
-			seen := map[string]bool{}
-			for _, codec := range strings.Split(value, " + ") {
-				if codec != "" && !seen[codec] {
-					counts[codec] += n
-					seen[codec] = true
+			for _, field := range fields {
+				if field == "audio" {
+					unknown = true
 				}
 			}
 		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return e
+		seen := map[string]bool{}
+		for _, codec := range strings.Split(value, " + ") {
+			if codec != "" {
+				seen[codec] = true
+			}
 		}
-		where := " WHERE (audio='' OR EXISTS(SELECT 1 FROM json_each(files.data,'$.unknownTraits') u WHERE u.value='audio'))"
-		if scope != "all" {
-			where += " AND service=?"
+		if unknown {
+			seen[""] = true
 		}
-		var unknown int
-		if e = tx.QueryRowContext(ctx, "SELECT count(*) FROM files"+where, args...).Scan(&unknown); e != nil {
-			return e
+		for _, scope := range []string{"all", service} {
+			out.FileTotals[scope] += n
+			for codec := range seen {
+				counts[scope][codec] += n
+			}
 		}
-		if unknown > 0 {
-			counts[""] = unknown
-		}
+	}
+	if e = rows.Err(); e != nil {
+		return e
+	}
+	for scope, values := range counts {
 		buckets := []StatisticBucket{}
-		for value, n := range counts {
+		for value, n := range values {
 			buckets = append(buckets, StatisticBucket{Value: value, Count: n})
 		}
 		sort.Slice(buckets, func(i, j int) bool {

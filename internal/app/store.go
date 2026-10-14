@@ -433,6 +433,11 @@ PRAGMA user_version=1;COMMIT;`)
 	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_statistics ON files(service,media_id,season,id,CASE WHEN json_valid(data) THEN json_extract(data,'$.episodes') END,CASE WHEN json_valid(data) THEN coalesce(json_extract(data,'$.metadataIncomplete'),0) END,json_valid(data))`); err != nil {
 		return fail(err)
 	}
+	// Audio distributions retain unknown-track semantics without scanning full JSON.
+	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_audio_statistics ON files(service,audio,CASE WHEN json_valid(data) THEN json_extract(data,'$.unknownTraits') END)`); err != nil {
+		return fail(err)
+	}
+
 	if err = s.Get("recognition", &recognition); err == nil {
 		s.recognition, err = CompileRecognition(recognition.Rules)
 		if err != nil {
