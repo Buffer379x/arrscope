@@ -20,16 +20,18 @@ import (
 )
 
 type Server struct {
-	Tags     *TagWriter
-	Store    *Store
-	Security *Security
-	Sync     *Syncer
-	mu       sync.Mutex
-	settings Settings
-	ctx      context.Context
-	Static   fs.FS
-	Demo     bool
-	Version  string
+	Background *Background
+	Webhooks   *WebhookManager
+	Tags       *TagWriter
+	Store      *Store
+	Security   *Security
+	Sync       *Syncer
+	mu         sync.Mutex
+	settings   Settings
+	ctx        context.Context
+	Static     fs.FS
+	Demo       bool
+	Version    string
 }
 
 func NewServer(ctx context.Context, store *Store, static fs.FS, version string) (*Server, error) {
@@ -53,6 +55,9 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		}
 		cfg.Emby.APIKey, e = sec.Open(cfg.Emby.APIKey)
 		if e != nil {
+			return nil, e
+		}
+		if e := normalize070(&cfg); e != nil {
 			return nil, e
 		}
 		if e := normalizeInterfaceTheme(&cfg); e != nil {
@@ -84,6 +89,8 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 		}
 		s.settings = cfg
 	}
+	s.Background = NewBackground(s)
+	s.Webhooks = NewWebhookManager(s)
 	s.Tags = NewTagWriter(ctx, store, s.Config, s.Sync.gate)
 	s.Sync.AfterSync = s.Tags.Queue
 	s.Sync.AfterStop = s.Tags.Close
@@ -102,7 +109,7 @@ func (s *Server) scheduleDue() {
 		if !cfg.Enabled || cfg.Interval == 0 || st.Running {
 			continue
 		}
-		if st.LastAttempt == nil || time.Since(*st.LastAttempt) >= time.Duration(cfg.Interval)*time.Minute {
+		if st.LastAttempt == nil || syncDue(time.Now(), st.LastAttempt, cfg, s.settings.SyncTimezone) {
 			s.Sync.Start(s.ctx, service, cfg, s.settings.Emby)
 		}
 	}
@@ -135,6 +142,10 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		if r.URL.Path == "/api/webhooks/arr" {
+			s.webhookHTTP(w, r)
+			return
+		}
 		if r.URL.Path == "/healthz" {
 			jsonOut(w, 200, map[string]string{"status": "ok", "version": s.Version})
 			return
@@ -183,6 +194,18 @@ func (s *Server) Handler() http.Handler {
 				out["sync"] = states
 				out["tagSync"] = s.Tags.Statuses()
 				out["recognitionRevision"] = s.Store.Recognition().Revision
+				out["releaseCheck"] = s.Background.ReleaseStatus()
+				var revision string
+				s.Store.Get("cacheRevision", &revision)
+				out["cacheRevision"] = revision
+				out["webhook"] = s.Webhooks.Statuses()
+				cfg := s.Config()
+				out["webhooksEnabled"] = cfg.Radarr.WebhookEnabled || cfg.Sonarr.WebhookEnabled
+				next := map[string]*time.Time{}
+				for service, c := range map[string]ServiceConfig{"radarr": cfg.Radarr, "sonarr": cfg.Sonarr} {
+					next[service] = nextSync(time.Now(), c, cfg.SyncTimezone)
+				}
+				out["nextSync"] = next
 			}
 			jsonOut(w, 200, out)
 			return
@@ -229,6 +252,27 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		switch r.URL.Path {
+		case "/api/storage":
+			if r.Method != "GET" {
+				w.WriteHeader(405)
+				return
+			}
+			s.storageHTTP(w, r)
+			return
+		case "/api/storage/refresh":
+			if r.Method != "POST" {
+				w.WriteHeader(405)
+				return
+			}
+			s.storageRefreshHTTP(w, r)
+			return
+		case "/api/webhook-credentials":
+			if r.Method != "POST" {
+				w.WriteHeader(405)
+				return
+			}
+			s.webhookCredentialsHTTP(w, r)
+			return
 		case "/api/logout":
 			if r.Method != "POST" {
 				break
@@ -438,6 +482,10 @@ func (s *Server) Handler() http.Handler {
 					return
 				}
 				cfg := in.Settings
+				if e := normalize070(&cfg); e != nil {
+					failure(w, r, 400, e)
+					return
+				}
 				if e := normalizeInterfaceTheme(&cfg); e != nil {
 					failure(w, r, 400, e)
 					return
@@ -695,7 +743,9 @@ func (s *Server) Handler() http.Handler {
 				failure(w, r, 400, errors.New("Invalid view mode"))
 				return
 			}
-			out, e := s.Store.QueryContext(r.Context(), r.URL.Query(), mode, false)
+			q := r.URL.Query()
+			q.Set("_infoMask", strconv.Itoa(infoMask(s.Config())))
+			out, e := s.Store.QueryContext(r.Context(), q, mode, false)
 			if e != nil {
 				failure(w, r, 400, e)
 				return
@@ -835,12 +885,14 @@ func safeCell(s string) string {
 	return s
 }
 func (s *Server) export(w http.ResponseWriter, r *http.Request) {
-	filter, args, e := where(r.URL.Query())
+	q := r.URL.Query()
+	q.Set("_infoMask", strconv.Itoa(infoMask(s.Config())))
+	filter, args, e := where(q)
 	if e != nil {
 		failure(w, r, 400, e)
 		return
 	}
-	order, e := displayOrder(r.URL.Query())
+	order, e := displayOrder(q)
 	if e != nil {
 		failure(w, r, 400, e)
 		return

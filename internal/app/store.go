@@ -484,17 +484,17 @@ func (s *Store) Put(key string, v any) error {
 	return e
 }
 func (s *Store) Replace(service string, files []File, status SyncStatus) error {
-	return s.replace(service, files, status, false)
+	return s.replace(service, files, status, false, nil)
 }
 
 // replaceSyncSnapshot takes ownership of a completed upstream snapshot. Drop
 // records as they are written so the growing SQLite transaction does not retain
 // a second full library in Go memory. Rollback still preserves the old cache.
 func (s *Store) replaceSyncSnapshot(service string, files []File, status SyncStatus) error {
-	return s.replace(service, files, status, true)
+	return s.replace(service, files, status, true, nil)
 }
 
-func (s *Store) replace(service string, files []File, status SyncStatus, consume bool) error {
+func (s *Store) replace(service string, files []File, status SyncStatus, consume bool, scope *DeltaScope) error {
 	if consume {
 		defer clear(files)
 	}
@@ -517,7 +517,7 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 			return e
 		}
 	}
-	if _, e = tx.Exec("DELETE FROM files WHERE service=?", service); e != nil {
+	if _, e = deleteScopedFiles(tx, service, scope); e != nil {
 		return e
 	}
 	st, e := tx.Prepare("INSERT INTO files(service,id,media_id,season,title,filename,resolution,codec,family,source,processing,hdr,bitDepth,audio,channels,language,size,conflict,data,series,episode_sort,rule_conflict,emby_match) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -568,8 +568,13 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 	if _, e = tx.Exec("DELETE FROM custom_overrides WHERE service=? AND NOT EXISTS(SELECT 1 FROM files f WHERE f.service=custom_overrides.service AND f.id=custom_overrides.file_id)", service); e != nil {
 		return e
 	}
-	b, _ := json.Marshal(status)
-	if _, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", "sync:"+service, string(b)); e != nil {
+	if scope == nil {
+		b, _ := json.Marshal(status)
+		if _, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", "sync:"+service, string(b)); e != nil {
+			return e
+		}
+	}
+	if _, e = tx.Exec("INSERT INTO kv(key,value) VALUES('cacheRevision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", strconv.Quote(fmt.Sprintf("%d", time.Now().UnixNano()))); e != nil {
 		return e
 	}
 	if e = tx.Commit(); e != nil {
@@ -718,12 +723,12 @@ func where(q url.Values) (string, []any, error) {
 	if state := q.Get("embyMatch"); state != "" {
 		switch state {
 		case "unmatched":
-			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks')")
-		case "matched", "missing", "ambiguous", "missing_size", "no_tracks":
+			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks','pending')")
+		case "matched", "missing", "ambiguous", "missing_size", "no_tracks", "pending":
 			w = append(w, "f.emby_match=?")
 			a = append(a, state)
 		case "unconfigured":
-			w = append(w, "f.emby_match=''")
+			w = append(w, "f.emby_match IN ('','unconfigured')")
 		default:
 			return "", nil, fmt.Errorf("Invalid Emby match filter")
 		}
@@ -982,13 +987,16 @@ func (s *Store) Presets() ([]Preset, error) {
 // SQL expressions and direction come exclusively from this allowlist.
 func displayOrder(q url.Values) (string, error) {
 	order, err := movieOrder(q)
-	if err == nil && q.Get("service") == "sonarr" {
+	if err == nil && q.Get("service") == "sonarr" && q.Get("sort") != "info" {
 		order = "f.series COLLATE NOCASE,f.media_id,f.season,f.episode_sort,f.id"
 	}
 	return order, err
 }
 func movieOrder(q url.Values) (string, error) {
 	field := q.Get("sort")
+	if field == "info" {
+		return infoOrderSQL(q)
+	}
 	if field == "" {
 		field = "title"
 	}

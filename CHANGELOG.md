@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.7.0
+
+Clock-anchored sync schedules, authenticated targeted webhooks, selected/shared storage capacity widgets, automatic release notices, sortable Info icon counts and library layout refinements. See [release notes](docs/releases/0.7.0.md).
+
 ## 0.6.3
 
 Configurable Info action column with new-tab Radarr/Sonarr links, file details and both warning indicators; persistent icon visibility/order and per-library Info column ordering. Existing layouts and cache rows remain compatible. No database schema migration. See [release notes](docs/releases/0.6.3.md).

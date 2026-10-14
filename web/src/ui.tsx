@@ -36,6 +36,7 @@ export const tableColumns = [
 ];
 export type ConnectionService = Service | "emby";
 export const embyMatchLabels: Record<string, string> = translatedLabels({
+  pending: "Awaiting Emby enrichment",
   unmatched: "All unsuccessful matches",
   matched: "Matched",
   unconfigured: "Without Emby enrichment",
