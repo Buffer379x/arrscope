@@ -61,6 +61,7 @@ type Settings struct {
 	Radarr          ServiceConfig       `json:"radarr"`
 	Sonarr          ServiceConfig       `json:"sonarr"`
 	Emby            ServiceConfig       `json:"emby"`
+	Jellyfin        ServiceConfig       `json:"jellyfin"`
 	SeasonMode      string              `json:"seasonMode"`
 }
 type Evidence struct {
@@ -97,7 +98,58 @@ type CustomTag struct {
 	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
 }
+type MediaMatch struct {
+	Status string       `json:"status"`
+	Tracks []AudioTrack `json:"tracks,omitempty"`
+	HDR    string       `json:"hdr,omitempty"`
+}
+type MediaMatches struct {
+	Emby     *MediaMatch `json:"emby,omitempty"`
+	Jellyfin *MediaMatch `json:"jellyfin,omitempty"`
+}
+
+func (m *MediaMatches) get(provider string) *MediaMatch {
+	if m == nil {
+		return nil
+	}
+	if provider == "jellyfin" {
+		return m.Jellyfin
+	}
+	return m.Emby
+}
+func (f *File) setMediaMatch(provider string, value MediaMatch) {
+	if f.MediaServers == nil {
+		f.MediaServers = &MediaMatches{}
+	}
+	if provider == "jellyfin" {
+		if f.MediaServers.Emby != nil && trackInventory(f.MediaServers.Emby.Tracks) == trackInventory(value.Tracks) {
+			value.Tracks = f.MediaServers.Emby.Tracks
+		}
+		f.MediaServers.Jellyfin = &value
+	} else {
+		f.MediaServers.Emby = &value
+	}
+}
+func (m *MediaMatches) count() int {
+	if m == nil {
+		return 0
+	}
+	n := 0
+	if m.Emby != nil {
+		n++
+	}
+	if m.Jellyfin != nil {
+		n++
+	}
+	return n
+}
+
 type File struct {
+	MediaServers         *MediaMatches       `json:"mediaServers,omitempty"`
+	MediaOrigin          string              `json:"mediaOrigin,omitempty"`
+	SeasonOutlier        bool                `json:"seasonOutlier"`
+	LanguageOutlier      bool                `json:"languageOutlier"`
+	SeasonReasons        map[string]string   `json:"seasonReasons,omitempty"`
 	InformationOnly      map[string][]string `json:"informationOnly,omitempty"`
 	comparisonEngine     *RecognitionEngine
 	Custom               []CustomTag           `json:"custom"`
@@ -158,7 +210,7 @@ func DefaultSettings() Settings {
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
-	return []*ServiceConfig{&s.Radarr, &s.Sonarr, &s.Emby}
+	return []*ServiceConfig{&s.Radarr, &s.Sonarr, &s.Emby, &s.Jellyfin}
 }
 func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 	if in.ClearKey {

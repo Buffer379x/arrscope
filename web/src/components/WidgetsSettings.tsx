@@ -161,7 +161,7 @@ export function WidgetsSettings({
                           </label>
                           {!!chosen.sharedGroup && (
                             <label>
-                              {t("Shared group")}
+                              {t("Shared storage group")}
                               <input
                                 value={chosen.sharedGroup}
                                 maxLength={80}

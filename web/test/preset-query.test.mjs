@@ -13,3 +13,10 @@ test("preset identity normalizes selections, defaults, ranges, search and legacy
   assert.notEqual(canonicalPresetQuery("hdr=HDR10&hdr=Dolby+Vision&hdrOp=all"),canonicalPresetQuery("hdr=HDR10&hdr=Dolby+Vision&hdrOp=notAll"));
   assert.notEqual(canonicalPresetQuery("conflict=true"),canonicalPresetQuery("conflict=false"));
 });
+test("media-server and season status filters remain part of saved preset identity", () => {
+  assert.equal(canonicalPresetQuery("mediaMissing=true&mediaMatched=true&page=7"), canonicalPresetQuery("mediaMatched=true&mediaMissing=true"));
+  for (const key of ["mediaMatched", "mediaMissing", "mediaAmbiguous", "mediaConflicting", "mediaNoTracks", "mediaPending", "mediaUnconfigured", "seasonOutlier", "languageOutlier"]) {
+    assert.notEqual(canonicalPresetQuery(`${key}=true`), canonicalPresetQuery(""));
+    assert.notEqual(canonicalPresetQuery(`${key}=true`), canonicalPresetQuery(`${key}=false`));
+  }
+});

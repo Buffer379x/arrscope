@@ -38,7 +38,7 @@ export function WebhookSettings({
       </label>
       <p class="quiet">
         {t(
-          "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New Emby track metadata is added during the next full sync.",
+          "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server track metadata is added during the next full sync.",
         )}
       </p>
       <button

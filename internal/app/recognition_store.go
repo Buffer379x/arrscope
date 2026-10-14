@@ -44,6 +44,9 @@ func reparseFile(f *File, engine *RecognitionEngine) {
 		api.AudioStreamCount = f.AudioStreamCount
 	}
 	embyHDR := f.Evidence["hdr"].Emby
+	if f.MediaServers.count() > 0 {
+		embyHDR = ""
+	}
 	EnrichWithRules(f, api, engine)
 	if embyHDR != "" {
 		f.HDR = mergeHDR(f.HDR, embyHDR)
@@ -52,7 +55,9 @@ func reparseFile(f *File, engine *RecognitionEngine) {
 		e.Origin = "combined"
 		f.Evidence["hdr"] = e
 	}
-	if f.EmbyMatch == "matched" && len(f.AudioTracks) > 0 {
+	if f.MediaServers.count() > 0 {
+		resolveMediaServers(f)
+	} else if f.EmbyMatch == "matched" && len(f.AudioTracks) > 0 {
 		streams := []embyStream{}
 		for _, track := range f.AudioTracks {
 			streams = append(streams, embyStream{Type: "Audio", Index: track.Index, Language: track.Language, Codec: track.Codec, Channels: track.Channels, ChannelLayout: track.ChannelLayout, Title: track.Title, IsDefault: track.Default})
@@ -162,7 +167,7 @@ func reparseCached(ctx context.Context, tx *sql.Tx, engine *RecognitionEngine) e
 			return err
 		}
 		if len(batch) == 0 {
-			return nil
+			return rebuildSeasonAnalysis(ctx, tx, nil)
 		}
 		for _, item := range batch {
 			oldCustom := item.file.RecognizedCustom

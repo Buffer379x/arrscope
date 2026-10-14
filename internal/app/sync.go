@@ -111,9 +111,19 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 				debug.FreeOSMemory()
 			}
 		}
-		if err == nil && len(supplemental) > 0 && supplemental[0].Enabled {
-			if err = NewEmby(supplemental[0]).Enrich(ctx, service, files); err != nil {
-				err = errors.New("Emby enrichment failed: " + err.Error())
+		if err == nil {
+			for i, config := range supplemental {
+				if !config.Enabled {
+					continue
+				}
+				client := NewEmby(config)
+				if i == 1 {
+					client = NewJellyfin(config)
+				}
+				if err = client.Enrich(ctx, service, files); err != nil {
+					err = errors.New(client.label() + " enrichment failed: " + err.Error())
+					break
+				}
 			}
 		}
 		// Arr catalog indexes and Emby candidate maps are no longer needed.

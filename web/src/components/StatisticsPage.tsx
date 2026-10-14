@@ -122,16 +122,17 @@ export function StatisticsPage({
               </small>
             </article>
             <article class="stat-widget">
-              <span>{t("Emby matching")}</span>
+              <span>{t("Media server matching")}</span>
               <dl>
                 {[
                   ["matched", t("Matched")],
                   ["missing", t("Not found")],
                   ["ambiguous", t("Ambiguous")],
+                  ["conflicting", t("Conflicting media server metadata")],
                   ["missing_size", t("Size missing")],
                   ["no_tracks", t("Audio tracks missing")],
-                  ["unconfigured", t("Without Emby enrichment")],
-                  ["pending", t("Awaiting Emby enrichment")],
+                  ["unconfigured", t("Without media server enrichment")],
+                  ["pending", t("Awaiting media server matching")],
                 ]
                   .sort(
                     (a, b) => (data.emby[b[0]] || 0) - (data.emby[a[0]] || 0),

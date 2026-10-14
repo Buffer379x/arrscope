@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.8.0
+
+Independent Emby/Jellyfin connections, media-server matching checkboxes, indexed technical/language season outliers with explanations and CSV, parallel incoming/outgoing tag controls, clearer shared-storage identities, and German Quelle labels. Schema 14 preserves existing data with a backup.
+
 ## 0.7.3
 
 Persistent tag presentation catalog, assignment counts and safe deletion, local names for external custom/auto-tags, editable storage path names, service-level sync actions, consistent tag settings and collapsed library filters. See [release notes](docs/releases/0.7.3.md).

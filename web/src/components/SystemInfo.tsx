@@ -199,28 +199,42 @@ export function SystemInfo({
             );
           })}
           <article>
-            <h4>Emby</h4>
-            <p>{settings.emby.enabled ? t("Enabled") : t("Disabled")}</p>
-            <small>{t("Emby enriches the Radarr and Sonarr syncs.")}</small>
-            <button
-              type="button"
-              class="button system-sync-button"
-              disabled={
-                demo ||
-                !settings.emby.enabled ||
-                syncing.emby ||
-                (!settings.radarr.enabled && !settings.sonarr.enabled) ||
-                Object.values(status.sync || {}).some((s) => s.running)
-              }
-              onClick={() => void manualSync("emby")}
-            >
-              <RefreshCw size={15} />
-              {t("Match now")}
-            </button>
-            {settings.emby.enabled &&
-              Object.values(status.sync || {}).some((s) => s.running) && (
-                <progress aria-label={t("Sync in progress …")} />
+            <h4>{t("Media server")}</h4>
+            {(["emby", "jellyfin"] as const)
+              .filter((provider) => settings[provider].enabled)
+              .map((provider) => (
+                <section class="media-system-entry" key={provider}>
+                  <div class="system-service-heading">
+                    <b>{provider === "emby" ? "Emby" : "Jellyfin"}</b>
+                    <button
+                      type="button"
+                      class="button system-sync-button"
+                      disabled={
+                        demo ||
+                        syncing[provider] ||
+                        (!settings.radarr.enabled &&
+                          !settings.sonarr.enabled) ||
+                        Object.values(status.sync || {}).some((s) => s.running)
+                      }
+                      onClick={() => void manualSync(provider)}
+                    >
+                      <RefreshCw size={15} />
+                      {t("Match now")}
+                    </button>
+                  </div>
+                  {Object.values(status.sync || {}).some((s) => s.running) && (
+                    <progress aria-label={t("Sync in progress …")} />
+                  )}
+                </section>
+              ))}
+            {!settings.emby.enabled && !settings.jellyfin.enabled && (
+              <p>{t("Disabled")}</p>
+            )}
+            <small>
+              {t(
+                "Media servers supplement enabled library syncs. Matching now refreshes both libraries and all enabled media servers.",
               )}
+            </small>
           </article>
         </div>
       </section>

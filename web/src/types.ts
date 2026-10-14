@@ -41,6 +41,7 @@ export type Settings = {
   radarr: Connection;
   sonarr: Connection;
   emby: Connection;
+  jellyfin: Connection;
   seasonMode: "matches" | "season";
 };
 export type Evidence = {
@@ -99,6 +100,14 @@ export type MediaFile = {
     default: boolean;
   }[];
   embyMatch?: string;
+  mediaServers?: Record<
+    string,
+    { status: string; hdr?: string; tracks?: MediaFile["audioTracks"] }
+  >;
+  mediaOrigin?: string;
+  seasonOutlier?: boolean;
+  languageOutlier?: boolean;
+  seasonReasons?: Record<string, string>;
   channels: string;
   language: string;
   size: number;

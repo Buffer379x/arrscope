@@ -2,6 +2,7 @@ import argparse, json, os, re, socket, subprocess, sys, tempfile, threading, tim
 parser = argparse.ArgumentParser(description='Isolated Scopearr container test with synthetic Arr/Emby APIs; no real service access.')
 parser.add_argument('--image', default='scopearr:test')
 parser.add_argument('--files-per-service', type=int, default=50000)
+parser.add_argument('--jellyfin', action='store_true', help='Also enrich from Jellyfin and verify two enabled media servers under the same memory limit.')
 args = parser.parse_args()
 if not 1 <= args.files_per_service <= 100000:
     parser.error('Use 1 to 100000 files per service.')
@@ -40,7 +41,7 @@ class Fixture(BaseHTTPRequestHandler):
             sid = int(q['seriesId'][0])
             ids = range((sid - 1) * PER_SERIES + 1, min(sid * PER_SERIES, N) + 1)
             data = [arrfile(i, 'sonarr', sid) for i in ids] if u.path.endswith('episodefile') else [{'id': i, 'episodeFileId': i, 'episodeNumber': (i - 1) % PER_SERIES + 1, 'title': f'Episode {i:05d}', 'airDate': '2020-01-01'} for i in ids]
-        elif u.path == '/emby/Items':
+        elif u.path in ['/emby/Items', '/Items']:
             service = 'radarr' if q['IncludeItemTypes'][0] == 'Movie' else 'sonarr'
             start = int(q['StartIndex'][0])
             limit = int(q['Limit'][0])
@@ -76,7 +77,7 @@ def req(path, data=None, method=None, timeout=10):
     r = urllib.request.Request(base + path, data=None if data is None else json.dumps(data).encode(), method=method, headers={'Content-Type': 'application/json', 'X-CSRF-Token': csrf})
     with opener.open(r, timeout=timeout) as response:
         return json.load(response)
-result = {'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 64MiB under the 256MiB container limit'}
+result = {'enabled_media_servers': ['emby'] + (['jellyfin'] if args.jellyfin else []), 'files_per_service': N, 'total_files': 2 * N, 'memory_limit_mib': 256, 'emby_tracks_per_file': 2, 'forced_overlap': overlap is not None, 'architecture': docker('image', 'inspect', args.image, '--format', '{{.Architecture}}'), 'runtime': 'GOMAXPROCS=2, Go memory target at most 64MiB under the 256MiB container limit'}
 # Match the host's unprivileged UID/GID so it can clean up private 0700 backup
 # directories on Linux bind mounts. Root callers still run the app as 99:100.
 test_uid = os.getuid() if os.getuid() else 99
@@ -97,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
         req('/api/setup', {'username': 'review', 'password': 'Synthetic-review-2026', 'token': token})
         csrf = req('/api/status')['csrf']
         cfg = req('/api/settings')
-        for service in ['radarr', 'sonarr', 'emby']:
+        for service in ['radarr', 'sonarr', 'emby'] + (['jellyfin'] if args.jellyfin else []):
             cfg[service].update(enabled=True, url=f'http://host.docker.internal:{fixture.server_port}', apiKey='synthetic', interval=0)
         start = time.perf_counter()
         req('/api/settings', cfg, 'PUT')

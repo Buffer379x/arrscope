@@ -20,6 +20,11 @@ import {
   labels,
   operatorLabels,
 } from "../ui";
+import {
+  mediaStateFilters,
+  seasonTechnicalHelp,
+  seasonLanguageHelp,
+} from "../media-filters";
 import { StateFilter } from "./StateFilter";
 import { MultiFilter } from "./MultiFilter";
 type Props = {
@@ -280,54 +285,45 @@ export function FilterPanel({
               negative="complete"
               change={change}
             />
-            <StateFilter
-              name="embyMatch"
-              label="All unsuccessful matches"
-              value={q.get("embyMatch") || ""}
-              positive="unmatched"
-              negative="matched"
-              change={change}
-            />
-            {["unknownYear"].map((k) => (
-              <label class="check-field">
-                <input
-                  type="checkbox"
-                  checked={q.get(k) === "true"}
-                  onChange={(e) =>
-                    change(k, e.currentTarget.checked ? ["true"] : [])
-                  }
+            {service === "sonarr" && (
+              <>
+                <StateFilter
+                  name="seasonOutlier"
+                  label="Technical outliers"
+                  value={q.get("seasonOutlier") || ""}
+                  positive="true"
+                  negative="false"
+                  change={change}
+                  help={seasonTechnicalHelp}
                 />
-                {t("Unknown year")}
-              </label>
-            ))}
-            <div class="emby-match-field">
-              <label>
-                <span>{t("Emby matching")}</span>
-                <select
-                  aria-label={t("Emby matching")}
-                  value={q.get("embyMatch") || ""}
-                  onChange={(e) =>
-                    change(
-                      "embyMatch",
-                      e.currentTarget.value ? [e.currentTarget.value] : [],
-                    )
-                  }
-                >
-                  <option value="">{t("All files")}</option>
-                  {[
-                    "unmatched",
-                    "matched",
-                    "missing",
-                    "ambiguous",
-                    "missing_size",
-                    "no_tracks",
-                    "unconfigured",
-                  ].map((k) => (
-                    <option value={k}>{embyMatchLabels[k]}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                <StateFilter
+                  name="languageOutlier"
+                  label="Language outliers"
+                  value={q.get("languageOutlier") || ""}
+                  positive="true"
+                  negative="false"
+                  change={change}
+                  help={seasonLanguageHelp}
+                />
+              </>
+            )}
+            <section
+              class="media-match-filters"
+              aria-label={t("Media server matching")}
+            >
+              <h3>{t("Media server matching")}</h3>
+              {Object.entries(mediaStateFilters).map(([key, label]) => (
+                <StateFilter
+                  key={key}
+                  name={key}
+                  label={label}
+                  value={q.get(key) || ""}
+                  positive="true"
+                  negative="false"
+                  change={change}
+                />
+              ))}
+            </section>
           </section>
         </div>
       )}
@@ -364,7 +360,15 @@ export function FilterPanel({
                         yearMax: t("To"),
                         conflict: t("Metadata disagreement"),
                         ruleConflict: t("Conflicting recognition rules"),
-                        embyMatch: t("Emby matching"),
+                        embyMatch: t("Media server matching"),
+                        seasonOutlier: t("Technical outliers"),
+                        languageOutlier: t("Language outliers"),
+                        ...Object.fromEntries(
+                          Object.entries(mediaStateFilters).map(([k, v]) => [
+                            k,
+                            t(v),
+                          ]),
+                        ),
                         metadata: t("Metadata status"),
                         sizeMin: t("Bytes from"),
                         sizeMax: t("Bytes to"),
@@ -387,8 +391,14 @@ export function FilterPanel({
                     .map((value) =>
                       k === "embyMatch"
                         ? embyMatchLabels[value] || value
-                        : ["conflict", "ruleConflict"].includes(k)
-                          ? t(value === "true" ? "Conflicting" : "No conflicts")
+                        : [
+                              "conflict",
+                              "ruleConflict",
+                              "seasonOutlier",
+                              "languageOutlier",
+                              ...Object.keys(mediaStateFilters),
+                            ].includes(k)
+                          ? t(value === "true" ? "is" : "is not")
                           : value === "__unknown__"
                             ? t("Unknown")
                             : k === "metadata"

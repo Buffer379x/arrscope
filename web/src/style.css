@@ -458,3 +458,22 @@
 .color-settings-table th:nth-child(2) { text-align:right; }
 .storage-shared { display:grid; gap:12px; }
 .storage-shared > label:not(.check-field) { min-width:0; }
+/* Scopearr 0.8: parallel tag controls, shared semantic media statuses. */
+.tag-integration-settings { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; }
+.tag-integration-settings > section { min-width:0; }
+.media-provider-select { display:block; max-width:240px; margin-bottom:16px; }
+.media-provider-select select { width:100%; }
+.media-match-filters { border-top:1px solid var(--line); margin-top:16px; padding-top:16px; }
+.media-match-filters h3 { margin:0 0 12px; font-size:inherit; }
+.state-filter-label { display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.state-filter-label .check-field { margin:0; }
+.inline-help { display:inline-flex; flex:none; }
+.inline-help .icon-button { padding:3px; width:24px; min-height:24px; border:0; background:transparent; }
+.inline-help .filter-logic-tooltip { left:auto; right:0; width:min(440px,calc(100vw - 56px)); }
+.technical-outlier td { background:color-mix(in srgb,var(--accent) 7%,var(--panel)); }
+.language-outlier td { box-shadow:inset 0 -2px color-mix(in srgb,var(--accent) 55%,var(--line)); }
+.season-row.has-outlier strong { color:var(--accent); }
+.media-system-entry { padding:16px 0; }
+.media-system-entry + .media-system-entry { border-top:1px solid var(--line); }
+@media(max-width:700px) { .tag-integration-settings {grid-template-columns:minmax(0,1fr);} .inline-help .filter-logic-tooltip { position:fixed;left:24px;right:24px;top:auto;bottom:24px;width:auto;} }
+.tag-integration-settings h4 { margin:0 0 12px; }
