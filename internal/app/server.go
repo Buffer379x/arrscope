@@ -449,6 +449,42 @@ func (s *Server) Handler() http.Handler {
 				jsonOut(w, 200, out)
 				return
 			}
+		case "/api/tag-catalog":
+			if r.Method == "GET" {
+				out, e := s.Store.TagCatalog(r.Context())
+				if e != nil {
+					failure(w, r, 500, e)
+				} else {
+					jsonOut(w, 200, out)
+				}
+				return
+			}
+			if r.Method == "DELETE" {
+				var in struct {
+					Field string `json:"field"`
+					Value string `json:"value"`
+				}
+				if e := decode(w, r, &in); e != nil {
+					failure(w, r, 400, e)
+					return
+				}
+				s.mu.Lock()
+				e := s.Store.DeleteCatalogTag(r.Context(), in.Field, in.Value)
+				if e == nil {
+					var stored Settings
+					if s.Store.Get("settings", &stored) == nil {
+						s.settings.TagColors = stored.TagColors
+						s.settings.TagTextColors = stored.TagTextColors
+					}
+				}
+				s.mu.Unlock()
+				if e != nil {
+					failure(w, r, 400, e)
+				} else {
+					jsonOut(w, 200, map[string]bool{"ok": true})
+				}
+				return
+			}
 		case "/api/display-tags":
 			if r.Method == "GET" {
 				out, e := s.Store.DisplayTags(r.Context())
@@ -991,7 +1027,11 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 		}
 		var names []string
 		for _, tag := range f.Custom {
-			names = append(names, tag.Name)
+			name := tag.Name
+			if tag.DisplayName != "" {
+				name = tag.DisplayName
+			}
+			names = append(names, name)
 		}
 		var years []string
 		for _, y := range f.Years {

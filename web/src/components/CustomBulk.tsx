@@ -116,7 +116,7 @@ export function CustomBulk({
                   />
                   <span>
                     <AutoTagMark tag={tag} />
-                    {tag.name}
+                    {tag.displayName || tag.name}
                   </span>
                   <small>
                     {count(n)} / {count(selection.total)}

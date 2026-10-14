@@ -144,6 +144,11 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
                     req('/api/' + endpoint)
                     cached.append((time.perf_counter() - t) * 1000)
                 result[endpoint.split('?')[0] + '_cached_p95_ms'] = round(sorted(cached)[18], 3)
+            # Presentation counts share one grouped trait scan, rather than one scan per tag.
+            t = time.perf_counter()
+            catalog = req('/api/tag-catalog')
+            result['tag_catalog_ms'] = round((time.perf_counter() - t) * 1000, 3)
+            assert next(row['count'] for row in catalog if row['field'] == 'resolution' and row['value'] == '1080p') == 2 * N
             # Reprocess the entire cache under the same 256 MiB/no-swap limit.
             # Verified Emby pairs must survive and no synthetic upstream GET may occur.
             current = req('/api/recognition')

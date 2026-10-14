@@ -78,7 +78,26 @@ export function SystemInfo({
             const tags = status.tagSync?.[service];
             return (
               <article key={service}>
-                <h4>{service === "radarr" ? "Radarr" : "Sonarr"}</h4>
+                <div class="system-service-heading">
+                  <h4>{service === "radarr" ? "Radarr" : "Sonarr"}</h4>{" "}
+                  <button
+                    type="button"
+                    class="button system-sync-button"
+                    disabled={
+                      demo ||
+                      !settings[service].enabled ||
+                      syncing[service] ||
+                      sync?.running
+                    }
+                    onClick={() => void manualSync(service)}
+                  >
+                    <RefreshCw size={15} class={sync?.running ? "spin" : ""} />
+                    {t("Sync now")}
+                  </button>
+                  {sync?.running && (
+                    <progress aria-label={t("Sync in progress …")} />
+                  )}
+                </div>
                 <p class={sync?.error ? "error" : ""}>
                   {!settings[service].enabled
                     ? t("Disabled")
@@ -126,23 +145,6 @@ export function SystemInfo({
                 <small>
                   {count(sync?.count || 0)} {t("files in cache")}
                 </small>
-                <button
-                  type="button"
-                  class="button system-sync-button"
-                  disabled={
-                    demo ||
-                    !settings[service].enabled ||
-                    syncing[service] ||
-                    sync?.running
-                  }
-                  onClick={() => void manualSync(service)}
-                >
-                  <RefreshCw size={15} class={sync?.running ? "spin" : ""} />
-                  {t("Sync now")}
-                </button>
-                {sync?.running && (
-                  <progress aria-label={t("Sync in progress …")} />
-                )}
                 {(Object.values(settings[service].tagSync || {}).some(
                   Boolean,
                 ) ||

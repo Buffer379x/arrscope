@@ -745,6 +745,13 @@
     "Service settings changed during tag check": "Diensteinstellungen wurden während des Tag-Abgleichs geändert",
     "Refresh tag conflicts before resolving": "Aktualisiere die Tag-Konflikte vor der Entscheidung",
     "Invalid conflict resolution": "Ungültige Entscheidung für den Konflikt",
-    "Synchronize the new service before importing tags": "Synchronisiere den neuen Dienst vor dem Import von Tags"
+    "Synchronize the new service before importing tags": "Synchronisiere den neuen Dienst vor dem Import von Tags",
+    "Count": "Anzahl",
+    "Delete tag {name}?": "Tag {name} löschen?",
+    "Remove tag assignments before deleting the tag": "Entferne die Zuordnungen, bevor du das Tag löschst",
+    "Invalid tag category": "Ungültige Tag-Kategorie",
+    "Tag no longer exists": "Tag ist nicht mehr vorhanden",
+    "Create tags here, assign them in your library or use them in filename rules.": "Lege Tags an, weise sie in deiner Bibliothek zu oder nutze sie in Dateinamen-Regeln.",
+    "Assignments and deletion are controlled by the service.": "Zuordnungen und Löschung werden vom Dienst gesteuert."
   }
 }

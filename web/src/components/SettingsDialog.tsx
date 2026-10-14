@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-preact";
 import { WidgetsSettings } from "./WidgetsSettings";
 import { WebhookSettings } from "./WebhookSettings";
 import { ListLayoutSettings } from "./ListLayoutSettings";
@@ -87,6 +88,8 @@ export function SettingsDialog({
     previews: TagPreview[];
   } | null>(null);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
+  type CatalogTag = { field: string; value: string; count: number };
+  const [catalog, setCatalog] = useState<CatalogTag[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
   const [cfg, setCfg] = useState<Settings>(structuredClone(settings)),
     [busy, setBusy] = useState(false),
@@ -97,44 +100,29 @@ export function SettingsDialog({
     [colorField, setColorField] = useState("resolution"),
     [recognized, setRecognized] = useState<Record<string, string[]>>({});
   useEffect(() => {
-    Promise.all([
-      api<Record<string, string[]>>("display-tags"),
-      api<Record<string, string[]>>("facets?service=radarr"),
-      api<Record<string, string[]>>("facets?service=sonarr"),
-    ])
-      .then((all) => {
+    api<CatalogTag[]>("tag-catalog")
+      .then((rows) => {
+        setCatalog(rows);
         const values: Record<string, string[]> = {};
-        colorFields.forEach((field) => {
-          values[field] = [
-            ...new Set(
-              all
-                .slice(1)
-                .flatMap((f) => f[field] || [])
-                .filter(
-                  (value) =>
-                    (all[0][field] || []).includes(value) &&
-                    (field !== "custom" || value !== "__unknown__"),
-                ),
-            ),
-          ].sort((a, b) =>
+        for (const field of colorFields) {
+          values[field] =
             field === "custom"
-              ? (
-                  customTags.find((tag) => String(tag.id) === a)?.name || a
-                ).localeCompare(
-                  customTags.find((tag) => String(tag.id) === b)?.name || b,
-                )
-              : a.localeCompare(b),
-          );
-        });
+              ? customTags.map((tag) => String(tag.id))
+              : rows
+                  .filter((row) => row.field === field)
+                  .map((row) => row.value);
+        }
         setRecognized(values);
       })
       .catch(() => {});
   }, [
     customTags,
     status.recognitionRevision,
+    status.cacheRevision,
     status.sync?.radarr?.lastSuccess,
     status.sync?.sonarr?.lastSuccess,
   ]);
+
   const dirty =
     JSON.stringify(cfg) !== JSON.stringify(settings) || draftLocale !== locale;
   useEffect(() => {
@@ -678,114 +666,114 @@ export function SettingsDialog({
                         </p>
                       )}
                       {service !== "emby" && (
-                        <section class="external-tag-settings">
-                          <h4>{t("External tags")}</h4>
-                          <label class="check-field">
-                            <input
-                              type="checkbox"
-                              checked={!!cfg[service].tagImport}
-                              onChange={(e) =>
-                                update(service, {
-                                  tagImport: e.currentTarget.checked,
-                                  ...(e.currentTarget.checked &&
-                                  !cfg[service].tagImport
-                                    ? { tagImportInterval: 5 }
-                                    : {}),
-                                })
-                              }
-                            />
-                            {t("Import external tags as custom tags")}
-                          </label>
-                          <label>
-                            {t("Tag check interval")}
-                            <select
-                              value={cfg[service].tagImportInterval ?? 5}
-                              disabled={!cfg[service].tagImport}
-                              onChange={(e) =>
-                                update(service, {
-                                  tagImportInterval: Number(
-                                    e.currentTarget.value,
-                                  ),
-                                })
-                              }
-                            >
-                              {[0, 5, 15, 30, -1].map((v) => (
-                                <option value={v}>
-                                  {t(
-                                    v === 0
-                                      ? "Manual only"
-                                      : v === -1
-                                        ? "With library sync"
-                                        : v === 5
-                                          ? "Every 5 minutes"
-                                          : v === 15
-                                            ? "Every 15 minutes"
-                                            : "Every 30 minutes",
-                                  )}
-                                </option>
+                        <div class="tag-integration-settings">
+                          <section class="external-tag-settings">
+                            <h4>{t("External tags")}</h4>
+                            <label class="check-field">
+                              <input
+                                type="checkbox"
+                                checked={!!cfg[service].tagImport}
+                                onChange={(e) =>
+                                  update(service, {
+                                    tagImport: e.currentTarget.checked,
+                                    ...(e.currentTarget.checked &&
+                                    !cfg[service].tagImport
+                                      ? { tagImportInterval: 5 }
+                                      : {}),
+                                  })
+                                }
+                              />
+                              {t("Import external tags as custom tags")}
+                            </label>
+                            <label>
+                              {t("Tag check interval")}
+                              <select
+                                value={cfg[service].tagImportInterval ?? 5}
+                                disabled={!cfg[service].tagImport}
+                                onChange={(e) =>
+                                  update(service, {
+                                    tagImportInterval: Number(
+                                      e.currentTarget.value,
+                                    ),
+                                  })
+                                }
+                              >
+                                {[0, 5, 15, 30, -1].map((v) => (
+                                  <option value={v}>
+                                    {t(
+                                      v === 0
+                                        ? "Manual only"
+                                        : v === -1
+                                          ? "With library sync"
+                                          : v === 5
+                                            ? "Every 5 minutes"
+                                            : v === 15
+                                              ? "Every 15 minutes"
+                                              : "Every 30 minutes",
+                                    )}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <p class="quiet">
+                              {t(
+                                "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or Emby requests are needed for tag checks.",
+                              )}
+                            </p>
+                          </section>
+                          <section class="outbound-tag-settings">
+                            <h4>
+                              {t("Tag synchronization to {service}", {
+                                service:
+                                  service === "radarr" ? "Radarr" : "Sonarr",
+                              })}
+                            </h4>
+                            <p class="quiet">
+                              {t(
+                                "Disabled by default. When saving changes, choose whether existing tags should be kept or overwritten, and whether disabled groups should be kept or deleted.",
+                              )}
+                            </p>
+                            <div class="tag-group-options">
+                              {[
+                                "resolution",
+                                "codec",
+                                "source",
+                                "hdr",
+                                "bitDepth",
+                                "audio",
+                                "channels",
+                                "language",
+                                "custom",
+                              ].map((field) => (
+                                <label class="check-field">
+                                  <input
+                                    type="checkbox"
+                                    disabled={demo}
+                                    checked={
+                                      !!cfg[service].tagSync?.[
+                                        field as keyof import("../types").TagGroups
+                                      ]
+                                    }
+                                    onChange={(e) =>
+                                      update(service, {
+                                        tagSync: {
+                                          ...cfg[service].tagSync,
+                                          [field]: e.currentTarget.checked,
+                                        } as import("../types").TagGroups,
+                                      })
+                                    }
+                                  />
+                                  {labels[field]}
+                                </label>
                               ))}
-                            </select>
-                          </label>
-                          <p class="quiet">
-                            {t(
-                              "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or Emby requests are needed for tag checks.",
-                            )}
-                          </p>
-                        </section>
-                      )}
-                      {service !== "emby" && (
-                        <section class="outbound-tag-settings">
-                          <h4>
-                            {t("Tag synchronization to {service}", {
-                              service:
-                                service === "radarr" ? "Radarr" : "Sonarr",
-                            })}
-                          </h4>
-                          <p class="quiet">
-                            {t(
-                              "Disabled by default. When saving changes, choose whether existing tags should be kept or overwritten, and whether disabled groups should be kept or deleted.",
-                            )}
-                          </p>
-                          <div class="tag-group-options">
-                            {[
-                              "resolution",
-                              "codec",
-                              "source",
-                              "hdr",
-                              "bitDepth",
-                              "audio",
-                              "channels",
-                              "language",
-                              "custom",
-                            ].map((field) => (
-                              <label class="check-field">
-                                <input
-                                  type="checkbox"
-                                  disabled={demo}
-                                  checked={
-                                    !!cfg[service].tagSync?.[
-                                      field as keyof import("../types").TagGroups
-                                    ]
-                                  }
-                                  onChange={(e) =>
-                                    update(service, {
-                                      tagSync: {
-                                        ...cfg[service].tagSync,
-                                        [field]: e.currentTarget.checked,
-                                      } as import("../types").TagGroups,
-                                    })
-                                  }
-                                />
-                                {labels[field]}
-                              </label>
-                            ))}
-                          </div>
-                          <small>
-                            {t(
-                              "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.",
-                            )}
-                          </small>
-                        </section>
+                            </div>
+                            <small>
+                              {t(
+                                "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.",
+                              )}
+                            </small>
+                          </section>
+                        </div>
                       )}
                       {service !== "emby" && (
                         <WebhookSettings
@@ -1123,9 +1111,11 @@ export function SettingsDialog({
                     <thead>
                       <tr>
                         <th>{t("Tag preview")}</th>
+                        <th>{t("Count")}</th>
                         <th>{t("Color")}</th>
                         <th>{t("Text")}</th>
                         <th>{t("Reset column")}</th>
+                        <th>{t("Actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1137,6 +1127,17 @@ export function SettingsDialog({
                         )
                         .map((value) => {
                           const key = colorField + ":" + value;
+                          const custom = customTags.find(
+                            (tag) => String(tag.id) === value,
+                          );
+                          const links =
+                            colorField === "custom"
+                              ? custom?.count || 0
+                              : catalog.find(
+                                  (row) =>
+                                    row.field === colorField &&
+                                    row.value === value,
+                                )?.count || 0;
                           const label =
                             value === "__unknown__"
                               ? t("Unknown")
@@ -1158,12 +1159,14 @@ export function SettingsDialog({
                                 ) : (
                                   <Tag
                                     kind={colorField}
+                                    forceTag
                                     value={value === "__unknown__" ? "" : value}
                                     colors={cfg.tagColors || {}}
                                     textColors={cfg.tagTextColors || {}}
                                   ></Tag>
                                 )}
                               </td>
+                              <td class="tag-link-count">{links}</td>
                               <td>
                                 <input
                                   type="color"
@@ -1249,6 +1252,61 @@ export function SettingsDialog({
                                   })}
                                 >
                                   <RotateCcw size={16} />
+                                </button>
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  class="icon-button danger-button color-action"
+                                  aria-label={t("Delete tag: {name}", {
+                                    name: label,
+                                  })}
+                                  disabled={links > 0 || !!custom?.protected}
+                                  onClick={async () => {
+                                    if (
+                                      !(await confirmDeletion(
+                                        t("Delete tag {name}?", {
+                                          name: label,
+                                        }),
+                                      ))
+                                    )
+                                      return;
+                                    try {
+                                      if (colorField === "custom") {
+                                        await api("custom-tags/batch", "PUT", {
+                                          original: customTags,
+                                          tags: customTags.filter(
+                                            (tag) => String(tag.id) !== value,
+                                          ),
+                                        });
+                                        await customChanged();
+                                      } else {
+                                        await api("tag-catalog", "DELETE", {
+                                          field: colorField,
+                                          value,
+                                        });
+                                        await saved();
+                                      }
+                                      setCatalog((old) =>
+                                        old.filter(
+                                          (row) =>
+                                            row.field !== colorField ||
+                                            row.value !== value,
+                                        ),
+                                      );
+                                      setRecognized((old) => ({
+                                        ...old,
+                                        [colorField]: (
+                                          old[colorField] || []
+                                        ).filter((v) => v !== value),
+                                      }));
+                                      setColor(key);
+                                      await refresh();
+                                      notify(t("Settings saved."));
+                                    } catch {}
+                                  }}
+                                >
+                                  <Trash2 size={16} />
                                 </button>
                               </td>
                             </tr>

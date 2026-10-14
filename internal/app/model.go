@@ -87,13 +87,15 @@ type AudioTrack struct {
 	Default       bool   `json:"default"`
 }
 type CustomTag struct {
-	Protected bool     `json:"protected,omitempty"`
-	Sources   []string `json:"sources,omitempty"`
-	Rules     []string `json:"rules,omitempty"`
-	LocalRule bool     `json:"localRule,omitempty"`
-	Manual    bool     `json:"manual,omitempty"`
-	ID        int64    `json:"id"`
-	Name      string   `json:"name"`
+	DisplayName string   `json:"displayName,omitempty"`
+	Count       int      `json:"count"`
+	Protected   bool     `json:"protected,omitempty"`
+	Sources     []string `json:"sources,omitempty"`
+	Rules       []string `json:"rules,omitempty"`
+	LocalRule   bool     `json:"localRule,omitempty"`
+	Manual      bool     `json:"manual,omitempty"`
+	ID          int64    `json:"id"`
+	Name        string   `json:"name"`
 }
 type File struct {
 	InformationOnly      map[string][]string `json:"informationOnly,omitempty"`

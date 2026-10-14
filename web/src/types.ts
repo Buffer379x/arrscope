@@ -52,6 +52,8 @@ export type Evidence = {
   rules?: string[];
 };
 export type CustomTag = {
+  displayName?: string;
+  count?: number;
   id: number;
   name: string;
   manual?: boolean;
@@ -124,7 +126,10 @@ export type SyncStatus = {
   count: number;
 };
 export type WidgetSettings = {
-  storage: Record<Service, { path: string; sharedGroup: string }[]>;
+  storage: Record<
+    Service,
+    { path: string; sharedGroup: string; name?: string }[]
+  >;
   colors: Record<string, string>;
 };
 export type StorageSnapshot = {

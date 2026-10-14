@@ -9,7 +9,7 @@ export function autoTagHint(tag: CustomTag) {
     ...(tag.rules || []).map((r) =>
       r.replace(/^radarr/, "Radarr").replace(/^sonarr/, "Sonarr"),
     ),
-    t("Change the rule in the service to change this tag."),
+    t("Assignments and deletion are controlled by the service."),
   ].join("\n");
 }
 export function AutoTagMark({ tag }: { tag: CustomTag }) {

@@ -94,6 +94,12 @@ func TestCustomBulkPersistenceRecognitionAndFilterSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err = s.DeleteCustomTag(ctx, a.ID); err == nil {
+		t.Fatal("linked tag deletion accepted")
+	}
+	if _, err = s.ApplyCustom(ctx, all, map[string]bool{strconv.FormatInt(a.ID, 10): false}); err != nil {
+		t.Fatal(err)
+	}
 	if err = s.DeleteCustomTag(ctx, a.ID); err != nil {
 		t.Fatal(err)
 	}

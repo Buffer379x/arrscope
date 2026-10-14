@@ -76,8 +76,11 @@ export function CustomTagsSettings({
         saved.map((tag) => {
           const draft = current.find((r) => r.id === tag.id),
             old = previous.find((r) => r.id === tag.id);
-          return tag.id !== changedID && draft && old && draft.name !== old.name
-            ? { ...tag, name: draft.name }
+          return tag.id !== changedID &&
+            draft &&
+            old &&
+            draft.displayName !== old.displayName
+            ? { ...tag, displayName: draft.displayName }
             : tag;
         }),
       );
@@ -111,12 +114,12 @@ export function CustomTagsSettings({
   };
   const rename = async (tag: CustomTag, value: string) => {
     const old = baseline.current.find((r) => r.id === tag.id);
-    if (!old || value === old.name) return;
+    if (!old || value === (old.displayName || old.name)) return;
     if (
       !value.trim() ||
       !(await commit(
         baseline.current.map((r) =>
-          r.id === tag.id ? { ...r, name: value.trim() } : r,
+          r.id === tag.id ? { ...r, displayName: value.trim() } : r,
         ),
         tag.id,
       ))
@@ -126,9 +129,9 @@ export function CustomTagsSettings({
           r.id === tag.id
             ? {
                 ...r,
-                name:
-                  baseline.current.find((b) => b.id === tag.id)?.name ||
-                  old.name,
+                displayName:
+                  baseline.current.find((b) => b.id === tag.id)?.displayName ||
+                  "",
               }
             : r,
         ),
@@ -150,7 +153,7 @@ export function CustomTagsSettings({
         </button>
         <p class="quiet">
           {t(
-            "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
+            "Create tags here, assign them in your library or use them in filename rules.",
           )}
         </p>
       </header>
@@ -190,6 +193,7 @@ export function CustomTagsSettings({
               <tr>
                 <th>{t("Name")}</th>
                 <th>{t("Management")}</th>
+                <th>{t("Count")}</th>
                 <th>{t("Color")}</th>
                 <th>{t("Text")}</th>
                 <th>{t("Reset column")}</th>
@@ -209,20 +213,22 @@ export function CustomTagsSettings({
                       title={tag.protected ? autoTagHint(tag) : tag.name}
                     >
                       <AutoTagMark tag={tag} />
-                      {tag.name}
+                      {tag.displayName || tag.name}
                     </Tag>
-                    {!tag.protected && (
+                    {
                       <input
                         aria-label={t("Tag name: {name}", { name: tag.name })}
                         maxLength={80}
                         required
-                        value={tag.name}
+                        value={tag.displayName || tag.name}
                         disabled={busy}
                         onInput={(e) => {
                           const value = e.currentTarget.value;
                           setDrafts((current) =>
                             current.map((r) =>
-                              r.id === tag.id ? { ...r, name: value } : r,
+                              r.id === tag.id
+                                ? { ...r, displayName: value }
+                                : r,
                             ),
                           );
                         }}
@@ -234,7 +240,7 @@ export function CustomTagsSettings({
                           }
                         }}
                       />
-                    )}
+                    }
                   </td>
                   <td title={tag.protected ? autoTagHint(tag) : undefined}>
                     {tag.protected
@@ -257,6 +263,7 @@ export function CustomTagsSettings({
                               : "Manual",
                         )}
                   </td>
+                  <td class="tag-link-count">{tag.count || 0}</td>
                   <td>
                     <input
                       type="color"
@@ -339,7 +346,7 @@ export function CustomTagsSettings({
                       <button
                         type="button"
                         class="button danger-button"
-                        disabled={busy || tag.protected}
+                        disabled={busy || tag.protected || !!tag.count}
                         aria-label={t("Delete tag: {name}", { name: tag.name })}
                         title={
                           tag.protected
