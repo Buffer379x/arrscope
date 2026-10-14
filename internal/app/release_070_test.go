@@ -319,3 +319,39 @@ func TestWebhookQueueCoalescesAndCredentialsStayEncrypted(t *testing.T) {
 		t.Fatal("durable credentials/queue lost")
 	}
 }
+func TestTargetedTagPlanUsesOnlyAffectedCacheAndCatalogEntry(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	paths := []string{}
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/api/v3/tag":
+			json.NewEncoder(w).Encode([]map[string]any{{"id": 1, "label": "1080p"}})
+		case "/api/v3/movie/42":
+			json.NewEncoder(w).Encode(map[string]any{"id": 42, "title": "Affected", "tags": []int{}})
+		default:
+			t.Errorf("unexpected tag endpoint %s", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	defer api.Close()
+	cfg := ServiceConfig{Enabled: true, URL: api.URL, APIKey: "synthetic", TagSync: TagGroups{Resolution: true}, TagSyncMode: "add"}
+	a, b := sample(1, "A.1080p.mkv"), sample(2, "B.720p.mkv")
+	a.MediaID = 42
+	b.MediaID = 99
+	now := time.Now()
+	if e := s.Replace("radarr", []File{a, b}, SyncStatus{Source: tagEndpoint(cfg), LastSuccess: &now}); e != nil {
+		t.Fatal(e)
+	}
+	p, e := s.BuildTagPlan(ctx, "radarr", cfg, nil, 42)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(p.Snapshot.desired) != 1 || p.Snapshot.desired[99] != nil || len(p.Operations) != 1 || p.Operations[0].ID != 42 || p.Required["720p"] {
+		t.Fatal("unrelated cache selected", p.Snapshot, p.Operations)
+	}
+	if !reflect.DeepEqual(paths, []string{"/api/v3/tag", "/api/v3/movie/42"}) {
+		t.Fatal(paths)
+	}
+}

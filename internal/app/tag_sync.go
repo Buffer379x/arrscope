@@ -291,7 +291,7 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	}
 	defer tx.Rollback()
 	if c.TagSync.Active() {
-		if e = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true); e != nil {
+		if e = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true, target...); e != nil {
 			return 0, false, e
 		}
 		for f, on := range c.TagSync.fields() {
@@ -513,7 +513,13 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 		}
 	}
 	if c.TagSync.Custom {
-		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field='custom' AND media_id>0", service, endpoint); e != nil {
+		query := "DELETE FROM tag_sync_values WHERE service=? AND endpoint=? AND field='custom' AND media_id>0"
+		args := []any{service, endpoint}
+		if len(target) > 0 {
+			query += " AND media_id=?"
+			args = append(args, target[0])
+		}
+		if _, e = finish.ExecContext(ctx, query, args...); e != nil {
 			return len(changed), false, e
 		}
 		for id, ls := range p.Snapshot.custom {

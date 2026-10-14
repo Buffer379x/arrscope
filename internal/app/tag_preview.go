@@ -248,7 +248,7 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 			p.Waiting = true
 			return p, nil
 		}
-		p.Snapshot, e = readTagSnapshot(ctx, s.DB, service, c.TagSync)
+		p.Snapshot, e = readTagSnapshot(ctx, s.DB, service, c.TagSync, target...)
 		if e != nil {
 			return nil, e
 		}

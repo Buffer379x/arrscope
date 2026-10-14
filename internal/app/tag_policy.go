@@ -65,7 +65,7 @@ type tagSnapshot struct {
 	custom  map[int]map[string]bool
 }
 
-func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGroups) (tagSnapshot, error) {
+func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGroups, target ...int) (tagSnapshot, error) {
 	mask := g.fields()
 	intern := map[string]string{}
 	out := tagSnapshot{map[int]map[string]bool{}, map[string]map[string]bool{}, map[int]map[string]bool{}}
@@ -77,7 +77,13 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 	if g.Audio || g.Language {
 		uncertainty = "coalesce(json_extract(f.data,'$.unknownTraits'),'[]')"
 	}
-	rows, err := q.QueryContext(ctx, "SELECT f.media_id,f.resolution,f.codec,f.source,f.processing,f.hdr,f.bitDepth,f.audio,f.channels,f.language,"+custom+","+uncertainty+" FROM files f WHERE f.service=?", service)
+	filter := "f.service=?"
+	args := []any{service}
+	if len(target) > 0 {
+		filter += " AND f.media_id=?"
+		args = append(args, target[0])
+	}
+	rows, err := q.QueryContext(ctx, "SELECT f.media_id,f.resolution,f.codec,f.source,f.processing,f.hdr,f.bitDepth,f.audio,f.channels,f.language,"+custom+","+uncertainty+" FROM files f WHERE "+filter, args...)
 	if err != nil {
 		return out, err
 	}
@@ -151,8 +157,8 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 	}
 	return out, rows.Err()
 }
-func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint string, g TagGroups, owned bool) error {
-	snap, err := readTagSnapshot(ctx, tx, service, g)
+func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint string, g TagGroups, owned bool, target ...int) error {
+	snap, err := readTagSnapshot(ctx, tx, service, g, target...)
 	if err != nil {
 		return err
 	}

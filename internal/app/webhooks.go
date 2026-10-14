@@ -355,7 +355,10 @@ func (m *WebhookManager) processOne(ctx context.Context) {
 		e = readCtx.Err()
 	}
 	m.s.mu.Unlock()
-	if e == nil && c.TagSync.Active() {
+	var tagPolicyPending bool
+	m.s.Store.Get("tagSyncDirty:"+job.Service, &tagPolicyPending)
+	// A pending service-wide policy transition must finish before a targeted tag reconciliation.
+	if e == nil && c.TagSync.Active() && !tagPolicyPending {
 		_, _, e = m.s.Store.ReconcileTags(readCtx, job.Service, c, func() bool {
 			fresh := m.s.Config()
 			next := fresh.Radarr
