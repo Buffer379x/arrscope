@@ -271,7 +271,7 @@
 }
 .dashboard-settings-table th:first-child,
 .dashboard-settings-table td:first-child {
-  width: 54px;
+  width: 68px;
   text-align: center;
 }
 .dashboard-settings-table td:nth-child(2),
@@ -320,3 +320,5 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+.dashboard-settings-table th:first-child { padding: 10px; white-space: nowrap; }
