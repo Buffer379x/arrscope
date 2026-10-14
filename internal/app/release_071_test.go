@@ -14,6 +14,9 @@ func TestAudioDashboardCountsMatchCompoundFilters(t *testing.T) {
 		files[i].APIInfo = nil
 		files[i].Evidence = nil
 		files[i].Audio = values[i]
+		if i == 3 {
+			applyEmby(&files[i], []embyStream{{Type: "Audio", Index: 1, Codec: "aac", Language: "ger"}, {Type: "Audio", Index: 2, Language: "und"}})
+		}
 	}
 	if e := s.Replace("radarr", files, SyncStatus{}); e != nil {
 		t.Fatal(e)
@@ -46,6 +49,9 @@ func TestAudioDashboardCountsMatchCompoundFilters(t *testing.T) {
 	}
 	if counts["DTS"] != 3 || counts["AC-3"] != 2 || counts["MP3"] != 1 {
 		t.Fatal(counts)
+	}
+	if counts[""] != 2 {
+		t.Fatal("partial unknown audio lost", counts)
 	}
 	stats.FileTotals["all"] = 99
 	next, e := s.Statistics()
