@@ -65,8 +65,8 @@ func TestStorageAreasDoNotSumOverlappingUnraidShares(t *testing.T) {
 	cfg.Radarr = ServiceConfig{Enabled: true, URL: "http://radarr"}
 	cfg.Sonarr = ServiceConfig{Enabled: true, URL: "http://sonarr"}
 	cfg.Widgets.Storage = map[string][]StorageSelection{
-		"radarr": {{"/movies", ""}, {"/documentaries", "documentaries"}, {"/downloads", "downloads"}},
-		"sonarr": {{"/shows", ""}, {"/documentaries", "documentaries"}, {"/downloads", "downloads"}},
+		"radarr": {{Path: "/movies", SharedGroup: ""}, {Path: "/documentaries", SharedGroup: "documentaries"}, {Path: "/downloads", SharedGroup: "downloads"}},
+		"sonarr": {{Path: "/shows", SharedGroup: ""}, {Path: "/documentaries", SharedGroup: "documentaries"}, {Path: "/downloads", SharedGroup: "downloads"}},
 	}
 	now := time.Now()
 	later := now.Add(time.Minute)

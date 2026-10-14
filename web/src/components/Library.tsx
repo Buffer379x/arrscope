@@ -187,9 +187,7 @@ export function Library({
     [settingsDirty, setSettingsDirty] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [settingsSection, setSettingsSection] = useState("connections"),
-    [collapsed, setCollapsed] = useState(
-      localStorage.getItem("scopearr-filter-collapsed") === "true",
-    ),
+    [collapsed, setCollapsed] = useState(true),
     [filename, setFilename] = useState<MediaFile | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -226,9 +224,6 @@ export function Library({
       theme,
     );
   }, [settings?.interfaceTheme, theme]);
-  useEffect(() => {
-    localStorage.setItem("scopearr-filter-collapsed", String(collapsed));
-  }, [collapsed]);
   useEffect(() => {
     localStorage.setItem("scopearr-film-sort", JSON.stringify(movieSort));
   }, [movieSort]);
@@ -299,7 +294,7 @@ export function Library({
     }));
     setPresetIds((current) => ({ ...current, [target]: undefined }));
     setService(target);
-    setCollapsed(false);
+    setCollapsed(true);
     setPage(1);
     setResults(emptyResults);
     setView("library");
@@ -311,6 +306,7 @@ export function Library({
     n.delete("service");
     n.delete("sort");
     n.delete("dir");
+    if (view !== "library" || service !== p.service) setCollapsed(true);
     setView("library");
     setFilters({ ...filters, [p.service]: n.toString() });
     setPage(1);
@@ -459,7 +455,7 @@ export function Library({
   return (
     <CustomTagNames.Provider
       value={Object.fromEntries(
-        customTags.map((tag) => [String(tag.id), tag.name]),
+        customTags.map((tag) => [String(tag.id), tag.displayName || tag.name]),
       )}
     >
       <TagVisibility.Provider value={tagVisibility}>
@@ -498,6 +494,7 @@ export function Library({
                     }
                     onClick={() => {
                       if (!canLeaveRules()) return;
+                      setCollapsed(true);
                       setView("library");
                       if (service === "radarr") return;
                       setService("radarr");
@@ -513,6 +510,7 @@ export function Library({
                     }
                     onClick={() => {
                       if (!canLeaveRules()) return;
+                      setCollapsed(true);
                       setView("library");
                       if (service === "sonarr") return;
                       setService("sonarr");
@@ -850,15 +848,15 @@ export function Library({
                                           kind="custom"
                                           value={String(tag.id)}
                                           forceTag={tag.manual || tag.protected}
-                                          label={tag.name}
+                                          label={tag.displayName || tag.name}
                                           title={
                                             tag.protected
                                               ? autoTagHint(tag)
-                                              : tag.name
+                                              : tag.displayName || tag.name
                                           }
                                         >
                                           <AutoTagMark tag={tag} />
-                                          {tag.name}
+                                          {tag.displayName || tag.name}
                                         </Tag>
                                       ))}
                                     </div>

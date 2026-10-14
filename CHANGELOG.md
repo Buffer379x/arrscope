@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.7.3
+
+Persistent tag presentation catalog, assignment counts and safe deletion, local names for external custom/auto-tags, editable storage path names, service-level sync actions, consistent tag settings and collapsed library filters. See [release notes](docs/releases/0.7.3.md).
+
 ## 0.7.2
 
 Storage area navigation, optional inbound custom-tag reconciliation, protected external auto-tags with rule information, shared custom-tag color controls and schema 12. See [release notes](docs/releases/0.7.2.md).

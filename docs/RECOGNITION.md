@@ -67,3 +67,9 @@ Built-in and user rules share the same priority ordering. Priorities apply withi
 For `Movie.Ultra.HD.BluRay.mkv`, a Source token `Ultra.HD` returning UHD with priority 95 and Explicit override replaces BluRay. With Only if missing, BluRay remains because the direct rule already found it. A direct UHD rule at priority 95 chooses UHD before the broader BluRay rule but still reports the contradictory direct results.
 
 From 0.6.1, explicit edge separators such as `.Ultra.HD.` supply their own boundaries rather than requiring a second adjacent separator. Interior text stays literal: `Ultra.HD` does not match `Ultra-HD`; use regex for alternative spellings. Existing rule definitions, priorities and modes are preserved. Apply the new matching to cached files by saving a rule or completing the next file-data sync.
+
+## Retained presentation entries
+
+Removing a filename rule retains its known presentation tags and saved colors under Display. Assignment counts use file entries across both libraries and include composite values once per file. Unused entries can be removed after confirmation; linked entries are rejected by both UI and backend. Removing a presentation entry does not delete a recognition rule or change outbound tag groups. A later recognized match restores its default presentation entry.
+
+Custom tags also show file counts. Their local display names remain independent from canonical sync labels; external auto-rule references still protect assignments and deletion.

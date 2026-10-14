@@ -91,6 +91,12 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 		return RecognitionConfig{}, err
 	}
 	defer tx.Rollback()
+	if err = rememberTagRules(ctx, tx, s.recognition.config.Rules); err != nil {
+		return RecognitionConfig{}, err
+	}
+	if err = rememberTagRules(ctx, tx, rules); err != nil {
+		return RecognitionConfig{}, err
+	}
 	if err = reparseCached(ctx, tx, engine); err != nil {
 		return RecognitionConfig{}, err
 	}

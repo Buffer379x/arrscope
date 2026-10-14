@@ -266,6 +266,12 @@ func TestExternalGlobalDeleteAndConflictReview(t *testing.T) {
 		t.Fatal(e)
 	}
 	id := customID(t, s, "favorite")
+	if e := s.DeleteCustomTag(ctx, id); e == nil {
+		t.Fatal("linked tag deletion accepted")
+	}
+	if _, e := s.ApplyCustom(ctx, url.Values{"service": {"radarr"}}, map[string]bool{fmt.Sprint(id): false}); e != nil {
+		t.Fatal(e)
+	}
 	if e := s.DeleteCustomTag(ctx, id); e != nil {
 		t.Fatal(e)
 	}

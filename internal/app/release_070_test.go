@@ -51,7 +51,7 @@ func TestSharedStorageAreasAndPersistence(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.Radarr = ServiceConfig{Enabled: true, URL: "http://r"}
 	cfg.Sonarr = ServiceConfig{Enabled: true, URL: "http://s"}
-	cfg.Widgets.Storage = map[string][]StorageSelection{"radarr": {{"/movies", ""}, {"/downloads", "downloads"}}, "sonarr": {{"/series", ""}, {"/download", "downloads"}}}
+	cfg.Widgets.Storage = map[string][]StorageSelection{"radarr": {{Path: "/movies", SharedGroup: ""}, {Path: "/downloads", SharedGroup: "downloads"}}, "sonarr": {{Path: "/series", SharedGroup: ""}, {Path: "/download", SharedGroup: "downloads"}}}
 	now := time.Now()
 	snap := map[string]StorageSnapshot{"radarr": {Disks: []DiskSpace{{Path: "/movies", Total: 100, Free: 30}, {Path: "/downloads", Total: 200, Free: 100}}, SuccessAt: &now, Source: tagEndpoint(cfg.Radarr)}, "sonarr": {Disks: []DiskSpace{{Path: "/series", Total: 300, Free: 200}, {Path: "/download", Total: 200, Free: 100}}, SuccessAt: &now, Source: tagEndpoint(cfg.Sonarr)}}
 	all := storageAreas(cfg, snap, "all")

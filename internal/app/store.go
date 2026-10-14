@@ -59,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 12 {
+	if version > 13 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -434,6 +434,16 @@ PRAGMA user_version=1;COMMIT;`)
 	}
 
 	var recognition RecognitionConfig
+	if originalVersion < 13 {
+		if originalVersion == 12 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		if _, err = db.Exec("BEGIN;" + tagCatalogSchema + "COMMIT;"); err != nil {
+			return fail(err)
+		}
+	}
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.
 	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_traits ON files(service,resolution,codec,source,hdr,audio,language,media_id,season,processing,family,bitDepth,channels,size,conflict,rule_conflict,emby_match,title COLLATE NOCASE,id)`); err != nil {
@@ -460,6 +470,11 @@ PRAGMA user_version=1;COMMIT;`)
 		}
 	} else {
 		return fail(err)
+	}
+	if originalVersion < 13 {
+		if err = s.seedTagCatalog(context.Background()); err != nil {
+			return fail(err)
+		}
 	}
 	os.Chmod(filepath.Join(dir, "scopearr.db"), 0600)
 	return s, nil
@@ -1017,7 +1032,7 @@ func movieOrder(q url.Values) (string, error) {
 		field = "title"
 	}
 	expression, ok := map[string]string{
-		"custom": "(SELECT group_concat(name_key) FROM (SELECT t.name_key FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key))",
+		"custom": "(SELECT group_concat(name_sort) FROM (SELECT lower(coalesce(nullif(l.label,''),t.name_key)) name_sort FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id LEFT JOIN custom_tag_labels l ON l.tag_id=t.id WHERE c.file_rowid=f.rowid ORDER BY name_sort))",
 		"title":  "f.title COLLATE NOCASE", "year": "(SELECT min(year) FROM years y WHERE y.file_rowid=f.rowid)",
 		"resolution": "CASE f.resolution WHEN '4320p' THEN 4320 WHEN '2160p' THEN 2160 WHEN '1440p' THEN 1440 WHEN '1080p' THEN 1080 WHEN '720p' THEN 720 WHEN '576p' THEN 576 WHEN '480p' THEN 480 ELSE CAST(f.resolution AS INTEGER) END",
 		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "(f.language||' '||f.audio) COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",

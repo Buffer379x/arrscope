@@ -445,3 +445,16 @@
 .custom-tags-table td:nth-child(2) {
   max-width: 170px;
 }
+
+/* Tag controls share one full-width section; service actions belong to its heading. */
+.tag-integration-settings { grid-column:1/-1; border-top:1px solid var(--line); padding-top:18px; display:grid; gap:20px; }
+.tag-integration-settings .external-tag-settings { margin:0; padding:0; border:0; }
+.tag-integration-settings .outbound-tag-settings { margin:0; padding:0; border:0; }
+.system-service-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.system-service-heading h4 { margin:0; }
+.system-service-heading .system-sync-button { width:auto; margin:0; }
+.system-service-heading progress { flex-basis:100%; }
+.tag-link-count { text-align:right; font-variant-numeric:tabular-nums; width:1%; }
+.color-settings-table th:nth-child(2) { text-align:right; }
+.storage-shared { display:grid; gap:12px; }
+.storage-shared > label:not(.check-field) { min-width:0; }

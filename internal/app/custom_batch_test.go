@@ -66,6 +66,13 @@ func TestCustomDraftDeletionCleansRulesColorsPresetsAndAssignments(t *testing.T)
 		t.Fatal(err)
 	}
 	original, _ := s.CustomTags(ctx)
+	if _, err := s.SaveCustomTags(ctx, original, []CustomTag{b}); err == nil {
+		t.Fatal("linked tag deletion accepted")
+	}
+	if _, err := s.ApplyCustom(ctx, url.Values{"service": {"radarr"}}, map[string]bool{key: false}); err != nil {
+		t.Fatal(err)
+	}
+	original, _ = s.CustomTags(ctx)
 	if _, err := s.SaveCustomTags(ctx, original, []CustomTag{b}); err != nil {
 		t.Fatal(err)
 	}

@@ -745,6 +745,13 @@
     "Service settings changed during tag check": "La configuración cambió durante la comprobación",
     "Refresh tag conflicts before resolving": "Actualiza los conflictos antes de resolverlos",
     "Invalid conflict resolution": "Resolución no válida",
-    "Synchronize the new service before importing tags": "Sincroniza el nuevo servicio antes de importar etiquetas"
+    "Synchronize the new service before importing tags": "Sincroniza el nuevo servicio antes de importar etiquetas",
+    "Count": "Cantidad",
+    "Delete tag {name}?": "¿Eliminar la etiqueta {name}?",
+    "Remove tag assignments before deleting the tag": "Elimina las asignaciones antes de borrar la etiqueta",
+    "Invalid tag category": "Categoría de etiqueta no válida",
+    "Tag no longer exists": "La etiqueta ya no existe",
+    "Create tags here, assign them in your library or use them in filename rules.": "Crea etiquetas, asígnalas en tu biblioteca o úsalas en reglas de nombres de archivo.",
+    "Assignments and deletion are controlled by the service.": "El servicio controla las asignaciones y la eliminación."
   }
 }

@@ -11,6 +11,7 @@ import (
 )
 
 type StorageSelection struct {
+	Name        string `json:"name,omitempty"`
 	Path        string `json:"path"`
 	SharedGroup string `json:"sharedGroup"`
 }
@@ -68,7 +69,11 @@ func normalize070(cfg *Settings) error {
 		seen := map[string]bool{}
 		for i, item := range list {
 			list[i].SharedGroup = strings.TrimSpace(item.SharedGroup)
-			if item.Path == "" || len(item.Path) > 1024 || seen[item.Path] || len(list[i].SharedGroup) > 80 {
+			list[i].Name = strings.TrimSpace(item.Name)
+			if list[i].Name == "" {
+				list[i].Name = item.Path
+			}
+			if item.Path == "" || len(item.Path) > 1024 || seen[item.Path] || len(list[i].SharedGroup) > 80 || len([]rune(list[i].Name)) > 160 || strings.ContainsAny(list[i].Name, "\r\n\x00") {
 				return errors.New("Invalid storage selection")
 			}
 			seen[item.Path] = true
@@ -111,9 +116,12 @@ func storageAreas(cfg Settings, snap map[string]StorageSnapshot, scope string) [
 			index[d.Path] = d
 		}
 		for _, selection := range cfg.Widgets.Storage[service] {
-			key, label := service+":"+selection.Path, service+" · "+selection.Path
+			key, label := service+":"+selection.Path, selection.Name
+			if label == "" {
+				label = selection.Path
+			}
 			if selection.SharedGroup != "" {
-				key, label = "shared:"+selection.SharedGroup, selection.SharedGroup
+				key = "shared:" + selection.SharedGroup
 			}
 			v := groups[key]
 			if v == nil {

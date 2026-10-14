@@ -18,18 +18,18 @@ CREATE TABLE IF NOT EXISTS file_custom_auto(file_rowid INTEGER REFERENCES files(
 CREATE TABLE IF NOT EXISTS file_custom(file_rowid INTEGER REFERENCES files(rowid) ON DELETE CASCADE,tag_id INTEGER REFERENCES custom_tags(id) ON DELETE CASCADE,PRIMARY KEY(file_rowid,tag_id));
 CREATE INDEX IF NOT EXISTS file_custom_value ON file_custom(tag_id,file_rowid);
 PRAGMA user_version=6;`
-const customJSON = `coalesce((SELECT json_group_array(json_object('id',ct.id,'name',ct.name,'protected',json(CASE WHEN EXISTS(SELECT 1 FROM external_tag_defs d WHERE d.custom_id=ct.id AND d.service=f.service AND d.rules<>'[]') THEN 'true' ELSE 'false' END),'rules',json(coalesce((SELECT json_group_array(d.service||' · '||r.value) FROM external_tag_defs d,json_each(d.rules) r WHERE d.custom_id=ct.id AND d.service=f.service),'[]')),'manual',json(CASE WHEN EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=ct.id AND o.state=1) THEN 'true' ELSE 'false' END))) FROM (SELECT t.id,t.name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY t.name_key,t.id) ct),'[]')`
+const customJSON = `coalesce((SELECT json_group_array(json_object('id',ct.id,'name',ct.name,'displayName',ct.display_name,'protected',json(CASE WHEN EXISTS(SELECT 1 FROM external_tag_defs d WHERE d.custom_id=ct.id AND d.service=f.service AND d.rules<>'[]') THEN 'true' ELSE 'false' END),'rules',json(coalesce((SELECT json_group_array(d.service||' · '||r.value) FROM external_tag_defs d,json_each(d.rules) r WHERE d.custom_id=ct.id AND d.service=f.service),'[]')),'manual',json(CASE WHEN EXISTS(SELECT 1 FROM custom_overrides o WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=ct.id AND o.state=1) THEN 'true' ELSE 'false' END))) FROM (SELECT t.id,t.name,coalesce((SELECT label FROM custom_tag_labels WHERE tag_id=t.id),'') display_name FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id WHERE c.file_rowid=f.rowid ORDER BY lower(coalesce(nullif(display_name,''),t.name)),t.id) ct),'[]')`
 
 func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
 	out := []CustomTag{}
-	rows, err := s.DB.QueryContext(ctx, "SELECT id,name FROM custom_tags ORDER BY name_key,id")
+	rows, err := s.DB.QueryContext(ctx, `SELECT t.id,t.name,coalesce(l.label,''),(SELECT count(*) FROM file_custom c WHERE c.tag_id=t.id) FROM custom_tags t LEFT JOIN custom_tag_labels l ON l.tag_id=t.id ORDER BY lower(coalesce(nullif(l.label,''),t.name)),t.id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var t CustomTag
-		if err = rows.Scan(&t.ID, &t.Name); err != nil {
+		if err = rows.Scan(&t.ID, &t.Name, &t.DisplayName, &t.Count); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -44,55 +44,47 @@ func (s *Store) CustomTags(ctx context.Context) ([]CustomTag, error) {
 	return out, nil
 }
 func (s *Store) SaveCustomTag(ctx context.Context, tag CustomTag) (CustomTag, error) {
-	s.recognitionMu.Lock()
-	defer s.recognitionMu.Unlock()
-	if tag.ID > 0 {
-		if on, e := protectedCustom(ctx, s.DB, tag.ID); e != nil {
-			return tag, e
-		} else if on {
-			return tag, fmt.Errorf("This tag is controlled by an external auto-tag rule")
-		}
+	original, e := s.CustomTags(ctx)
+	if e != nil {
+		return tag, e
 	}
-	tag.Name = strings.TrimSpace(tag.Name)
-	if tag.Name == "" || len([]rune(tag.Name)) > 80 || strings.ContainsFunc(tag.Name, unicode.IsControl) {
-		return tag, fmt.Errorf("Enter a tag name between 1 and 80 characters")
-	}
-	key := strings.ToLower(tag.Name)
-	var duplicate int64
-	if err := s.DB.QueryRowContext(ctx, "SELECT id FROM custom_tags WHERE name_key=? AND id<>?", key, tag.ID).Scan(&duplicate); err == nil {
-		return tag, fmt.Errorf("A custom tag with this name already exists")
-	} else if err != sql.ErrNoRows {
-		return tag, err
-	}
+	next := append([]CustomTag{}, original...)
 	if tag.ID == 0 {
-		var count int
-		if err := s.DB.QueryRowContext(ctx, "SELECT count(*) FROM custom_tags").Scan(&count); err != nil {
-			return tag, err
-		}
-		if count >= 128 {
-			return tag, fmt.Errorf("At most 128 custom tags are allowed")
-		}
-		result, err := s.DB.ExecContext(ctx, "INSERT INTO custom_tags(name,name_key) VALUES(?,?)", tag.Name, key)
-		if err != nil {
-			return tag, err
-		}
-		tag.ID, _ = result.LastInsertId()
+		tag.ID = -1
+		next = append(next, tag)
 	} else {
-		result, err := s.DB.ExecContext(ctx, "UPDATE custom_tags SET name=?,name_key=? WHERE id=?", tag.Name, key, tag.ID)
-		if err != nil {
-			return tag, err
+		found := false
+		for i := range next {
+			if next[i].ID == tag.ID {
+				next[i] = tag
+				found = true
+				break
+			}
 		}
-		n, _ := result.RowsAffected()
-		if n != 1 {
+		if !found {
 			return tag, fmt.Errorf("Custom tag no longer exists")
 		}
 	}
-	s.invalidateCustomFacets()
-	return tag, nil
+	saved, e := s.SaveCustomTags(ctx, original, next)
+	if e != nil {
+		return tag, e
+	}
+	for _, value := range saved {
+		if value.ID == tag.ID || tag.ID < 0 && value.Name == strings.TrimSpace(tag.Name) {
+			return value, nil
+		}
+	}
+	return tag, fmt.Errorf("Custom tag no longer exists")
 }
 func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
+	var links int
+	if e := s.DB.QueryRowContext(ctx, "SELECT count(*) FROM file_custom WHERE tag_id=?", id).Scan(&links); e != nil {
+		return e
+	} else if links > 0 {
+		return fmt.Errorf("Remove tag assignments before deleting the tag")
+	}
 	if on, e := protectedCustom(ctx, s.DB, id); e != nil {
 		return e
 	} else if on {
@@ -190,6 +182,9 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 		if _, err = tx.ExecContext(ctx, "UPDATE presets SET query=? WHERE id=?", item.query, item.id); err != nil {
 			return err
 		}
+	}
+	if err = revisionCustom(ctx, tx); err != nil {
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		return err
@@ -402,14 +397,16 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 		return nil, err
 	}
 	baseline := map[int64]string{}
+	aliases := map[int64]string{}
 	for _, tag := range original {
 		baseline[tag.ID] = tag.Name
+		aliases[tag.ID] = tag.DisplayName
 	}
 	if len(original) != len(current) || len(baseline) != len(original) {
 		return nil, fmt.Errorf("Custom tags changed in another session. Reload before saving.")
 	}
 	for _, tag := range current {
-		if baseline[tag.ID] != tag.Name {
+		if baseline[tag.ID] != tag.Name || aliases[tag.ID] != tag.DisplayName {
 			return nil, fmt.Errorf("Custom tags changed in another session. Reload before saving.")
 		}
 	}
@@ -425,6 +422,10 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 	for i := range tags {
 		tag := &tags[i]
 		tag.Name = strings.TrimSpace(tag.Name)
+		tag.DisplayName = strings.TrimSpace(tag.DisplayName)
+		if len([]rune(tag.DisplayName)) > 80 || strings.ContainsFunc(tag.DisplayName, unicode.IsControl) {
+			return nil, fmt.Errorf("Enter a tag name between 1 and 80 characters")
+		}
 		if tag.Name == "" || len([]rune(tag.Name)) > 80 || strings.ContainsFunc(tag.Name, unicode.IsControl) {
 			return nil, fmt.Errorf("Enter a tag name between 1 and 80 characters")
 		}
@@ -445,6 +446,9 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 		}
 	}
 	for _, tag := range current {
+		if deleted[tag.ID] && tag.Count > 0 {
+			return nil, fmt.Errorf("Remove tag assignments before deleting the tag")
+		}
 		if tag.Protected {
 			found := false
 			for _, next := range tags {
@@ -516,6 +520,16 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 			if err == nil {
 				tag.ID, err = result.LastInsertId()
 			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, tag := range tags {
+		if tag.DisplayName == "" {
+			_, err = tx.ExecContext(ctx, "DELETE FROM custom_tag_labels WHERE tag_id=?", tag.ID)
+		} else {
+			_, err = tx.ExecContext(ctx, "INSERT INTO custom_tag_labels VALUES(?,?) ON CONFLICT(tag_id) DO UPDATE SET label=excluded.label", tag.ID, tag.DisplayName)
 		}
 		if err != nil {
 			return nil, err
@@ -603,6 +617,9 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 			}
 
 		}
+	}
+	if err = revisionCustom(ctx, tx); err != nil {
+		return nil, err
 	}
 	if err = tx.Commit(); err != nil {
 		return nil, err

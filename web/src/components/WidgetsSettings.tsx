@@ -27,6 +27,7 @@ export function WidgetsSettings({
     path: string,
     checked: boolean,
     sharedGroup = "",
+    name?: string,
   ) {
     const existing = settings.widgets.storage[service] || [];
     changed({
@@ -38,7 +39,12 @@ export function WidgetsSettings({
           [service]: checked
             ? [
                 ...existing.filter((s) => s.path !== path),
-                { path, sharedGroup },
+                {
+                  path,
+                  sharedGroup,
+                  name:
+                    name ?? existing.find((s) => s.path === path)?.name ?? path,
+                },
               ]
             : existing.filter((s) => s.path !== path),
         },
@@ -122,6 +128,22 @@ export function WidgetsSettings({
                       </small>
                       {chosen && (
                         <div class="storage-shared">
+                          <label>
+                            {t("Name")}
+                            <input
+                              value={chosen.name ?? path}
+                              maxLength={160}
+                              onInput={(e) =>
+                                select(
+                                  service,
+                                  path,
+                                  true,
+                                  chosen.sharedGroup,
+                                  e.currentTarget.value,
+                                )
+                              }
+                            />
+                          </label>
                           <label class="check-field">
                             <input
                               type="checkbox"

@@ -5,7 +5,8 @@
 1. Under Settings → Widgets, refresh each enabled service's paths. This sends a read-only GET to `/api/v3/diskspace`.
 2. Select the storage areas that should be available in the dashboard. Unchecked paths are excluded. Saved selections survive temporary service failures.
 3. For duplicate paths reporting the same filesystem capacity, enable Shared storage and use the same group name. For example, Radarr and Sonarr `/downloads` can share a `downloads` group; their `/documentaries` paths can share a separate `documentaries` group. Do not group distinct Movies and Shows capacities just because they reside on the same array.
-4. Save settings. Previous/next arrows below the widget title show one area at a time. The browser remembers the selected area per scope. Entire library includes both services; Movies and TV series include only their service's selected areas. Shared areas appear once. Used and Free colors apply to all scopes.
+4. Edit Name for each selected path, shared or independent. It defaults to the original path and does not change the path or shared-group key. Entire-library groups use the first selected service name (Radarr before Sonarr); each service scope uses that service’s name.
+5. Save settings. Previous/next arrows below the widget title show one area at a time. The browser remembers the selected area per scope. Entire library includes both services; Movies and TV series include only their service's selected areas. Shared areas appear once. Used and Free colors apply to all scopes.
 
 **Scopearr does not add storage areas together.** Unraid Movies, Shows and Documentaries shares can use overlapping subsets of the same array. Their filesystem capacities and available bytes cannot establish the physical union. Displaying separate areas avoids a misleading combined total without requiring an Unraid connection.
 
