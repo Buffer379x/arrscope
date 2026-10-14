@@ -350,6 +350,11 @@ export function SettingsDialog({
           {section === "custom" && (
             <CustomTagsSettings
               tags={customTags}
+              settings={cfg}
+              setSettings={setCfg}
+              saveColors={() => void saveSettings(cfg)}
+              colorsDirty={dirty}
+              savingColors={busy}
               changed={async () => {
                 await customChanged();
                 const tags = await api<CustomTag[]>("custom-tags");
@@ -671,6 +676,62 @@ export function SettingsDialog({
                             "Synced with Radarr and Sonarr. An error preserves the last complete cache.",
                           )}
                         </p>
+                      )}
+                      {service !== "emby" && (
+                        <section class="external-tag-settings">
+                          <h4>{t("External tags")}</h4>
+                          <label class="check-field">
+                            <input
+                              type="checkbox"
+                              checked={!!cfg[service].tagImport}
+                              onChange={(e) =>
+                                update(service, {
+                                  tagImport: e.currentTarget.checked,
+                                  ...(e.currentTarget.checked &&
+                                  !cfg[service].tagImport
+                                    ? { tagImportInterval: 5 }
+                                    : {}),
+                                })
+                              }
+                            />
+                            {t("Import external tags as custom tags")}
+                          </label>
+                          <label>
+                            {t("Tag check interval")}
+                            <select
+                              value={cfg[service].tagImportInterval ?? 5}
+                              disabled={!cfg[service].tagImport}
+                              onChange={(e) =>
+                                update(service, {
+                                  tagImportInterval: Number(
+                                    e.currentTarget.value,
+                                  ),
+                                })
+                              }
+                            >
+                              {[0, 5, 15, 30, -1].map((v) => (
+                                <option value={v}>
+                                  {t(
+                                    v === 0
+                                      ? "Manual only"
+                                      : v === -1
+                                        ? "With library sync"
+                                        : v === 5
+                                          ? "Every 5 minutes"
+                                          : v === 15
+                                            ? "Every 15 minutes"
+                                            : "Every 30 minutes",
+                                  )}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <p class="quiet">
+                            {t(
+                              "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or Emby requests are needed for tag checks.",
+                            )}
+                          </p>
+                        </section>
                       )}
                       {service !== "emby" && (
                         <section class="outbound-tag-settings">

@@ -355,6 +355,93 @@
   }
 }
 
-.storage-area-select { display:block; margin:16px 0 4px; }
-.storage-area-select select { width:100%; }
-.storage-capacity-note { margin:16px 0 0; font-size:11px; }
+.storage-area-select {
+  display: block;
+  margin: 16px 0 4px;
+}
+.storage-area-select select {
+  width: 100%;
+}
+.storage-capacity-note {
+  margin: 16px 0 0;
+  font-size: 11px;
+}
+
+/* Five-row cards share a base size and still expand independently. */
+.dashboard-detail-grid > .distribution-card {
+  min-height: 468px;
+}
+.storage-widget .storage-chart {
+  width: min(100%, 220px);
+  margin: 10px auto 20px;
+}
+.storage-area-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+.storage-area-navigation strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.storage-widget .storage-legend {
+  margin-top: auto;
+}
+.auto-tag-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 4px 0 0;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  vertical-align: middle;
+}
+.auto-tag-mark:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.auto-tag-explanation {
+  white-space: pre-line;
+  line-height: 1.7;
+}
+.external-tag-settings {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+.external-tag-conflict {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.custom-tags-table input:not([type="color"]) {
+  margin-top: 8px;
+}
+.custom-tags-table input[type="color"] {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+}
+.custom-tags-table th:nth-child(n + 3),
+.custom-tags-table td:nth-child(n + 3) {
+  text-align: right;
+  width: 52px;
+  white-space: nowrap;
+}
+.custom-tags-table th:nth-child(2),
+.custom-tags-table td:nth-child(2) {
+  max-width: 170px;
+}

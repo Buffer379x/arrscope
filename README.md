@@ -24,7 +24,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - [Selected/shared storage widgets](docs/WIDGETS.md) with individual-area Used/Free charts and no summed overlapping shares; automatic release notices in System.
 - One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
 - A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.
-- Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. A read-only removal preview shows provenance, affected titles and definition cleanup before confirmation; newly encountered foreign assignments pause for review.
+- Optional [tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. A read-only removal preview shows provenance, affected titles and definition cleanup before confirmation; newly encountered foreign assignments pause for review.
 
 ## Install
 
@@ -60,7 +60,7 @@ Flags are representative language symbols, not claims about a file’s country o
 
 Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag`. Optional outbound synchronization can create/delete affected tag definitions and add/remove movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
+Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag` and tag usage details. Optional incoming checks also read `autotagging` for referenced rules. Optional outbound synchronization can create/delete affected tag definitions and add/remove movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
 
 Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 
@@ -100,7 +100,9 @@ The generated Scopearr PNG icon, favicons and Apple touch icon are included unde
 
 ## Custom tags
 
-Create and rename tags under Settings → Custom tags, then click Save to commit the draft. In Movies or TV series, a tag icon in each Custom cell edits that single file; empty cells show no placeholder dash. Use Custom tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
+Optional incoming checks add ordinary Radarr/Sonarr tags and protected automatic-rule tags to the catalog. Rule tags show a gear and rule information; their colors remain editable. Checks can run separately from file sync. Ordinary edits can be sent back through the outbound Custom group. See [tag synchronization](docs/TAG-SYNC.md).
+
+Create tags with Add, rename with Enter or by leaving the field, and confirm deletion under Settings → Custom tags. These actions save immediately. In Movies or TV series, a tag icon in each Custom cell edits that single file; empty cells show no placeholder dash. Use Set tags beside CSV to assign or remove tags for every actual filtered file, including other pages. A partial checkbox means only some matching files have that tag. Apply commits changes together; additional full-season context rows are excluded. Tags are displayed alphabetically and are included in CSV exports.
 
 Custom filters support OR, exclusion, contains-all and does-not-contain-all. Colors and filters list tags in use; the administration catalog also keeps unused tags available for future assignment. Filename rules can select Custom and an existing tag. All matching Custom rules add their tags; multiple tags are not conflicts. Manual additions survive synchronization and rule edits. Removed automatic tags may reappear after the next successful service sync.
 
@@ -112,6 +114,6 @@ Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=t
 
 ## Settings and dashboard
 
-Settings Save actions sit beside the section heading. Language, colors, display preferences and custom-tag administration remain drafts until saved; leaving a section warns about unsaved edits. Rule additions/deletions save after their individual confirmation; checkbox edits are batched until Save settings. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
+Settings Save actions sit beside the section heading. Language, colors and display preferences remain drafts until saved; leaving a section warns about unsaved edits. Rule additions/deletions save after their individual confirmation; checkbox edits are batched until Save settings. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
 
 Dashboard distribution widgets show the top five entries. More/Less expands or collapses the remaining values without changing totals or percentages. Clicking an entry selects the existing library filters without saving a preset. Feedback appears as automatically dismissed bottom-right toasts.

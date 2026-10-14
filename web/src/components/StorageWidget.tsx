@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Settings, StorageData } from "../types";
 import { t, useI18n, getLocale } from "../i18n";
@@ -19,7 +20,18 @@ export function StorageWidget({
 }) {
   useI18n();
   const [data, setData] = useState<StorageData | null>(null);
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("scopearr-storage-areas") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  useEffect(
+    () =>
+      localStorage.setItem("scopearr-storage-areas", JSON.stringify(selected)),
+    [selected],
+  );
   const [error, setError] = useState(false);
   useEffect(() => {
     let current = true;
@@ -52,21 +64,46 @@ export function StorageWidget({
         <h3>{t("Storage")}</h3>
       </div>
       {!!areas.length && (
-        <label class="storage-area-select">
-          <select
-            aria-label={t("Storage area")}
-            value={total?.key}
-            onChange={(e) =>
-              setSelected({ ...selected, [scope]: e.currentTarget.value })
+        <div
+          class="storage-area-navigation"
+          role="group"
+          aria-label={t("Storage area")}
+        >
+          <button
+            class="icon-button"
+            type="button"
+            disabled={areas.length < 2}
+            aria-label={t("Previous storage area")}
+            onClick={() =>
+              setSelected({
+                ...selected,
+                [scope]:
+                  areas[
+                    (areas.indexOf(total!) - 1 + areas.length) % areas.length
+                  ].key,
+              })
             }
           >
-            {areas.map((area) => (
-              <option key={area.key} value={area.key}>
-                {area.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <ChevronLeft size={16} />
+          </button>
+          <strong title={total?.paths.join(" · ")}>
+            {total?.label.replace(/^radarr · |^sonarr · /, "")}
+          </strong>
+          <button
+            class="icon-button"
+            type="button"
+            disabled={areas.length < 2}
+            aria-label={t("Next storage area")}
+            onClick={() =>
+              setSelected({
+                ...selected,
+                [scope]: areas[(areas.indexOf(total!) + 1) % areas.length].key,
+              })
+            }
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       )}
       {total && total.total > 0 ? (
         <>
@@ -110,13 +147,6 @@ export function StorageWidget({
             error
               ? "Storage readings are stale or unavailable"
               : "Select storage paths in Settings → Widgets.",
-          )}
-        </p>
-      )}
-      {total && (
-        <p class="quiet storage-capacity-note">
-          {t(
-            "Filesystem capacity, including other data. Overlapping areas are not added.",
           )}
         </p>
       )}

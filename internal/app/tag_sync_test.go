@@ -15,6 +15,11 @@ import (
 )
 
 type tagFixture struct {
+	auto        map[int][]int
+	failDetails bool
+	nullDetails bool
+	failRules   bool
+
 	mu                     sync.Mutex
 	tags                   map[int]string
 	media                  map[int][]int
@@ -68,6 +73,58 @@ func newTagFixture(t *testing.T, service string) (*tagFixture, *httptest.Server)
 				json.NewEncoder(w).Encode(map[string]any{"id": id, "label": label, key: refs, "importListIds": extra})
 				return
 			}
+			if r.URL.Path == "/api/v3/tag/detail" {
+				if f.nullDetails {
+					json.NewEncoder(w).Encode(nil)
+					return
+				}
+				if f.failDetails {
+					w.WriteHeader(503)
+					return
+				}
+				out := []map[string]any{}
+				for id, label := range f.tags {
+					refs := []int{}
+					for mid, ids := range f.media {
+						for _, tid := range ids {
+							if tid == id {
+								refs = append(refs, mid)
+								break
+							}
+						}
+					}
+					autos := f.auto[id]
+					if autos == nil {
+						autos = []int{}
+					}
+					key := "movieIds"
+					if service == "sonarr" {
+						key = "seriesIds"
+					}
+					out = append(out, map[string]any{"id": id, "label": label, key: refs, "autoTagIds": autos})
+				}
+				json.NewEncoder(w).Encode(out)
+				return
+			}
+			if r.URL.Path == "/api/v3/autotagging" {
+				if f.failRules {
+					w.WriteHeader(503)
+					return
+				}
+				out := []map[string]any{}
+				seen := map[int]bool{}
+				for _, ids := range f.auto {
+					for _, id := range ids {
+						if !seen[id] {
+							seen[id] = true
+							out = append(out, map[string]any{"id": id, "name": fmt.Sprint("Auto rule ", id)})
+						}
+					}
+				}
+				json.NewEncoder(w).Encode(out)
+				return
+			}
+
 			switch r.URL.Path {
 			case "/api/v3/tag":
 				out := []arrTag{}

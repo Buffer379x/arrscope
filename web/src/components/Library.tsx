@@ -1,3 +1,4 @@
+import { AutoTagMark, autoTagHint } from "./AutoTagMark";
 import { RowInfo } from "./RowInfo";
 import { applyInterfaceTheme } from "../themes";
 import { TagInformation, TagVisibility } from "../ui";
@@ -157,6 +158,9 @@ export function Library({
         ) as Record<Service, string>,
     );
   };
+  useEffect(() => {
+    if (status.cacheRevision) loadCustom().catch(() => {});
+  }, [status.cacheRevision]);
   const [service, setService] = useState<Service>("radarr"),
     [view, setView] = useState<"library" | "statistics" | "recognition">(
       "statistics",
@@ -845,10 +849,17 @@ export function Library({
                                         <Tag
                                           kind="custom"
                                           value={String(tag.id)}
-                                          forceTag={tag.manual}
+                                          forceTag={tag.manual || tag.protected}
                                           label={tag.name}
-                                          title={tag.name}
-                                        />
+                                          title={
+                                            tag.protected
+                                              ? autoTagHint(tag)
+                                              : tag.name
+                                          }
+                                        >
+                                          <AutoTagMark tag={tag} />
+                                          {tag.name}
+                                        </Tag>
                                       ))}
                                     </div>
                                   </td>

@@ -517,17 +517,17 @@ func (s *Server) Handler() http.Handler {
 				base := s.Config()
 				var plans []*tagPlan
 				changed := cfg.Radarr.TagSync != base.Radarr.TagSync || cfg.Sonarr.TagSync != base.Sonarr.TagSync || cfg.Radarr.TagSyncMode != base.Radarr.TagSyncMode || cfg.Sonarr.TagSyncMode != base.Sonarr.TagSyncMode || cfg.Radarr.URL != base.Radarr.URL && cfg.Radarr.TagSync.Active() || cfg.Sonarr.URL != base.Sonarr.URL && cfg.Sonarr.TagSync.Active()
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(130 * time.Second))
+				ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+				defer cancel()
+				select {
+				case s.Sync.gate <- struct{}{}:
+					defer func() { <-s.Sync.gate }()
+				case <-ctx.Done():
+					failure(w, r, 503, errors.New("Sync is busy. Try again after it completes"))
+					return
+				}
 				if changed {
-					_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(130 * time.Second))
-					ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
-					defer cancel()
-					select {
-					case s.Sync.gate <- struct{}{}:
-						defer func() { <-s.Sync.gate }()
-					case <-ctx.Done():
-						failure(w, r, 503, errors.New("Sync is busy. Try again after it completes"))
-						return
-					}
 					for service, pair := range map[string][2]ServiceConfig{"radarr": {base.Radarr, cfg.Radarr}, "sonarr": {base.Sonarr, cfg.Sonarr}} {
 						before, next := pair[0], pair[1]
 						if before.TagSync == next.TagSync && before.TagSyncMode == next.TagSyncMode && before.URL == next.URL {
@@ -578,7 +578,7 @@ func (s *Server) Handler() http.Handler {
 					failure(w, r, 403, errors.New("Demo connections cannot be changed"))
 					return
 				}
-				if cfg.Emby.Interval != 0 || cfg.Emby.TagSync.Active() {
+				if cfg.Emby.Interval != 0 || cfg.Emby.TagSync.Active() || cfg.Emby.TagImport || cfg.Emby.TagImportInterval != 0 {
 					s.mu.Unlock()
 					failure(w, r, 400, errors.New("Emby syncs at the Radarr/Sonarr interval"))
 					return
@@ -625,6 +625,43 @@ func (s *Server) Handler() http.Handler {
 				jsonOut(w, 200, map[string]bool{"ok": true})
 				return
 			}
+		case "/api/tag-import":
+			if r.Method != "POST" {
+				break
+			}
+			var in struct {
+				Service    string `json:"service"`
+				MediaID    int    `json:"mediaId"`
+				RemoteID   int    `json:"remoteId"`
+				Resolution string `json:"resolution"`
+			}
+			if e := decode(w, r, &in); e != nil || !serviceOK(in.Service) || s.Demo {
+				failure(w, r, 400, errors.New("Invalid service or demo mode"))
+				return
+			}
+			cfg := s.Config()
+			c := cfg.Radarr
+			if in.Service == "sonarr" {
+				c = cfg.Sonarr
+			}
+			if !c.Enabled || !c.TagImport {
+				failure(w, r, 400, errors.New("Enable external tag import first"))
+				return
+			}
+			if in.Resolution != "" {
+				if in.Resolution != "local" && in.Resolution != "remote" {
+					failure(w, r, 400, errors.New("Invalid conflict resolution"))
+					return
+				}
+				if e := s.Store.ResolveExternal(r.Context(), in.Service, c, in.MediaID, in.RemoteID, in.Resolution == "local"); e != nil {
+					failure(w, r, 409, e)
+					return
+				}
+			}
+			s.Tags.Queue(in.Service)
+			jsonOut(w, 202, map[string]bool{"queued": true})
+			return
+
 		case "/api/test":
 			if r.Method != "POST" {
 				break

@@ -1,7 +1,9 @@
-import { confirmDeletion } from "../confirmation";
+import { AutoTagMark, autoTagHint } from "./AutoTagMark";
+import { Tag, defaultColor } from "../ui";
+import { confirmReset, confirmDeletion } from "../confirmation";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { Plus, Trash2, LoaderCircle } from "lucide-preact";
-import type { CustomTag } from "../types";
+import { Plus, Trash2, LoaderCircle, RotateCcw, Check } from "lucide-preact";
+import type { CustomTag, Settings } from "../types";
 import { api } from "../api";
 import { notify } from "../notifications";
 import { t, useI18n } from "../i18n";
@@ -9,7 +11,17 @@ export function CustomTagsSettings({
   tags,
   changed,
   onDirty,
+  settings,
+  setSettings,
+  saveColors,
+  colorsDirty,
+  savingColors,
 }: {
+  settings: Settings;
+  setSettings: (next: Settings) => void;
+  saveColors: () => void;
+  colorsDirty: boolean;
+  savingColors: boolean;
   tags: CustomTag[];
   changed: () => Promise<void>;
   onDirty: (value: boolean) => void;
@@ -25,6 +37,27 @@ export function CustomTagsSettings({
     JSON.stringify(baseline.current) !== JSON.stringify(drafts);
   useEffect(() => onDirty(dirty || busy), [dirty, busy]);
   useEffect(() => () => onDirty(false), []);
+  useEffect(() => {
+    if (!dirty && !busy) {
+      baseline.current = structuredClone(tags);
+      setDrafts(structuredClone(tags));
+    }
+  }, [JSON.stringify(tags)]);
+  const color = (id: number, value?: string, text?: string) => {
+    const key = "custom:" + id;
+    const colors = { ...settings.tagColors };
+    const texts = { ...settings.tagTextColors };
+    if (value) colors[key] = value;
+    else if (text === undefined) {
+      delete colors[key];
+      delete texts[key];
+    }
+    if (text !== undefined) {
+      if (text) texts[key] = text;
+      else delete texts[key];
+    }
+    setSettings({ ...settings, tagColors: colors, tagTextColors: texts });
+  };
   const commit = async (
     next: CustomTag[],
     changedID?: number,
@@ -106,6 +139,15 @@ export function CustomTagsSettings({
     <section class="custom-tags-settings" aria-label={t("Custom tags")}>
       <header class="settings-section-heading">
         <h2>{t("Custom tags")}</h2>
+        <button
+          type="button"
+          class="primary"
+          disabled={savingColors || !colorsDirty}
+          onClick={saveColors}
+        >
+          <Check size={16} />
+          {t("Save colors")}
+        </button>
         <p class="quiet">
           {t(
             "Create tags here, assign them in your library or use them in filename rules. Colors and filters show tags currently in use.",
@@ -147,6 +189,10 @@ export function CustomTagsSettings({
             <thead>
               <tr>
                 <th>{t("Name")}</th>
+                <th>{t("Management")}</th>
+                <th>{t("Color")}</th>
+                <th>{t("Text")}</th>
+                <th>{t("Reset column")}</th>
                 <th>{t("Actions")}</th>
               </tr>
             </thead>
@@ -154,37 +200,152 @@ export function CustomTagsSettings({
               {drafts.map((tag) => (
                 <tr key={tag.id}>
                   <td>
-                    <input
-                      aria-label={t("Tag name: {name}", { name: tag.name })}
-                      maxLength={80}
-                      required
-                      value={tag.name}
-                      disabled={busy}
-                      onInput={(e) => {
-                        const value = e.currentTarget.value;
-                        setDrafts((current) =>
-                          current.map((r) =>
-                            r.id === tag.id ? { ...r, name: value } : r,
+                    <Tag
+                      kind="custom"
+                      value={String(tag.id)}
+                      forceTag
+                      colors={settings.tagColors}
+                      textColors={settings.tagTextColors}
+                      title={tag.protected ? autoTagHint(tag) : tag.name}
+                    >
+                      <AutoTagMark tag={tag} />
+                      {tag.name}
+                    </Tag>
+                    {!tag.protected && (
+                      <input
+                        aria-label={t("Tag name: {name}", { name: tag.name })}
+                        maxLength={80}
+                        required
+                        value={tag.name}
+                        disabled={busy}
+                        onInput={(e) => {
+                          const value = e.currentTarget.value;
+                          setDrafts((current) =>
+                            current.map((r) =>
+                              r.id === tag.id ? { ...r, name: value } : r,
+                            ),
+                          );
+                        }}
+                        onBlur={(e) => void rename(tag, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                        }}
+                      />
+                    )}
+                  </td>
+                  <td title={tag.protected ? autoTagHint(tag) : undefined}>
+                    {tag.protected
+                      ? [
+                          ...new Set(
+                            tag.rules?.map((r) => r.split(" · ")[0]) || [],
                           ),
-                        );
-                      }}
-                      onBlur={(e) => void rename(tag, e.currentTarget.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          e.currentTarget.blur();
-                        }
-                      }}
+                        ]
+                          .map(
+                            (s) =>
+                              (s === "radarr" ? "Radarr" : "Sonarr") +
+                              " Auto-Tag",
+                          )
+                          .join(" / ")
+                      : t(
+                          tag.localRule
+                            ? "Scopearr rule"
+                            : tag.sources?.length
+                              ? "Shared"
+                              : "Manual",
+                        )}
+                  </td>
+                  <td>
+                    <input
+                      type="color"
+                      aria-label={t("Color for {value}", { value: tag.name })}
+                      value={
+                        settings.tagColors["custom:" + tag.id] ||
+                        defaultColor("custom", String(tag.id))
+                      }
+                      onInput={(e) => color(tag.id, e.currentTarget.value)}
                     />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="icon-button tag-text-color color-action"
+                      aria-label={t("Text color for {value}", {
+                        value: tag.name,
+                      })}
+                      title={t(
+                        settings.tagTextColors["custom:" + tag.id] === "#000000"
+                          ? "Black"
+                          : settings.tagTextColors["custom:" + tag.id] ===
+                              "#ffffff"
+                            ? "White"
+                            : "Automatic",
+                      )}
+                      onClick={() =>
+                        color(
+                          tag.id,
+                          undefined,
+                          settings.tagTextColors["custom:" + tag.id] ===
+                            "#000000"
+                            ? "#ffffff"
+                            : settings.tagTextColors["custom:" + tag.id] ===
+                                "#ffffff"
+                              ? ""
+                              : "#000000",
+                        )
+                      }
+                    >
+                      <span>A</span>
+                      <span aria-hidden="true">
+                        {settings.tagTextColors["custom:" + tag.id] ===
+                        "#000000"
+                          ? "●"
+                          : settings.tagTextColors["custom:" + tag.id] ===
+                              "#ffffff"
+                            ? "○"
+                            : "◐"}
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="icon-button color-action"
+                      disabled={
+                        !settings.tagColors["custom:" + tag.id] &&
+                        !settings.tagTextColors["custom:" + tag.id]
+                      }
+                      aria-label={t("Default color for {value}", {
+                        value: tag.name,
+                      })}
+                      onClick={async () => {
+                        if (
+                          await confirmReset(
+                            t("Reset background and text colors for {value}?", {
+                              value: tag.name,
+                            }),
+                          )
+                        )
+                          color(tag.id);
+                      }}
+                    >
+                      <RotateCcw size={16} />
+                    </button>
                   </td>
                   <td>
                     <div class="row-actions">
                       <button
                         type="button"
                         class="button danger-button"
-                        disabled={busy}
+                        disabled={busy || tag.protected}
                         aria-label={t("Delete tag: {name}", { name: tag.name })}
-                        title={t("Delete tag: {name}", { name: tag.name })}
+                        title={
+                          tag.protected
+                            ? autoTagHint(tag)
+                            : t("Delete tag: {name}", { name: tag.name })
+                        }
                         onClick={async () => {
                           if (pending.current) return;
                           if (

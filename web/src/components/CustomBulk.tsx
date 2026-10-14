@@ -1,3 +1,4 @@
+import { AutoTagMark, autoTagHint } from "./AutoTagMark";
 import { confirmDeletion } from "../confirmation";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../api";
@@ -84,6 +85,11 @@ export function CustomBulk({
             }
           }}
         >
+          <p class="quiet">
+            {t(
+              "Imported series tags apply to the entire series. Auto-tags are managed by their service.",
+            )}
+          </p>
           <div class="custom-tag-options">
             {selection.tags.map((tag) => {
               const id = String(tag.id),
@@ -97,7 +103,8 @@ export function CustomBulk({
                 <label class="check-field">
                   <input
                     type="checkbox"
-                    disabled={busy}
+                    disabled={busy || tag.protected}
+                    title={tag.protected ? autoTagHint(tag) : undefined}
                     checked={checked}
                     aria-checked={mixed ? "mixed" : checked}
                     ref={(el) => {
@@ -107,7 +114,10 @@ export function CustomBulk({
                       setChanges({ ...changes, [id]: e.currentTarget.checked })
                     }
                   />
-                  <span>{tag.name}</span>
+                  <span>
+                    <AutoTagMark tag={tag} />
+                    {tag.name}
+                  </span>
                   <small>
                     {count(n)} / {count(selection.total)}
                   </small>

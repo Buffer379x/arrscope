@@ -59,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 11 {
+	if version > 12 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -422,6 +422,17 @@ PRAGMA user_version=1;COMMIT;`)
 		}
 	}
 
+	if version < 12 {
+		if originalVersion >= 11 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		if _, err = db.Exec("BEGIN;" + tagImportSchema + "COMMIT;"); err != nil {
+			return fail(err)
+		}
+	}
+
 	var recognition RecognitionConfig
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.
@@ -518,7 +529,7 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 		}
 	}
 	if !customActive {
-		if e = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM custom_overrides WHERE service=?)", service).Scan(&customActive); e != nil {
+		if e = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM custom_overrides WHERE service=?) OR EXISTS(SELECT 1 FROM external_tag_bindings WHERE service=? AND present=1 AND imported=1)", service, service).Scan(&customActive); e != nil {
 			return e
 		}
 	}

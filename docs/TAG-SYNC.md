@@ -1,4 +1,4 @@
-# Outbound tag synchronization
+# Tag synchronization
 
 Under **Settings → Services**, select outbound groups independently for Radarr and Sonarr. All groups are off by default. Changes remain drafts until Save. When groups are enabled, disabled or the active handling mode changes, a confirmation dialog gathers the decisions separately for each service. Emby remains read-only.
 
@@ -16,7 +16,7 @@ Previously controlled assignments and adopted/created definitions continue norma
 
 **Keep and only add** preserves existing unrelated tags and appends the currently recognized values. Resolution/source changes can therefore accumulate values over time. Scopearr uses the API's add operation, preserving tags added concurrently by another client. Explicit removal of a previously synchronized custom assignment, or disabling a group with Delete, uses targeted remove operations.
 
-**Overwrite assignments** defines the complete desired set for each movie/series. Existing assignments, including manual tags, are removed unless desired by the selected groups or explicitly protected by a later Keep decision for a disabled group. A newly confirmed Overwrite decision removes those earlier protections as well. This mode reconciles changing traits on every successful file sync.
+**Overwrite assignments** defines the complete desired set for each movie/series. Existing assignments, including manual tags, are removed unless desired by the selected groups, imported as external custom tags, protected by an external auto-tag rule, or explicitly protected by a later Keep decision for a disabled group. A newly confirmed Overwrite decision removes those earlier protections as well. This mode reconciles changing traits on every successful file sync.
 
 Sonarr tags series rather than individual files. Scopearr unions every existing episode-file value: mixed 1080p/x264 and 2160p/x265 episodes produce all four tags. Source includes processing such as Remux. Missing traits produce stable, category-scoped English tags such as `resolution-unknown`, `codec-unknown`, `source-unknown`, `hdr-unknown`, `bit-depth-unknown`, `audio-codec-unknown`, `channels-unknown` and `language-unknown`. They follow the selected outbound groups. Known and missing values can both occur in a series union. An empty custom-tag list produces no unknown tag. Interface language changes do not rename outgoing tags.
 
@@ -42,11 +42,29 @@ Successful file syncs, relevant saved settings, recognition rules and custom-tag
 
 ## API boundaries
 
-Catalog reads stay allowlisted GET requests. Tag synchronization additionally reads `tag` and `tag/detail/<id>`, creates definitions with POST `tag`, edits assignments with PUT `movie/editor` or `series/editor`, and deletes unused definitions with DELETE `tag/<id>`. Numeric paths must contain a canonical positive ID.
+Catalog reads stay allowlisted GET requests. Tag synchronization additionally reads `tag`, `tag/detail`, `tag/detail/<id>` and, for external rule references, `autotagging`, creates definitions with POST `tag`, edits assignments with PUT `movie/editor` or `series/editor`, and deletes unused definitions with DELETE `tag/<id>`. Numeric paths must contain a canonical positive ID.
 
 Editor payloads contain only resource IDs, tag IDs, `applyTags: add|remove`, and `moveFiles: false`. Overwrite is implemented using targeted removals and additions; a concurrent foreign addition is preserved. No scan, download, rename, profile or path-change requests are sent. API keys remain server-side; redirects are rejected.
 
 See the official [Radarr tag controller](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/Tags/TagController.cs), [Radarr usage/deletion guard](https://github.com/Radarr/Radarr/blob/develop/src/NzbDrone.Core/Tags/TagService.cs), [Sonarr usage/deletion guard](https://github.com/Sonarr/Sonarr/blob/develop/src/NzbDrone.Core/Tags/TagService.cs), [Radarr movie editor](https://github.com/Radarr/Radarr/blob/develop/src/Radarr.Api.V3/Movies/MovieEditorController.cs) and [Sonarr series editor](https://github.com/Sonarr/Sonarr/blob/develop/src/Sonarr.Api.V3/Series/SeriesEditorController.cs).
+
+## Incoming custom tags and auto-tag rules
+
+Imports are optional per service under **Settings → Services**. Choose manual checks, every 5/15/30 minutes, or with library sync. Enabling imports proposes 5 minutes. Local edits queue an immediate check; every outbound job reads external state first. Sending ordinary custom-tag changes back also requires the outbound **Custom** group. System shows last check, pending changes, conflicts and Check tags now.
+
+Import-only checks read `tag/detail` and, if referenced, `autotagging`. They do not request movie/episode files, Emby metadata or scans. Connect webhooks do not announce ordinary tag edits. Technical labels recognized by Scopearr are excluded from new ordinary custom imports; rule-controlled labels are imported even when technical or unused. The combined catalog retains its existing 128-tag limit; exceeding it rejects the complete import rather than applying a partial snapshot.
+
+Ordinary tags match by their normalized outgoing label. Radarr assignments apply to movie files; Sonarr assignments apply to all series files. Tags assigned to individual Scopearr files keep their granularity when their union is read back from Sonarr. Snapshots and queued edits survive restart. Pulling cannot undo a pending local removal; externally removed ordinary assignments are not immediately recreated. Imported assignments and independent local assignments remain separate layers.
+
+A changed external name or deleted definition during a pending edit pauses writes. **Settings → System** offers Keep local change or Use service state. A fresh read verifies the decision; pending removal requires confirmation. Failed/incomplete responses keep the previous complete imported state and prevent writes. The APIs cannot provide an atomic transaction across services; concurrent edits after the final read are observed on the next check.
+
+Tags referenced by external automatic-tag rules appear in **Settings → Custom tags**, including unused rule tags. A gear opens service and rule names. Names, global deletion and service-controlled assignments are read-only in both UI and backend; colors remain editable. Custom and Display share color settings, saved explicitly. Ordinary creation, rename and confirmed deletion remain immediate.
+
+A rule reference means a tag is used by a rule, not proof of historical assignment origin. Scopearr does not change external rules or fight their assignments. Remove the rule reference in Radarr/Sonarr to unlock the tag on the next check; existing assignments remain. If the same name is automatic in one service and manual in the other, central name/deletion remain protected while ordinary assignments in the other service stay editable.
+
+Disabling imports stops checks and retains the snapshot; upstream tags are not deleted. Changing the service URL detaches its imported identities and pending edits so old server IDs cannot affect the new server. Local definitions and independent assignments remain.
+
+Official implementations: [Radarr tag details](https://github.com/Radarr/Radarr/blob/v6.4.4.10685/src/Radarr.Api.V3/Tags/TagDetailsController.cs), [Sonarr tag details](https://github.com/Sonarr/Sonarr/blob/v4.0.20.3014/src/Sonarr.Api.V3/Tags/TagDetailsController.cs), [Radarr automatic tagging](https://github.com/Radarr/Radarr/blob/v6.4.4.10685/src/NzbDrone.Core/AutoTagging/AutoTaggingService.cs).
 
 ## Rollback
 

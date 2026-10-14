@@ -28,6 +28,10 @@ func NewArr(c ServiceConfig) *ArrClient {
 	}}}
 }
 func ValidateConfig(c ServiceConfig) error {
+	if c.TagImportInterval != -1 && c.TagImportInterval != 0 && c.TagImportInterval != 5 && c.TagImportInterval != 15 && c.TagImportInterval != 30 {
+		return errors.New("Invalid tag check interval")
+	}
+
 	if c.SyncStart != "" {
 		if _, err := time.Parse("15:04", c.SyncStart); err != nil {
 			return errors.New("Invalid sync start time")
@@ -53,7 +57,7 @@ func ValidateConfig(c ServiceConfig) error {
 	return nil
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
-	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "diskspace": true, "tag": true, "tag/detail": true}
+	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "diskspace": true, "tag": true, "tag/detail": true, "autotagging": true}
 	if !allowed[path] && !positiveTagPath(path, "tag/detail/") && !positiveTagPath(path, "movie/") && !positiveTagPath(path, "series/") && !positiveTagPath(path, "moviefile/") && !positiveTagPath(path, "episodefile/") {
 		return errors.New("API endpoint is not allowed")
 	}

@@ -21,6 +21,8 @@ type TagGroups struct {
 
 func (g TagGroups) Active() bool { return g != (TagGroups{}) }
 func dataConfig(c ServiceConfig) ServiceConfig {
+	c.TagImport = false
+	c.TagImportInterval = 0
 	c.SyncStart = ""
 	c.WebhookEnabled = false
 	c.TagSync = TagGroups{}
@@ -30,18 +32,20 @@ func dataConfig(c ServiceConfig) ServiceConfig {
 }
 
 type ServiceConfig struct {
-	SyncStart      string    `json:"syncStart"`
-	WebhookEnabled bool      `json:"webhookEnabled"`
-	TagSyncMode    string    `json:"tagSyncMode,omitempty"`
-	TagSyncDisable string    `json:"tagSyncDisable,omitempty"`
-	TagSync        TagGroups `json:"tagSync"`
-	Enabled        bool      `json:"enabled"`
-	URL            string    `json:"url"`
-	APIKey         string    `json:"apiKey,omitempty"`
-	HasKey         bool      `json:"hasKey"`
-	ClearKey       bool      `json:"clearKey,omitempty"`
-	PathMappings   string    `json:"pathMappings,omitempty"`
-	Interval       int       `json:"interval"`
+	TagImport         bool      `json:"tagImport"`
+	TagImportInterval int       `json:"tagImportInterval"`
+	SyncStart         string    `json:"syncStart"`
+	WebhookEnabled    bool      `json:"webhookEnabled"`
+	TagSyncMode       string    `json:"tagSyncMode,omitempty"`
+	TagSyncDisable    string    `json:"tagSyncDisable,omitempty"`
+	TagSync           TagGroups `json:"tagSync"`
+	Enabled           bool      `json:"enabled"`
+	URL               string    `json:"url"`
+	APIKey            string    `json:"apiKey,omitempty"`
+	HasKey            bool      `json:"hasKey"`
+	ClearKey          bool      `json:"clearKey,omitempty"`
+	PathMappings      string    `json:"pathMappings,omitempty"`
+	Interval          int       `json:"interval"`
 }
 type Settings struct {
 	SyncTimezone    string              `json:"syncTimezone"`
@@ -83,9 +87,13 @@ type AudioTrack struct {
 	Default       bool   `json:"default"`
 }
 type CustomTag struct {
-	Manual bool   `json:"manual,omitempty"`
-	ID     int64  `json:"id"`
-	Name   string `json:"name"`
+	Protected bool     `json:"protected,omitempty"`
+	Sources   []string `json:"sources,omitempty"`
+	Rules     []string `json:"rules,omitempty"`
+	LocalRule bool     `json:"localRule,omitempty"`
+	Manual    bool     `json:"manual,omitempty"`
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
 }
 type File struct {
 	InformationOnly      map[string][]string `json:"informationOnly,omitempty"`
@@ -144,7 +152,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Sonarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
