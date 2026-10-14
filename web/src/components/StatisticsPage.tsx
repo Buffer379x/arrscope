@@ -1,14 +1,6 @@
 import { StorageWidget } from "./StorageWidget";
 import { getLocale, t, useI18n } from "../i18n";
-import {
-  BarChart3,
-  Clapperboard,
-  Database,
-  FileVideo2,
-  Film,
-  LoaderCircle,
-  Tv,
-} from "lucide-preact";
+import { BarChart3, Database, LoaderCircle } from "lucide-preact";
 import { useContext, useEffect, useState } from "preact/hooks";
 import type { Statistics, Status, Settings } from "../types";
 
@@ -92,32 +84,27 @@ export function StatisticsPage({
               {
                 label: t("Movies"),
                 value: data.movies,
-                icon: Film,
                 detail: t("with existing files"),
               },
               {
                 label: t("TV series"),
                 value: data.series,
-                icon: Tv,
                 detail: t("with existing episodes"),
               },
               {
                 label: t("Episodes"),
                 value: data.episodes,
-                icon: Clapperboard,
                 detail: t("including specials and multi-episode files"),
               },
               {
                 label: t("Media files"),
                 value: data.files,
-                icon: FileVideo2,
                 detail: t("movie and episode files"),
               },
             ].map((widget) => (
               <article class="stat-widget">
                 <div>
                   <span>{widget.label}</span>
-                  <widget.icon size={19} />
                 </div>
                 <strong>{count(widget.value)}</strong>
                 <small>{widget.detail}</small>
@@ -192,6 +179,12 @@ export function StatisticsPage({
             ))}
           </div>
           <div class="dashboard-detail-grid">
+            <DistributionChart
+              field="audio"
+              buckets={data.distributions[scope]?.audio || []}
+              totalOverride={data.fileTotals[scope] || 0}
+              onFilter={(value) => onFilter("audio", value, scope)}
+            />
             <LanguageDistribution
               buckets={data.distributions[scope]?.language || []}
               total={data.languageTotals[scope] || 0}
@@ -208,7 +201,9 @@ function DistributionChart({
   field,
   buckets,
   onFilter,
+  totalOverride,
 }: {
+  totalOverride?: number;
   field: string;
   onFilter: (value: string) => void;
   buckets: { value: string; count: number }[];
@@ -216,7 +211,9 @@ function DistributionChart({
   useI18n();
   const [expanded, setExpanded] = useState(false);
   const colors = useContext(TagColors);
-  const total = buckets.reduce((sum, b) => sum + b.count, 0);
+  const total = totalOverride ?? buckets.reduce((sum, b) => sum + b.count, 0);
+  const heading = field === "audio" ? t("Audio") : labels[field];
+  const occurrences = buckets.reduce((sum, b) => sum + b.count, 0);
   const colored = [...buckets]
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
     .map((bucket, i) => ({
@@ -228,10 +225,7 @@ function DistributionChart({
   return (
     <article class="distribution-card">
       <div class="distribution-title">
-        <h3>{labels[field]}</h3>
-        <span>
-          {count(total)} {t("files")}
-        </span>
+        <h3>{heading}</h3>
       </div>
       {total ? (
         <>
@@ -249,7 +243,7 @@ function DistributionChart({
             {colored.map((b) => (
               <span
                 style={{
-                  width: (b.count / total) * 100 + "%",
+                  width: (b.count / occurrences) * 100 + "%",
                   backgroundColor: b.color,
                 }}
                 title={(b.value || t("Unknown")) + ": " + count(b.count)}
@@ -334,10 +328,7 @@ function LanguageDistribution({
   return (
     <article class="distribution-card language-distribution">
       <div class="distribution-title">
-        <h3>{t("Language distribution")}</h3>
-        <span>
-          {count(total)} {t("titles")}
-        </span>
+        <h3>{t("Language")}</h3>
       </div>
       {total ? (
         <ul class="distribution-list">

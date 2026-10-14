@@ -167,7 +167,7 @@ export function WidgetsSettings({
               )}
               <small>
                 {t(
-                  "Use the same group name for paths on the same physical storage. Each group is counted once; separate volumes are added.",
+                  "Use the same group name only for duplicate paths reporting the same filesystem capacity. Each selected area has its own chart; overlapping shares are not added.",
                 )}
               </small>
             </section>

@@ -451,18 +451,58 @@ export function SettingsDialog({
               {(["radarr", "sonarr", "emby"] as ConnectionService[]).map(
                 (service) => (
                   <section class="connection">
-                    <h3 class="card-title">
-                      {service === "radarr" ? (
-                        <Film size={16} />
-                      ) : (
-                        <Tv size={16} />
-                      )}{" "}
-                      {service === "radarr"
-                        ? "Radarr"
-                        : service === "sonarr"
-                          ? "Sonarr"
-                          : t("Emby · optional")}
-                    </h3>
+                    <header class="connection-heading">
+                      <h3 class="card-title">
+                        {service === "radarr" ? (
+                          <Film size={16} />
+                        ) : (
+                          <Tv size={16} />
+                        )}{" "}
+                        {service === "radarr"
+                          ? "Radarr"
+                          : service === "sonarr"
+                            ? "Sonarr"
+                            : t("Emby · optional")}
+                      </h3>
+                      <div class="connection-heading-test">
+                        <button
+                          type="button"
+                          class="button"
+                          disabled={demo || testing[service]}
+                          onClick={async () => {
+                            setTesting((current) => ({
+                              ...current,
+                              [service]: true,
+                            }));
+                            try {
+                              const r = await api<{ version: string }>(
+                                "test",
+                                "POST",
+                                {
+                                  service,
+                                  url: cfg[service].url,
+                                  apiKey: cfg[service].apiKey || "",
+                                },
+                              );
+                              notify(
+                                t("Connected · version {version}", {
+                                  version: r.version,
+                                }),
+                              );
+                            } catch {
+                            } finally {
+                              setTesting((current) => ({
+                                ...current,
+                                [service]: false,
+                              }));
+                            }
+                          }}
+                        >
+                          {t("Test connection")}
+                          <ArrowUpRight size={14} />
+                        </button>
+                      </div>
+                    </header>
                     {service === "emby" && (
                       <p class="quiet">
                         {t(
@@ -695,44 +735,6 @@ export function SettingsDialog({
                           demo={demo}
                         />
                       )}
-                      <div class="connection-test">
-                        <button
-                          type="button"
-                          class="button"
-                          disabled={demo || testing[service]}
-                          onClick={async () => {
-                            setTesting((current) => ({
-                              ...current,
-                              [service]: true,
-                            }));
-                            try {
-                              const r = await api<{ version: string }>(
-                                "test",
-                                "POST",
-                                {
-                                  service,
-                                  url: cfg[service].url,
-                                  apiKey: cfg[service].apiKey || "",
-                                },
-                              );
-                              notify(
-                                t("Connected · version {version}", {
-                                  version: r.version,
-                                }),
-                              );
-                            } catch {
-                            } finally {
-                              setTesting((current) => ({
-                                ...current,
-                                [service]: false,
-                              }));
-                            }
-                          }}
-                        >
-                          {t("Test connection")}
-                          <ArrowUpRight size={14} />
-                        </button>
-                      </div>
                     </div>
                   </section>
                 ),

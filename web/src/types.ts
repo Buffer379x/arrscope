@@ -129,11 +129,18 @@ export type StorageSnapshot = {
 };
 export type StorageData = {
   services: Record<Service, StorageSnapshot>;
-  totals: Record<
+  areas: Record<
     string,
-    { total: number; free: number; used: number; count: number; error: string }
+    {
+      key: string;
+      label: string;
+      paths: string[];
+      total: number;
+      free: number;
+      used: number;
+      error: string;
+    }[]
   >;
-  colors: Record<string, string>;
 };
 export type Status = {
   cacheRevision?: string;
@@ -183,6 +190,7 @@ export type Preset = {
 };
 
 export type Statistics = {
+  fileTotals: Record<string, number>;
   languageTotals: Record<string, number>;
   movies: number;
   series: number;

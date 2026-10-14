@@ -3,13 +3,17 @@
 ## Storage selection
 
 1. Under Settings → Widgets, refresh each enabled service's paths. This sends a read-only GET to `/api/v3/diskspace`.
-2. Select the filesystems that should contribute to the dashboard. Unchecked paths are excluded. Saved selections are retained when a service temporarily fails.
-3. For multiple paths on the same storage, enable Shared storage and use the same group name. The Entire library view counts that group once. The Movies and TV series views include only their respective selected service paths. Distinct groups and ungrouped paths are summed.
-4. Save settings. Used and Free colors apply to all scopes. Total capacity appears inside the chart.
+2. Select the storage areas that should be available in the dashboard. Unchecked paths are excluded. Saved selections survive temporary service failures.
+3. For duplicate paths reporting the same filesystem capacity, enable Shared storage and use the same group name. For example, Radarr and Sonarr `/downloads` can share a `downloads` group; their `/documentaries` paths can share a separate `documentaries` group. Do not group distinct Movies and Shows capacities just because they reside on the same array.
+4. Save settings. The dashboard selector shows one area at a time. Entire library includes both services; Movies and TV series include only their service's selected areas. Shared areas appear once. Used and Free colors apply to all scopes.
 
-The Arr APIs report filesystem/mount capacities, **not media-directory size** and not Unraid share disk allocation policy. Scopearr cannot infer physical identity from path strings: different container paths may refer to the same device, while identically named paths may refer to separate devices. Select/group based on your actual deployment. Multiple paths on a single pool must share a group even within one service. Independent Film/TV Unraid pools remain separate; a shared Downloads pool uses a common group.
+**Scopearr does not add storage areas together.** Unraid Movies, Shows and Documentaries shares can use overlapping subsets of the same array. Their filesystem capacities and available bytes cannot establish the physical union. Displaying separate areas avoids a misleading combined total without requiring an Unraid connection.
 
-Readings refresh every 15 minutes for enabled services with selected paths; manual Refresh storage is also available. No media mounts, scans or filesystem traversal are performed. For a shared group with matching total capacity, the newest complete reading supplies both used and free space. Different total capacities show a warning rather than presenting an unreliable combined chart. Missing selected paths or failed reads are marked; the last successful values remain available. Disabling a service excludes it from totals.
+The Arr APIs report filesystem/mount capacities, **not media-directory size** or Unraid share contents. Used space is the selected filesystem's total minus free, including other data. A Documentaries share containing 889 GB can therefore report many TB used on its underlying disks. Scopearr cannot infer physical identity from paths: different container paths may refer to the same device, while identical paths can refer to different devices. Configure duplicate groups based on your deployment. Avoid `/` and `/config` unless you specifically want those filesystems; `/config` and `/downloads` may report the same NVME pool.
+
+Values are shown in decimal GB/TB, matching common Unraid displays. For example, 34.1 TiB is approximately 37.5 TB, and 903.1 GiB is approximately 970 GB. This unit conversion does not resolve overlapping capacity or directory usage differences.
+
+Readings refresh every 15 minutes for enabled services with selected paths; manual Refresh storage is also available. No media mounts, scans, Unraid connection or filesystem traversal are performed. A shared group uses the newest complete reading for both used and free. Conflicting total capacities prevent that area's chart and show a warning; unrelated areas remain available. Missing paths and failed reads are marked; valid last-successful readings remain visible. A changed service endpoint cannot reuse the previous endpoint's readings.
 
 Official capacity implementations: [Radarr](https://github.com/Radarr/Radarr/blob/develop/src/NzbDrone.Core/DiskSpace/DiskSpaceService.cs), [Sonarr](https://github.com/Sonarr/Sonarr/blob/v4.0.20.3014/src/NzbDrone.Core/DiskSpace/DiskSpaceService.cs).
 

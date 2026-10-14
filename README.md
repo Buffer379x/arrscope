@@ -16,12 +16,12 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Combined resolution, codec family, source, processing, year, size, HDR, bit depth, audio codec, channels and audio language filters. Search titles and filenames; select unknown and incomplete metadata.
 - Include/exclude filters and “contains all” / “does not contain all” for audio, HDR and language. Saved presets and CSV use the same filter logic.
 - Grouped TV seasons, specials and multi-episode files. Show only matching files or complete matching seasons with highlighted matches.
-- Dashboard counts and distributions by resolution, codec and source. Click a tag to select its value in the existing library filters. Selections remain unsaved unless you explicitly save a preset.
+- Dashboard counts and distributions by resolution, codec, source, audio codecs and language. Click a tag to select its value in the existing library filters. Selections remain unsaved unless you explicitly save a preset.
 - Optional Emby enrichment reads already available audio tracks. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
 - Persistent configurable columns and an Info action column with new-tab Radarr/Sonarr links, file details and warning icons. Saved icon visibility/order, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers and Info icon-count sorting in both libraries.
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - Optional clock-anchored synchronization and [authenticated realtime webhooks](docs/WEBHOOKS.md) for affected media, with durable retries and atomic scoped updates.
-- [Selected/shared storage widgets](docs/WIDGETS.md) with per-scope Used/Free capacity charts; automatic release notices in System.
+- [Selected/shared storage widgets](docs/WIDGETS.md) with individual-area Used/Free charts and no summed overlapping shares; automatic release notices in System.
 - One local admin account, encrypted API keys, HttpOnly sessions, CSRF protection and limited login attempts.
 - A single Go process and embedded Preact frontend; AMD64 and ARM64 Docker images.
 - Optional [outbound tag synchronization](docs/TAG-SYNC.md) for Radarr movies and Sonarr series, configurable per trait group and disabled by default. Choose whether to preserve and append to existing assignments, or replace them; choose Keep/Delete when disabling groups. A read-only removal preview shows provenance, affected titles and definition cleanup before confirmation; newly encountered foreign assignments pause for review.

@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from "lucide-preact";
 import { useState } from "preact/hooks";
 import type { Connection, Service } from "../types";
 import { t, useI18n } from "../i18n";
@@ -22,6 +23,7 @@ export function WebhookSettings({
     endpoint: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <section class="webhook-settings">
       <h4>{t("Realtime updates")}</h4>
@@ -69,12 +71,24 @@ export function WebhookSettings({
           </label>
           <label>
             {t("Password")}
-            <input
-              readOnly
-              type="password"
-              autoComplete="off"
-              value={credentials.password}
-            />
+            <span class="password-reveal-field">
+              <input
+                readOnly
+                type={showPassword ? "text" : "password"}
+                autoComplete="off"
+                value={credentials.password}
+              />
+              <button
+                type="button"
+                class="icon-button password-reveal"
+                title={t(showPassword ? "Hide password" : "Show password")}
+                aria-label={t(showPassword ? "Hide password" : "Show password")}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </span>
           </label>
           <small>
             {t(
@@ -84,7 +98,10 @@ export function WebhookSettings({
           <button
             type="button"
             class="button"
-            onClick={() => setCredentials(null)}
+            onClick={() => {
+              setCredentials(null);
+              setShowPassword(false);
+            }}
           >
             {t("Hide credentials")}
           </button>

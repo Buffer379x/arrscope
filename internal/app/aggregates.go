@@ -48,6 +48,10 @@ func (s *Store) StatisticsContext(ctx context.Context) (Statistics, error) {
 }
 func cloneStatistics(in Statistics) Statistics {
 	out := in
+	out.FileTotals = map[string]int{}
+	for key, value := range in.FileTotals {
+		out.FileTotals[key] = value
+	}
 	out.LanguageTotals = map[string]int{}
 	for key, value := range in.LanguageTotals {
 		out.LanguageTotals[key] = value

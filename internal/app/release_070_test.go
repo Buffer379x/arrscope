@@ -47,25 +47,32 @@ func TestClockScheduleAndDST(t *testing.T) {
 		t.Fatal("bad timezone accepted")
 	}
 }
-func TestSharedStorageTotalsAndPersistence(t *testing.T) {
+func TestSharedStorageAreasAndPersistence(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.Radarr = ServiceConfig{Enabled: true, URL: "http://r"}
 	cfg.Sonarr = ServiceConfig{Enabled: true, URL: "http://s"}
 	cfg.Widgets.Storage = map[string][]StorageSelection{"radarr": {{"/movies", ""}, {"/downloads", "downloads"}}, "sonarr": {{"/series", ""}, {"/download", "downloads"}}}
 	now := time.Now()
 	snap := map[string]StorageSnapshot{"radarr": {Disks: []DiskSpace{{Path: "/movies", Total: 100, Free: 30}, {Path: "/downloads", Total: 200, Free: 100}}, SuccessAt: &now, Source: tagEndpoint(cfg.Radarr)}, "sonarr": {Disks: []DiskSpace{{Path: "/series", Total: 300, Free: 200}, {Path: "/download", Total: 200, Free: 100}}, SuccessAt: &now, Source: tagEndpoint(cfg.Sonarr)}}
-	all := storageTotals(cfg, snap, "all")
-	if all.Total != 600 || all.Free != 330 || all.Used != 270 || all.Count != 3 || all.Error != "" {
+	all := storageAreas(cfg, snap, "all")
+	if len(all) != 3 {
 		t.Fatal(all)
 	}
-	if got := storageTotals(cfg, snap, "radarr"); got.Total != 300 {
+	for _, area := range all {
+		if area.Key == "shared:downloads" && (area.Total != 200 || area.Free != 100 || len(area.Paths) != 2) {
+			t.Fatal(area)
+		}
+	}
+	if got := storageAreas(cfg, snap, "radarr"); len(got) != 2 {
 		t.Fatal(got)
 	}
 	s := snap["sonarr"]
 	s.Disks[1].Total = 201
 	snap["sonarr"] = s
-	if got := storageTotals(cfg, snap, "all"); got.Error == "" {
-		t.Fatal("conflicting shared readings accepted")
+	for _, area := range storageAreas(cfg, snap, "all") {
+		if area.Key == "shared:downloads" && (area.Error == "" || area.Total != 0) {
+			t.Fatal("conflicting shared readings accepted", area)
+		}
 	}
 	if versionNewer("0.7.0", "0.6.9") != true || versionNewer("0.6.3", "0.7.0") || versionNewer("v0.7.0-rc1", "0.6.3") {
 		t.Fatal("version comparison")
