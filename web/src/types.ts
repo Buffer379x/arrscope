@@ -12,6 +12,8 @@ export type TagGroups = Record<
   boolean
 >;
 export type Connection = {
+  syncStart?: string;
+  webhookEnabled?: boolean;
   tagSyncMode?: "add" | "replace";
   tagSyncDisable?: "keep" | "delete";
   tagSync?: TagGroups;
@@ -24,6 +26,8 @@ export type Connection = {
   interval: number;
 };
 export type Settings = {
+  syncTimezone: string;
+  widgets: WidgetSettings;
   listInfoOrder: string[];
   listInfoVisible: string[];
   interfaceTheme: string;
@@ -109,7 +113,48 @@ export type SyncStatus = {
   error: string;
   count: number;
 };
+export type WidgetSettings = {
+  storage: Record<Service, { path: string; sharedGroup: string }[]>;
+  colors: Record<string, string>;
+};
+export type StorageSnapshot = {
+  disks: {
+    path: string;
+    label: string;
+    totalSpace: number;
+    freeSpace: number;
+  }[];
+  checkedAt?: string;
+  error: string;
+};
+export type StorageData = {
+  services: Record<Service, StorageSnapshot>;
+  totals: Record<
+    string,
+    { total: number; free: number; used: number; count: number; error: string }
+  >;
+  colors: Record<string, string>;
+};
 export type Status = {
+  cacheRevision?: string;
+  webhooksEnabled?: boolean;
+  webhook?: Record<
+    Service,
+    {
+      lastSuccess?: string;
+      lastReceived?: string;
+      pending: number;
+      error: string;
+    }
+  >;
+  nextSync?: Record<Service, string | null>;
+  releaseCheck?: {
+    latest?: string;
+    checkedAt?: string;
+    successAt?: string;
+    error: string;
+    updateAvailable: boolean;
+  };
   tagSync?: Record<
     Service,
     {

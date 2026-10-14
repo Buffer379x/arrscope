@@ -1,3 +1,5 @@
+import { WidgetsSettings } from "./WidgetsSettings";
+import { WebhookSettings } from "./WebhookSettings";
 import { ListLayoutSettings } from "./ListLayoutSettings";
 import { interfaceThemes, themeLabels } from "../themes";
 import { audioLanguageLabel } from "../languages";
@@ -323,6 +325,7 @@ export function SettingsDialog({
           {[
             ["connections", t("Services")],
             ["appearance", t("Display")],
+            ["widgets", t("Widgets")],
             ["custom", t("Custom tags")],
             ["recognition", t("Tag rules")],
             ["system", t("System")],
@@ -382,8 +385,8 @@ export function SettingsDialog({
                     ? "Services"
                     : section === "appearance"
                       ? "Display"
-                      : section === "colors"
-                        ? "Colors"
+                      : section === "widgets"
+                        ? "Widgets"
                         : "System",
                 )}
               </h2>
@@ -407,8 +410,8 @@ export function SettingsDialog({
                     ? "Configure connections, synchronization intervals and optional outbound tags."
                     : section === "appearance"
                       ? "Choose your interface language, library layout and default columns."
-                      : section === "colors"
-                        ? "Customize tag backgrounds, text colors and warning indicators."
+                      : section === "widgets"
+                        ? "Choose dashboard storage paths, shared groups and chart colors."
                         : "Check synchronization, manage backups and secure your account.",
                 )}
               </p>
@@ -420,7 +423,31 @@ export function SettingsDialog({
                 )}
               </div>
             )}
+            <div class="settings-section" hidden={section !== "widgets"}>
+              {section === "widgets" && (
+                <WidgetsSettings settings={cfg} changed={setCfg} demo={demo} />
+              )}
+            </div>
             <div class="settings-section" hidden={section !== "connections"}>
+              <section class="connection">
+                <label>
+                  {t("Sync timezone")}
+                  <input
+                    value={cfg.syncTimezone || ""}
+                    placeholder={
+                      Intl.DateTimeFormat().resolvedOptions().timeZone
+                    }
+                    onInput={(e) =>
+                      setCfg({ ...cfg, syncTimezone: e.currentTarget.value })
+                    }
+                  />
+                </label>
+                <small>
+                  {t(
+                    "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.",
+                  )}
+                </small>
+              </section>
               {(["radarr", "sonarr", "emby"] as ConnectionService[]).map(
                 (service) => (
                   <section class="connection">
@@ -553,29 +580,51 @@ export function SettingsDialog({
                         </label>
                       )}
                       {service !== "emby" ? (
-                        <label>
-                          {t("Synchronize")}
-                          <select
-                            disabled={demo}
-                            value={cfg[service].interval}
-                            onChange={(e) =>
-                              update(service, {
-                                interval: Number(e.currentTarget.value),
-                              })
-                            }
-                          >
-                            {[
-                              [0, t("Manual only")],
-                              [15, t("Every 15 minutes")],
-                              [30, t("Every 30 minutes")],
-                              [60, t("Hourly")],
-                              [360, t("Every 6 hours")],
-                              [1440, t("Daily")],
-                            ].map(([value, label]) => (
-                              <option value={value}>{label}</option>
-                            ))}
-                          </select>
-                        </label>
+                        <div class="sync-clock-grid">
+                          <label>
+                            {t("Synchronize")}
+                            <select
+                              disabled={demo}
+                              value={cfg[service].interval}
+                              onChange={(e) =>
+                                update(service, {
+                                  interval: Number(e.currentTarget.value),
+                                })
+                              }
+                            >
+                              {[
+                                [0, t("Manual only")],
+                                [15, t("Every 15 minutes")],
+                                [30, t("Every 30 minutes")],
+                                [60, t("Hourly")],
+                                [360, t("Every 6 hours")],
+                                [1440, t("Daily")],
+                              ].map(([value, label]) => (
+                                <option value={value}>{label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            {t("Starting at")}
+                            <input
+                              type="time"
+                              disabled={demo || cfg[service].interval === 0}
+                              value={cfg[service].syncStart || ""}
+                              onInput={(e) => {
+                                update(service, {
+                                  syncStart: e.currentTarget.value,
+                                });
+                                if (!cfg.syncTimezone)
+                                  setCfg((current) => ({
+                                    ...current,
+                                    syncTimezone:
+                                      Intl.DateTimeFormat().resolvedOptions()
+                                        .timeZone,
+                                  }));
+                              }}
+                            />
+                          </label>
+                        </div>
                       ) : (
                         <p class="quiet">
                           {t(
@@ -636,6 +685,15 @@ export function SettingsDialog({
                             )}
                           </small>
                         </section>
+                      )}
+                      {service !== "emby" && (
+                        <WebhookSettings
+                          service={service}
+                          config={cfg[service]}
+                          changed={(patch) => update(service, patch)}
+                          savedEnabled={!!settings[service].webhookEnabled}
+                          demo={demo}
+                        />
                       )}
                       <div class="connection-test">
                         <button

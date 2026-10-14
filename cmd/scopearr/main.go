@@ -69,6 +69,7 @@ func main() {
 		log.Fatal(err)
 	}
 	server.Demo = settingEnv("SCOPEARR_DEMO") == "true"
+	server.StartBackground(ctx)
 	addr := settingEnv("SCOPEARR_LISTEN")
 	if addr == "" {
 		addr = ":8080"
@@ -87,6 +88,8 @@ func main() {
 	if err = httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
+	cancel()
+	server.WaitBackground()
 	server.Sync.Shutdown()
 }
 

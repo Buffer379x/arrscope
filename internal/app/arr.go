@@ -28,6 +28,11 @@ func NewArr(c ServiceConfig) *ArrClient {
 	}}}
 }
 func ValidateConfig(c ServiceConfig) error {
+	if c.SyncStart != "" {
+		if _, err := time.Parse("15:04", c.SyncStart); err != nil {
+			return errors.New("Invalid sync start time")
+		}
+	}
 	if _, err := parsePathMappings(c.PathMappings); err != nil {
 		return err
 	}
@@ -48,8 +53,8 @@ func ValidateConfig(c ServiceConfig) error {
 	return nil
 }
 func (c *ArrClient) get(ctx context.Context, path string, q url.Values, out any) error {
-	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "tag": true, "tag/detail": true}
-	if !allowed[path] && !positiveTagPath(path, "tag/detail/") && !positiveTagPath(path, "movie/") && !positiveTagPath(path, "series/") {
+	allowed := map[string]bool{"system/status": true, "movie": true, "moviefile": true, "series": true, "episode": true, "episodefile": true, "diskspace": true, "tag": true, "tag/detail": true}
+	if !allowed[path] && !positiveTagPath(path, "tag/detail/") && !positiveTagPath(path, "movie/") && !positiveTagPath(path, "series/") && !positiveTagPath(path, "moviefile/") && !positiveTagPath(path, "episodefile/") {
 		return errors.New("API endpoint is not allowed")
 	}
 	u, e := url.Parse(strings.TrimRight(c.Base, "/") + "/api/v3/" + path)
@@ -96,6 +101,9 @@ func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, 
 			}
 			if res.StatusCode == 401 || res.StatusCode == 403 {
 				return errors.New("API key was rejected")
+			}
+			if res.StatusCode == 404 {
+				return ErrArrNotFound
 			}
 			return fmt.Errorf("Service returned HTTP %d", res.StatusCode)
 		}

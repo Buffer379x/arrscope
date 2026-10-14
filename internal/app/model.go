@@ -21,6 +21,8 @@ type TagGroups struct {
 
 func (g TagGroups) Active() bool { return g != (TagGroups{}) }
 func dataConfig(c ServiceConfig) ServiceConfig {
+	c.SyncStart = ""
+	c.WebhookEnabled = false
 	c.TagSync = TagGroups{}
 	c.TagSyncMode = ""
 	c.TagSyncDisable = ""
@@ -28,6 +30,8 @@ func dataConfig(c ServiceConfig) ServiceConfig {
 }
 
 type ServiceConfig struct {
+	SyncStart      string    `json:"syncStart"`
+	WebhookEnabled bool      `json:"webhookEnabled"`
 	TagSyncMode    string    `json:"tagSyncMode,omitempty"`
 	TagSyncDisable string    `json:"tagSyncDisable,omitempty"`
 	TagSync        TagGroups `json:"tagSync"`
@@ -40,6 +44,8 @@ type ServiceConfig struct {
 	Interval       int       `json:"interval"`
 }
 type Settings struct {
+	SyncTimezone    string              `json:"syncTimezone"`
+	Widgets         WidgetSettings      `json:"widgets"`
 	ListInfoOrder   []string            `json:"listInfoOrder"`
 	ListInfoVisible []string            `json:"listInfoVisible"`
 	InterfaceTheme  string              `json:"interfaceTheme"`
@@ -138,7 +144,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60}, Sonarr: ServiceConfig{Interval: 60}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {

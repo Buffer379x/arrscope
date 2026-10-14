@@ -36,7 +36,7 @@ export function useLibraryQuery({
       const params = new URLSearchParams(filters[service]);
       params.set("service", service);
       params.set("page", String(page));
-      if (service === "radarr") {
+      if (service === "radarr" || movieSort.field === "info") {
         params.set("sort", movieSort.field);
         params.set("dir", movieSort.direction);
       }

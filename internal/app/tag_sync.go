@@ -269,8 +269,8 @@ func sameTagIDs(a, b []int) bool {
 
 // Approved removals use targeted API operations. Concurrent foreign additions
 // survive even in overwrite mode and are reviewed on a later reconciliation.
-func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConfig, unchanged func() bool) (int, bool, error) {
-	p, e := s.BuildTagPlan(ctx, service, c, nil)
+func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConfig, unchanged func() bool, target ...int) (int, bool, error) {
+	p, e := s.BuildTagPlan(ctx, service, c, nil, target...)
 	if e != nil {
 		return 0, false, e
 	}
@@ -524,8 +524,10 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 			}
 		}
 	}
-	if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_approvals WHERE service=? AND endpoint=?", service, endpoint); e != nil {
-		return len(changed), false, e
+	if len(target) == 0 {
+		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_approvals WHERE service=? AND endpoint=?", service, endpoint); e != nil {
+			return len(changed), false, e
+		}
 	}
 	if !c.TagSync.Active() {
 		if _, e = finish.ExecContext(ctx, "DELETE FROM tag_sync_managed WHERE service=? AND endpoint=?", service, endpoint); e != nil {

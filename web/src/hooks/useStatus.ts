@@ -82,10 +82,12 @@ export function useStatus() {
     schedule.current = () => {
       clearTimeout(timer.current);
       if (!mounted.current || document.hidden) return;
-      const active = [
-        ...Object.values(current.current?.sync || {}),
-        ...Object.values(current.current?.tagSync || {}),
-      ].some((s) => s.running);
+      const active =
+        current.current?.webhooksEnabled ||
+        [
+          ...Object.values(current.current?.sync || {}),
+          ...Object.values(current.current?.tagSync || {}),
+        ].some((s) => s.running);
       timer.current = setTimeout(
         poll,
         active ? 3000 : current.current?.authenticated ? 30000 : 60000,

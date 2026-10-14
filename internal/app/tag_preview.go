@@ -202,7 +202,7 @@ func (s *Store) plannedPolicies(ctx context.Context, service string, c ServiceCo
 }
 
 // BuildTagPlan is read-only. Execution and preview consume exactly these operations.
-func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfig, old *ServiceConfig) (*tagPlan, error) {
+func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfig, old *ServiceConfig, target ...int) (*tagPlan, error) {
 	if !serviceOK(service) {
 		return nil, errors.New("Invalid service")
 	}
@@ -291,7 +291,19 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 	if service == "radarr" {
 		q.Set("excludeLocalCovers", "true")
 	}
-	if e = client.get(ctx, catalog, q, &media); e != nil {
+	if len(target) > 0 {
+		var one taggedMedia
+		e = client.get(ctx, catalog+"/"+fmt.Sprint(target[0]), nil, &one)
+		if errors.Is(e, ErrArrNotFound) {
+			media = []taggedMedia{}
+		} else if e != nil {
+			return nil, e
+		} else if one.ID != target[0] {
+			return nil, errors.New("Invalid targeted tag response")
+		} else {
+			media = []taggedMedia{one}
+		}
+	} else if e = client.get(ctx, catalog, q, &media); e != nil {
 		return nil, e
 	}
 	sort.Slice(media, func(i, j int) bool { return media[i].ID < media[j].ID })

@@ -71,6 +71,7 @@ import { Modal } from "./Modal";
 import { SettingsDialog } from "./SettingsDialog";
 import { StatisticsPage } from "./StatisticsPage";
 const movieSortFields = [
+  "info",
   "title",
   "year",
   "resolution",
@@ -237,7 +238,7 @@ export function Library({
   useFacets(
     view === "library" && !settingsOpen,
     service,
-    `${sync?.lastSuccess}:${status.recognitionRevision}:${customRevision}`,
+    `${sync?.lastSuccess}:${status.cacheRevision}:${status.recognitionRevision}:${customRevision}:${settings?.listInfoVisible.join(",")}`,
     setFacets,
     setError,
   );
@@ -247,7 +248,7 @@ export function Library({
     filters,
     page,
     movieSort,
-    lastSuccess: `${sync?.lastSuccess}:${status.recognitionRevision}:${customRevision}`,
+    lastSuccess: `${sync?.lastSuccess}:${status.cacheRevision}:${status.recognitionRevision}:${customRevision}:${settings?.listInfoVisible.join(",")}`,
     seasonMode: settings?.seasonMode,
     setResults,
     setBusy,
@@ -360,7 +361,7 @@ export function Library({
   const exportQuery = new URLSearchParams(filters[service]);
   exportQuery.set("service", service);
   exportQuery.set("lang", getLocale());
-  if (service === "radarr") {
+  if (service === "radarr" || movieSort.field === "info") {
     exportQuery.set("sort", movieSort.field);
     exportQuery.set("dir", movieSort.direction);
   }
@@ -409,7 +410,7 @@ export function Library({
         scope="col"
         class={titleCell ? "title-cell" : undefined}
         aria-sort={
-          service === "radarr" && field !== "info"
+          service === "radarr" || field === "info"
             ? current
               ? movieSort.direction === "asc"
                 ? "ascending"
@@ -418,7 +419,7 @@ export function Library({
             : undefined
         }
       >
-        {service === "radarr" && field !== "info" ? (
+        {service === "radarr" || field === "info" ? (
           <button
             class={"column-sort" + (current ? " current" : "")}
             onClick={() => sortColumn(field)}
@@ -586,6 +587,7 @@ export function Library({
                 ) : view === "statistics" ? (
                   <StatisticsPage
                     status={status}
+                    settings={settings}
                     onFilter={openDashboardFilter}
                   />
                 ) : (
@@ -658,20 +660,6 @@ export function Library({
                             <span>{count(results.total)}</span>
                             {busy && <LoaderCircle size={16} class="spin" />}
                           </h2>
-                          <p>
-                            {active.length
-                              ? t("Files matching your filters")
-                              : t("Your complete library")}
-                            {results.displayTotal > results.total &&
-                              t(
-                                " · {count} additional files as season context",
-                                {
-                                  count: count(
-                                    results.displayTotal - results.total,
-                                  ),
-                                },
-                              )}
-                          </p>
                         </div>
                         <div class="results-tools">
                           <button
@@ -704,7 +692,8 @@ export function Library({
                             disabled={!results.total}
                             onClick={() => setCustomOpen(true)}
                           >
-                            {t("Custom tags")}
+                            <TagIcon size={15} />
+                            {t("Set tag")}
                           </button>
                           <a class="button" href={"/api/export?" + exportQuery}>
                             <Download size={15} />

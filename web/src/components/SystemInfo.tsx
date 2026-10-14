@@ -29,7 +29,21 @@ export function SystemInfo({
       <dl class="system-details">
         <div>
           <dt>{t("Version")}</dt>
-          <dd>{status.version}</dd>
+          <dd>
+            {status.version}
+            <p class="release-check-status" role="status">
+              {status.releaseCheck?.successAt
+                ? status.releaseCheck.updateAvailable
+                  ? t("New version {version} available", {
+                      version: status.releaseCheck.latest || "",
+                    })
+                  : t("Version is up to date")
+                : t("Checking for a new version …")}
+            </p>
+            {status.releaseCheck?.error && (
+              <small class="quiet">{t(status.releaseCheck.error)}</small>
+            )}
+          </dd>
         </div>
         <div>
           <dt>{t("Back up cache")}</dt>
@@ -77,6 +91,30 @@ export function SystemInfo({
                             date: date(sync?.lastSuccess),
                           })}
                 </p>
+                {status.nextSync?.[service] && (
+                  <small class="next-sync">
+                    {t("Next sync: {date}", {
+                      date: date(status.nextSync[service]),
+                    })}
+                  </small>
+                )}
+                {settings[service].webhookEnabled && (
+                  <div class="webhook-status">
+                    <b>{t("Realtime updates")}</b>
+                    <p class="quiet">
+                      {status.webhook?.[service]?.error
+                        ? t(status.webhook[service].error)
+                        : t("Last webhook update: {date}", {
+                            date: date(status.webhook?.[service]?.lastSuccess),
+                          })}
+                    </p>
+                    <small>
+                      {t("{count} pending", {
+                        count: status.webhook?.[service]?.pending || 0,
+                      })}
+                    </small>
+                  </div>
+                )}
                 <small>
                   {count(sync?.count || 0)} {t("files in cache")}
                 </small>

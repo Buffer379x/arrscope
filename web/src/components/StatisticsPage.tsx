@@ -1,3 +1,4 @@
+import { StorageWidget } from "./StorageWidget";
 import { getLocale, t, useI18n } from "../i18n";
 import {
   BarChart3,
@@ -9,7 +10,7 @@ import {
   Tv,
 } from "lucide-preact";
 import { useContext, useEffect, useState } from "preact/hooks";
-import type { Statistics, Status } from "../types";
+import type { Statistics, Status, Settings } from "../types";
 
 import { LanguageFlag } from "./LanguageFlag";
 import { audioLanguageLabel } from "../languages";
@@ -27,9 +28,11 @@ const chartPalette = [
 ];
 export function StatisticsPage({
   status,
+  settings,
   onFilter,
 }: {
   status: Status;
+  settings: Settings | null;
   onFilter: (field: string, value: string, scope: string) => void;
 }) {
   useI18n();
@@ -56,6 +59,7 @@ export function StatisticsPage({
     status.sync?.radarr.lastSuccess,
     status.sync?.sonarr.lastSuccess,
     status.recognitionRevision,
+    status.cacheRevision,
     retry,
   ]);
   return (
@@ -140,6 +144,7 @@ export function StatisticsPage({
                   ["missing_size", t("Size missing")],
                   ["no_tracks", t("Audio tracks missing")],
                   ["unconfigured", t("Without Emby enrichment")],
+                  ["pending", t("Awaiting Emby enrichment")],
                 ]
                   .sort(
                     (a, b) => (data.emby[b[0]] || 0) - (data.emby[a[0]] || 0),
@@ -186,11 +191,14 @@ export function StatisticsPage({
               />
             ))}
           </div>
-          <LanguageDistribution
-            buckets={data.distributions[scope]?.language || []}
-            total={data.languageTotals[scope] || 0}
-            onFilter={(value) => onFilter("language", value, scope)}
-          />
+          <div class="dashboard-detail-grid">
+            <LanguageDistribution
+              buckets={data.distributions[scope]?.language || []}
+              total={data.languageTotals[scope] || 0}
+              onFilter={(value) => onFilter("language", value, scope)}
+            />
+            {settings && <StorageWidget settings={settings} scope={scope} />}
+          </div>
         </>
       )}
     </section>

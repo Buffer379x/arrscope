@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp } from "lucide-preact";
+import { confirmReset } from "../confirmation";
+import { ArrowDown, ArrowUp, RotateCcw } from "lucide-preact";
 import type { Settings } from "../types";
 import { t, useI18n } from "../i18n";
 const labels: Record<string, string> = {
@@ -80,6 +81,22 @@ export function ListLayoutSettings({
           </div>
         ))}
       </div>
+      <button
+        type="button"
+        class="icon-button"
+        aria-label={t("Restore defaults")}
+        title={t("Restore defaults")}
+        onClick={async () => {
+          if (await confirmReset(t("Restore defaults?")))
+            changed({
+              ...settings,
+              listInfoOrder: ["link", "details", "metadata", "recognition"],
+              listInfoVisible: ["link", "details", "metadata", "recognition"],
+            });
+        }}
+      >
+        <RotateCcw size={16} />
+      </button>
     </section>
   );
 }
