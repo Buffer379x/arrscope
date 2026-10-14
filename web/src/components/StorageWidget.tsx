@@ -1,13 +1,13 @@
 import { useEffect, useState } from "preact/hooks";
-import { HardDrive } from "lucide-preact";
 import type { Settings, StorageData } from "../types";
 import { t, useI18n, getLocale } from "../i18n";
 import { api } from "../api";
 export function storageBytes(n: number) {
+  const divisor = n >= 1e12 ? 1e12 : 1e9;
   return (
     new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 }).format(
-      n / 1024 ** 4,
-    ) + " TiB"
+      n / divisor,
+    ) + (divisor === 1e12 ? " TB" : " GB")
   );
 }
 export function StorageWidget({
@@ -19,6 +19,7 @@ export function StorageWidget({
 }) {
   useI18n();
   const [data, setData] = useState<StorageData | null>(null);
+  const [selected, setSelected] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
   useEffect(() => {
     let current = true;
@@ -42,18 +43,36 @@ export function StorageWidget({
       abort.abort();
     };
   }, [JSON.stringify(settings.widgets.storage)]);
-  const total = data?.totals[scope];
+  const areas = data?.areas[scope] || [];
+  const total = areas.find((a) => a.key === selected[scope]) || areas[0];
   const used = total?.total ? (total.used / total.total) * 100 : 0;
   return (
     <article class="distribution-card storage-widget">
       <div class="distribution-title">
-        <h3>{t("Storage distribution")}</h3>
-        <HardDrive size={18} />
+        <h3>{t("Storage")}</h3>
       </div>
+      {!!areas.length && (
+        <label class="storage-area-select">
+          <select
+            aria-label={t("Storage area")}
+            value={total?.key}
+            onChange={(e) =>
+              setSelected({ ...selected, [scope]: e.currentTarget.value })
+            }
+          >
+            {areas.map((area) => (
+              <option key={area.key} value={area.key}>
+                {area.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {total && total.total > 0 ? (
         <>
           <div
             class="storage-chart"
+            title={total.paths.join(" · ")}
             role="img"
             aria-label={t("{used} used · {free} free", {
               used: storageBytes(total.used),
@@ -91,6 +110,13 @@ export function StorageWidget({
             error
               ? "Storage readings are stale or unavailable"
               : "Select storage paths in Settings → Widgets.",
+          )}
+        </p>
+      )}
+      {total && (
+        <p class="quiet storage-capacity-note">
+          {t(
+            "Filesystem capacity, including other data. Overlapping areas are not added.",
           )}
         </p>
       )}

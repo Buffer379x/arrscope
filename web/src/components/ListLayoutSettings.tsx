@@ -83,7 +83,7 @@ export function ListLayoutSettings({
       </div>
       <button
         type="button"
-        class="icon-button"
+        class="icon-button list-layout-reset"
         aria-label={t("Restore defaults")}
         title={t("Restore defaults")}
         onClick={async () => {

@@ -279,3 +279,82 @@
     grid-template-columns: 1fr;
   }
 }
+/* Dashboard cards expand independently; the bottom row mirrors the three trait cards. */
+.dashboard-detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+.distribution-grid {
+  align-items: start;
+}
+.storage-widget {
+  min-height: 410px;
+  display: flex;
+  flex-direction: column;
+}
+.storage-chart {
+  width: min(100%, 260px);
+  height: auto;
+  aspect-ratio: 1;
+  margin: 8px auto 20px;
+  flex: none;
+}
+.storage-chart > div {
+  width: 71%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.storage-legend {
+  margin: 0;
+}
+.connection .list-layout-reset {
+  align-self: flex-start;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex: none;
+}
+.connection-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.connection-heading h3 {
+  flex: 1;
+  min-width: 0;
+}
+.connection-heading-test {
+  flex: none;
+}
+.connection-heading-test button {
+  width: auto;
+  white-space: nowrap;
+}
+.password-reveal-field {
+  position: relative;
+  display: block;
+}
+.password-reveal-field input {
+  padding-right: 46px;
+}
+.password-reveal-field .password-reveal {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+@media (max-width: 900px) {
+  .dashboard-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.storage-area-select { display:block; margin:16px 0 4px; }
+.storage-area-select select { width:100%; }
+.storage-capacity-note { margin:16px 0 0; font-size:11px; }

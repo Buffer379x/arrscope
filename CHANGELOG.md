@@ -2,6 +2,10 @@
 
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
+## 0.7.1
+
+Individual storage-area charts without summing overlapping shares, independent dashboard cards, Audio codec distribution, compact widget headings and reset controls, service-heading connection tests and a revealable webhook password. See [release notes](docs/releases/0.7.1.md).
+
 ## 0.7.0
 
 Clock-anchored sync schedules, authenticated targeted webhooks, selected/shared storage capacity widgets, automatic release notices, sortable Info icon counts and library layout refinements. See [release notes](docs/releases/0.7.0.md).

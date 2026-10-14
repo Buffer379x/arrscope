@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -30,12 +31,16 @@ type StorageSnapshot struct {
 	Error     string      `json:"error"`
 	Source    string      `json:"-"`
 }
-type StorageTotal struct {
-	Total int64  `json:"total"`
-	Free  int64  `json:"free"`
-	Used  int64  `json:"used"`
-	Error string `json:"error"`
-	Count int    `json:"count"`
+
+// A storage area is one complete filesystem reading, never a sum of shares.
+type StorageArea struct {
+	Key   string   `json:"key"`
+	Label string   `json:"label"`
+	Paths []string `json:"paths"`
+	Total int64    `json:"total"`
+	Free  int64    `json:"free"`
+	Used  int64    `json:"used"`
+	Error string   `json:"error"`
 }
 
 func defaultWidgets() WidgetSettings {
@@ -81,13 +86,14 @@ func normalize070(cfg *Settings) error {
 	}
 	return nil
 }
-func storageTotals(cfg Settings, snap map[string]StorageSnapshot, scope string) StorageTotal {
-	result := StorageTotal{}
+func storageAreas(cfg Settings, snap map[string]StorageSnapshot, scope string) []StorageArea {
 	type sample struct {
-		disk DiskSpace
-		at   time.Time
+		area         StorageArea
+		at           time.Time
+		valid        bool
+		inconsistent bool
 	}
-	groups := map[string]sample{}
+	groups := map[string]*sample{}
 	for _, service := range []string{"radarr", "sonarr"} {
 		if scope != "all" && scope != service {
 			continue
@@ -100,62 +106,64 @@ func storageTotals(cfg Settings, snap map[string]StorageSnapshot, scope string) 
 			continue
 		}
 		s := snap[service]
-		if len(cfg.Widgets.Storage[service]) == 0 {
-			continue
-		}
-		if s.Error != "" {
-			result.Error = "Storage readings are stale or unavailable"
-		}
-		if s.Source != tagEndpoint(c) || s.SuccessAt == nil {
-			result.Error = "Storage readings are stale or unavailable"
-			continue
-		}
 		index := map[string]DiskSpace{}
 		for _, d := range s.Disks {
 			index[d.Path] = d
 		}
 		for _, selection := range cfg.Widgets.Storage[service] {
-			d, ok := index[selection.Path]
-			if !ok {
-				result.Error = "A selected storage path is unavailable"
+			key, label := service+":"+selection.Path, service+" · "+selection.Path
+			if selection.SharedGroup != "" {
+				key, label = "shared:"+selection.SharedGroup, selection.SharedGroup
+			}
+			v := groups[key]
+			if v == nil {
+				v = &sample{area: StorageArea{Key: key, Label: label, Paths: []string{}}}
+				groups[key] = v
+			}
+			v.area.Paths = append(v.area.Paths, service+" · "+selection.Path)
+			if s.Error != "" {
+				v.area.Error = "Storage readings are stale or unavailable"
+			}
+			if s.Source != tagEndpoint(c) || s.SuccessAt == nil {
+				v.area.Error = "Storage readings are stale or unavailable"
 				continue
 			}
-			key := service + ":" + d.Path
-			if selection.SharedGroup != "" {
-				key = "shared:" + selection.SharedGroup
+			d, ok := index[selection.Path]
+			if !ok {
+				v.area.Error = "A selected storage path is unavailable"
+				continue
 			}
-			v, exists := groups[key]
-			if exists && v.disk.Total != d.Total {
-				result.Error = "Shared storage readings have different total capacities"
-				return result
+			if d.Total < 0 || d.Free < 0 || d.Free > d.Total {
+				v.area.Error = "Invalid storage capacity"
+				continue
 			}
-			if !exists || s.SuccessAt.After(v.at) {
-				groups[key] = sample{d, *s.SuccessAt}
+			if v.valid && v.area.Total != d.Total {
+				v.inconsistent = true
+			}
+			if !v.valid || s.SuccessAt.After(v.at) {
+				v.area.Total, v.area.Free, v.area.Used = d.Total, d.Free, d.Total-d.Free
+				v.at, v.valid = *s.SuccessAt, true
 			}
 		}
 	}
-	for _, s := range groups {
-		d := s.disk
-		if d.Total < 0 || d.Free < 0 || d.Free > d.Total {
-			return StorageTotal{Error: "Invalid storage capacity"}
+	result := []StorageArea{}
+	for _, v := range groups {
+		if v.inconsistent {
+			v.area.Total, v.area.Free, v.area.Used = 0, 0, 0
+			v.area.Error = "Shared storage readings have different total capacities"
 		}
-		if d.Total > 9223372036854775807-result.Total {
-			return StorageTotal{Error: "Storage capacity exceeds limits"}
-		}
-		result.Total += d.Total
-		result.Free += d.Free
-		result.Count++
+		result = append(result, v.area)
 	}
-	result.Used = result.Total - result.Free
+	sort.Slice(result, func(i, j int) bool { return result[i].Label < result[j].Label })
 	return result
 }
 func (s *Server) storageHTTP(w http.ResponseWriter, r *http.Request) {
-	snap := s.Background.Storage()
-	totals := map[string]StorageTotal{}
+	snap, cfg := s.Background.Storage(), s.Config()
+	areas := map[string][]StorageArea{}
 	for _, scope := range []string{"all", "radarr", "sonarr"} {
-		totals[scope] = storageTotals(s.Config(), snap, scope)
+		areas[scope] = storageAreas(cfg, snap, scope)
 	}
-	jsonOut(w, 200, map[string]any{"services": snap, "totals": totals})
+	jsonOut(w, 200, map[string]any{"services": snap, "areas": areas})
 }
 func (s *Server) storageRefreshHTTP(w http.ResponseWriter, r *http.Request) {
 	var in struct {

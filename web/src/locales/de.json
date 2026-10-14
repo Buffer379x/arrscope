@@ -704,6 +704,12 @@
     "Next sync: {date}": "Nächster Sync: {date}",
     "Last webhook update: {date}": "Letztes Webhook-Update: {date}",
     "{count} pending": "{count} ausstehend",
-    "Awaiting Emby enrichment": "Emby-Abgleich ausstehend"
+    "Awaiting Emby enrichment": "Emby-Abgleich ausstehend",
+    "Storage": "Speicherplatz",
+    "Show password": "Passwort anzeigen",
+    "Hide password": "Passwort verbergen",
+    "Storage area": "Speicherbereich",
+    "Filesystem capacity, including other data. Overlapping areas are not added.": "Dateisystem-Kapazität inklusive anderer Daten. Überlappende Bereiche werden nicht addiert.",
+    "Use the same group name only for duplicate paths reporting the same filesystem capacity. Each selected area has its own chart; overlapping shares are not added.": "Nutze denselben Gruppennamen nur für doppelte Pfade mit derselben Dateisystem-Kapazität. Jeder ausgewählte Bereich hat ein eigenes Diagramm; überlappende Shares werden nicht addiert."
   }
 }

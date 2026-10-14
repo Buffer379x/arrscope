@@ -704,6 +704,12 @@
     "Next sync: {date}": "Next sync: {date}",
     "Last webhook update: {date}": "Last webhook update: {date}",
     "{count} pending": "{count} pending",
-    "Awaiting Emby enrichment": "Awaiting Emby enrichment"
+    "Awaiting Emby enrichment": "Awaiting Emby enrichment",
+    "Storage": "Storage",
+    "Show password": "Show password",
+    "Hide password": "Hide password",
+    "Storage area": "Storage area",
+    "Filesystem capacity, including other data. Overlapping areas are not added.": "Filesystem capacity, including other data. Overlapping areas are not added.",
+    "Use the same group name only for duplicate paths reporting the same filesystem capacity. Each selected area has its own chart; overlapping shares are not added.": "Use the same group name only for duplicate paths reporting the same filesystem capacity. Each selected area has its own chart; overlapping shares are not added."
   }
 }

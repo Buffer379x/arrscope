@@ -1037,6 +1037,7 @@ type StatisticBucket struct {
 	Count int    `json:"count"`
 }
 type Statistics struct {
+	FileTotals     map[string]int                          `json:"fileTotals"`
 	LanguageTotals map[string]int                          `json:"languageTotals"`
 	Movies         int                                     `json:"movies"`
 	Series         int                                     `json:"series"`
@@ -1119,6 +1120,9 @@ func (s *Store) statistics(ctx context.Context) (Statistics, error) {
 			}
 			out.Distributions[service][field] = buckets
 		}
+	}
+	if e = addAudioStatistics(ctx, tx, &out); e != nil {
+		return out, e
 	}
 	// Decode episode associations once, rather than once per language and scope.
 	// DISTINCT entity identities retain multi-episode and duplicate-file semantics.
