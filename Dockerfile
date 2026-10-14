@@ -29,5 +29,5 @@ ENV GOMEMLIMIT=64MiB GOMAXPROCS=2 SQLITE_TMPDIR=/data
 USER 99:100
 EXPOSE 8080
 VOLUME ["/data"]
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["scopearr", "healthcheck"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["wget", "-q", "--spider", "-T", "3", "-Y", "off", "http://127.0.0.1:8080/healthz"]
 ENTRYPOINT ["scopearr"]
