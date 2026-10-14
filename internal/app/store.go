@@ -789,8 +789,8 @@ func where(q url.Values) (string, []any, error) {
 	if state := q.Get("embyMatch"); state != "" && q.Get("mediaMatch") == "" {
 		switch state {
 		case "unmatched":
-			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks','pending')")
-		case "matched", "missing", "ambiguous", "missing_size", "no_tracks", "pending":
+			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks','pending','conflicting')")
+		case "matched", "missing", "ambiguous", "missing_size", "no_tracks", "pending", "conflicting":
 			w = append(w, "f.emby_match=?")
 			a = append(a, state)
 		case "unconfigured":
