@@ -506,3 +506,62 @@ func TestExternalIncompleteSnapshotCannotWriteOrEraseCache(t *testing.T) {
 		}
 	}
 }
+
+func TestExternalKeepLocalAfterDefinitionDeletionCompletesIntent(t *testing.T) {
+	ctx := context.Background()
+	s, f, c := importedFixture(t, "radarr")
+	if e := s.ImportTags(ctx, "radarr", c, func() bool { return true }); e != nil {
+		t.Fatal(e)
+	}
+	id := customID(t, s, "manual")
+	if _, e := s.ApplyCustom(ctx, url.Values{"service": {"radarr"}, "fileId": {"1"}}, map[string]bool{fmt.Sprint(id): true}); e != nil {
+		t.Fatal(e)
+	}
+	f.mu.Lock()
+	delete(f.tags, 1)
+	for mid, ids := range f.media {
+		next := []int{}
+		for _, tid := range ids {
+			if tid != 1 {
+				next = append(next, tid)
+			}
+		}
+		f.media[mid] = next
+	}
+	f.mu.Unlock()
+	if _, _, e := s.ReconcileTags(ctx, "radarr", c, func() bool { return true }); e != ErrExternalConflict {
+		t.Fatal(e)
+	}
+	if e := s.ResolveExternal(ctx, "radarr", c, 10, 1, true); e != nil {
+		t.Fatal(e)
+	}
+	if _, _, e := s.ReconcileTags(ctx, "radarr", c, func() bool { return true }); e != nil {
+		t.Fatal(e)
+	}
+	var pending int
+	if e := s.DB.QueryRow("SELECT count(*) FROM external_tag_pending").Scan(&pending); e != nil || pending != 0 {
+		t.Fatal("obsolete ID kept a pending edit", pending, e)
+	}
+	if !containsString(f.names(10), "manual") {
+		t.Fatal("local choice did not recreate assignment")
+	}
+	f.mu.Lock()
+	for tid, name := range f.tags {
+		if name == "manual" {
+			ids := []int{}
+			for _, v := range f.media[10] {
+				if v != tid {
+					ids = append(ids, v)
+				}
+			}
+			f.media[10] = ids
+		}
+	}
+	f.mu.Unlock()
+	if _, _, e := s.ReconcileTags(ctx, "radarr", c, func() bool { return true }); e != nil {
+		t.Fatal(e)
+	}
+	if customMatches(t, s, "radarr", id) != 0 || containsString(f.names(10), "manual") {
+		t.Fatal("stale intent undid a later external removal")
+	}
+}
