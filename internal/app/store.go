@@ -851,6 +851,13 @@ func (s *Store) Query(q url.Values, mode string, all bool) (Results, error) {
 }
 func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all bool) (Results, error) {
 	out := Results{Files: []File{}, Page: 1, PageSize: 100}
+	if value := q.Get("_pageSize"); value != "" {
+		size, err := strconv.Atoi(value)
+		if err != nil || size < 1 || size > 1000 {
+			return out, fmt.Errorf("Entries per page must be between 1 and 1000")
+		}
+		out.PageSize = size
+	}
 	filter, args, e := where(q)
 	if e != nil {
 		return out, e

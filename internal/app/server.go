@@ -832,6 +832,7 @@ func (s *Server) Handler() http.Handler {
 			}
 			q := r.URL.Query()
 			q.Set("_infoMask", strconv.Itoa(infoMask(s.Config())))
+			q.Set("_pageSize", strconv.Itoa(s.Config().PageSize))
 			out, e := s.Store.QueryContext(r.Context(), q, mode, false)
 			if e != nil {
 				failure(w, r, 400, e)
@@ -974,6 +975,7 @@ func safeCell(s string) string {
 func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	q.Set("_infoMask", strconv.Itoa(infoMask(s.Config())))
+	q.Set("_pageSize", strconv.Itoa(s.Config().PageSize))
 	filter, args, e := where(q)
 	if e != nil {
 		failure(w, r, 400, e)

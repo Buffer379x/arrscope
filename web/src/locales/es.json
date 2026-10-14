@@ -686,7 +686,7 @@
     "Storage readings are stale or unavailable": "Los datos de almacenamiento están obsoletos o no disponibles",
     "A selected storage path is unavailable": "Una ruta seleccionada no está disponible",
     "Shared storage readings have different total capacities": "El grupo compartido informa de capacidades totales distintas",
-    "Choose dashboard storage paths, shared groups and chart colors.": "Elige rutas, grupos compartidos y colores del panel.",
+    "Choose dashboard storage paths, shared groups and chart colors.": "Elige los widgets del panel, su orden, las rutas de almacenamiento y los colores de los gráficos.",
     "Sync timezone": "Zona horaria de sincronización",
     "Starting at": "A partir de",
     "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.": "Los horarios usan esta zona IANA. Vacío usa UTC; sin hora de inicio se mantiene el intervalo anterior.",
@@ -793,6 +793,15 @@
     "Jellyfin enrichment failed: ": "Error al añadir datos de Jellyfin: ",
     "Media servers sync at the Radarr/Sonarr interval": "Los servidores multimedia se sincronizan con el intervalo de Radarr/Sonarr",
     "Media servers do not support outbound tags": "Los servidores multimedia no admiten envío de etiquetas",
-    "Enable the selected media server and at least one library before matching": "Activa el servidor multimedia seleccionado y al menos una biblioteca antes de la asignación"
+    "Enable the selected media server and at least one library before matching": "Activa el servidor multimedia seleccionado y al menos una biblioteca antes de la asignación",
+    "Dashboard widgets": "Widgets del panel",
+    "Widget": "Widget",
+    "Order": "Orden",
+    "Pagination": "Paginación",
+    "Entries per page": "Entradas por página",
+    "Shared by movies and TV series. Default: 100. Allowed: 1–1000.": "Compartido por películas y series. Predeterminado: 100. Permitido: 1–1000.",
+    "Entries per page must be between 1 and 1000": "Las entradas por página deben estar entre 1 y 1000",
+    "Invalid dashboard widget selection": "Selección de widgets del panel no válida",
+    "No dashboard widgets selected.": "No se han seleccionado widgets del panel."
   }
 }

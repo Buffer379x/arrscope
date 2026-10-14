@@ -874,6 +874,31 @@ export function SettingsDialog({
                   )}
                 </small>
               </section>
+              <section class="connection">
+                <h3 class="card-title">{t("Pagination")}</h3>
+                <label>
+                  {t("Entries per page")}
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    step="1"
+                    required
+                    value={cfg.pageSize ?? 100}
+                    onInput={(e) =>
+                      setCfg({
+                        ...cfg,
+                        pageSize: Number(e.currentTarget.value),
+                      })
+                    }
+                  />
+                </label>
+                <small>
+                  {t(
+                    "Shared by movies and TV series. Default: 100. Allowed: 1–1000.",
+                  )}
+                </small>
+              </section>
               <ListLayoutSettings
                 settings={cfg}
                 changed={(next) => setCfg(next)}

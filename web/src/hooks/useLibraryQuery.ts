@@ -9,6 +9,7 @@ type QueryArgs = {
   movieSort: FilmSort;
   lastSuccess: string | null | undefined;
   seasonMode: string | undefined;
+  pageSize: number | undefined;
   setResults: (r: Results) => void;
   setBusy: (b: boolean) => void;
   setError: (s: string) => void;
@@ -21,6 +22,7 @@ export function useLibraryQuery({
   movieSort,
   lastSuccess,
   seasonMode,
+  pageSize,
   setResults,
   setBusy,
   setError,
@@ -71,6 +73,7 @@ export function useLibraryQuery({
     page,
     lastSuccess,
     seasonMode,
+    pageSize,
   ]);
 }
 export function useFacets(

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
-import { RefreshCw, RotateCcw } from "lucide-preact";
+import { ArrowUp, ArrowDown, RefreshCw, RotateCcw } from "lucide-preact";
 import type { Service, Settings, StorageData } from "../types";
 import { t, useI18n } from "../i18n";
 import { api } from "../api";
 import { confirmReset } from "../confirmation";
+import { dashboardOrder, dashboardLabels } from "../dashboard-widgets";
 import { storageBytes } from "./StorageWidget";
 export function WidgetsSettings({
   settings,
@@ -53,6 +54,109 @@ export function WidgetsSettings({
   }
   return (
     <>
+      <section class="connection">
+        <h3 class="card-title">{t("Dashboard widgets")}</h3>
+        <div class="table-wrap">
+          <table class="dashboard-settings-table">
+            <thead>
+              <tr>
+                <th>{t("Enabled")}</th>
+                <th>{t("Widget")}</th>
+                <th>{t("Order")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(settings.widgets.order ?? dashboardOrder).map((id, index) => (
+                <tr key={id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t(dashboardLabels[id])}
+                      checked={(
+                        settings.widgets.visible ?? dashboardOrder
+                      ).includes(id)}
+                      onChange={(e) =>
+                        changed({
+                          ...settings,
+                          widgets: {
+                            ...settings.widgets,
+                            visible: e.currentTarget.checked
+                              ? [
+                                  ...(settings.widgets.visible ??
+                                    dashboardOrder),
+                                  id,
+                                ]
+                              : (
+                                  settings.widgets.visible ?? dashboardOrder
+                                ).filter((key) => key !== id),
+                          },
+                        })
+                      }
+                    />
+                  </td>
+                  <td>{t(dashboardLabels[id])}</td>
+                  <td>
+                    <div class="column-move-tools">
+                      {([-1, 1] as const).map((direction) => (
+                        <button
+                          type="button"
+                          class="icon-button"
+                          aria-label={
+                            t(dashboardLabels[id]) +
+                            " · " +
+                            t(direction === -1 ? "Move up" : "Move down")
+                          }
+                          title={t(direction === -1 ? "Move up" : "Move down")}
+                          disabled={
+                            index + direction < 0 ||
+                            index + direction >= settings.widgets.order.length
+                          }
+                          onClick={() => {
+                            const order = [...settings.widgets.order];
+                            [order[index], order[index + direction]] = [
+                              order[index + direction],
+                              order[index],
+                            ];
+                            changed({
+                              ...settings,
+                              widgets: { ...settings.widgets, order },
+                            });
+                          }}
+                        >
+                          {direction === -1 ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          class="icon-button list-layout-reset"
+          title={t("Restore defaults")}
+          aria-label={t("Restore defaults")}
+          onClick={async () => {
+            if (await confirmReset(t("Restore defaults?")))
+              changed({
+                ...settings,
+                widgets: {
+                  ...settings.widgets,
+                  order: [...dashboardOrder],
+                  visible: [...dashboardOrder],
+                },
+              });
+          }}
+        >
+          <RotateCcw size={16} />
+        </button>
+      </section>
       <div class="storage-settings-grid">
         {(["radarr", "sonarr"] as Service[]).map((service) => {
           const snapshot = data?.services[service];

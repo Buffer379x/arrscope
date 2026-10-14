@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- Configure visibility and order of the six graphical dashboard widgets, with a restore-defaults control.
+- Configure a shared page size for Movies and TV series (default 100, range 1–1000).
+- Persist these settings and retain full CSV exports, bulk operations and season context.
+
 All project versions follow semantic versioning. Every release has an English entry under `docs/releases/`.
 
 ## 0.8.0

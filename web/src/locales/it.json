@@ -686,7 +686,7 @@
     "Storage readings are stale or unavailable": "I dati dello spazio sono obsoleti o non disponibili",
     "A selected storage path is unavailable": "Un percorso selezionato non è disponibile",
     "Shared storage readings have different total capacities": "Il gruppo condiviso indica capacità totali diverse",
-    "Choose dashboard storage paths, shared groups and chart colors.": "Scegli percorsi, gruppi condivisi e colori della dashboard.",
+    "Choose dashboard storage paths, shared groups and chart colors.": "Scegli i widget della dashboard, il loro ordine, i percorsi di archiviazione e i colori dei grafici.",
     "Sync timezone": "Fuso orario di sincronizzazione",
     "Starting at": "A partire dalle",
     "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.": "Gli orari usano questo fuso IANA. Vuoto usa UTC; senza ora iniziale resta il precedente intervallo.",
@@ -793,6 +793,15 @@
     "Jellyfin enrichment failed: ": "Arricchimento Jellyfin fallito: ",
     "Media servers sync at the Radarr/Sonarr interval": "I server multimediali si sincronizzano con l’intervallo di Radarr/Sonarr",
     "Media servers do not support outbound tags": "I server multimediali non supportano l’invio di tag",
-    "Enable the selected media server and at least one library before matching": "Abilita il server multimediale selezionato e almeno una libreria prima dell’associazione"
+    "Enable the selected media server and at least one library before matching": "Abilita il server multimediale selezionato e almeno una libreria prima dell’associazione",
+    "Dashboard widgets": "Widget della dashboard",
+    "Widget": "Widget",
+    "Order": "Ordine",
+    "Pagination": "Paginazione",
+    "Entries per page": "Elementi per pagina",
+    "Shared by movies and TV series. Default: 100. Allowed: 1–1000.": "Condiviso tra film e serie TV. Predefinito: 100. Consentito: 1–1000.",
+    "Entries per page must be between 1 and 1000": "Gli elementi per pagina devono essere tra 1 e 1000",
+    "Invalid dashboard widget selection": "Selezione dei widget della dashboard non valida",
+    "No dashboard widgets selected.": "Nessun widget della dashboard selezionato."
   }
 }

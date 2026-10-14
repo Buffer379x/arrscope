@@ -48,6 +48,7 @@ type ServiceConfig struct {
 	Interval          int       `json:"interval"`
 }
 type Settings struct {
+	PageSize        int                 `json:"pageSize"`
 	SyncTimezone    string              `json:"syncTimezone"`
 	Widgets         WidgetSettings      `json:"widgets"`
 	ListInfoOrder   []string            `json:"listInfoOrder"`
@@ -206,7 +207,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Sonarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{PageSize: 100, Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Sonarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
