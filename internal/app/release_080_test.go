@@ -218,6 +218,16 @@ func TestMediaCheckboxUnionAndExclusion(t *testing.T) {
 	if e != nil || !strings.Contains(key, "mediaMatched=false") {
 		t.Fatal(key, e)
 	}
+	legacy := url.Values{"service": {"sonarr"}, "embyMatch": {"unmatched"}}
+	legacyResult, legacyErr := s.Query(legacy, "matches", true)
+	if legacyErr != nil || legacyResult.Total != 4 {
+		t.Fatal("legacy unsuccessful preset omitted a new failure", legacyResult, legacyErr)
+	}
+	legacy.Set("embyMatch", "conflicting")
+	legacyResult, legacyErr = s.Query(legacy, "matches", true)
+	if legacyErr != nil || legacyResult.Total != 1 {
+		t.Fatal(legacyResult, legacyErr)
+	}
 	q.Set("mediaMatched", "bogus")
 	if _, e = s.Query(q, "matches", true); e == nil {
 		t.Fatal("invalid checkbox")
