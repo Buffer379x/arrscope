@@ -28,6 +28,7 @@ export type Connection = {
   interval: number;
 };
 export type Settings = {
+  pageSize: number;
   syncTimezone: string;
   widgets: WidgetSettings;
   listInfoOrder: string[];
@@ -135,6 +136,8 @@ export type SyncStatus = {
   count: number;
 };
 export type WidgetSettings = {
+  order: string[];
+  visible: string[];
   storage: Record<
     Service,
     { path: string; sharedGroup: string; name?: string }[]

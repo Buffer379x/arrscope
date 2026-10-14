@@ -249,10 +249,14 @@ export function Library({
     movieSort,
     lastSuccess: `${sync?.lastSuccess}:${status.cacheRevision}:${status.recognitionRevision}:${customRevision}:${settings?.listInfoVisible.join(",")}`,
     seasonMode: settings?.seasonMode,
+    pageSize: settings?.pageSize,
     setResults,
     setBusy,
     setError,
   });
+  useEffect(() => {
+    setPage(1);
+  }, [settings?.pageSize]);
   const openSettings = (section = "connections") => {
     if (!settingsOpen) libraryScroll.current = window.scrollY;
     setSettingsSection(section);
@@ -448,7 +452,7 @@ export function Library({
       </th>
     );
   };
-  const pages = Math.max(1, Math.ceil(results.displayTotal / 100));
+  const pages = Math.max(1, Math.ceil(results.displayTotal / results.pageSize));
   useEffect(() => {
     if (!busy && results.page === page && page > pages) setPage(pages);
   }, [busy, results.page, page, pages]);
@@ -984,9 +988,12 @@ export function Library({
                         <span>
                           {results.displayTotal
                             ? t("{from}–{to} of {total} files", {
-                                from: count((page - 1) * 100 + 1),
+                                from: count((page - 1) * results.pageSize + 1),
                                 to: count(
-                                  Math.min(page * 100, results.displayTotal),
+                                  Math.min(
+                                    page * results.pageSize,
+                                    results.displayTotal,
+                                  ),
                                 ),
                                 total: count(results.displayTotal),
                               })

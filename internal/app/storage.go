@@ -16,6 +16,8 @@ type StorageSelection struct {
 	SharedGroup string `json:"sharedGroup"`
 }
 type WidgetSettings struct {
+	Order   []string                      `json:"order"`
+	Visible []string                      `json:"visible"`
 	Storage map[string][]StorageSelection `json:"storage"`
 	Colors  map[string]string             `json:"colors"`
 }
@@ -45,9 +47,58 @@ type StorageArea struct {
 }
 
 func defaultWidgets() WidgetSettings {
-	return WidgetSettings{Storage: map[string][]StorageSelection{"radarr": {}, "sonarr": {}}, Colors: map[string]string{"used": "#729acb", "free": "#62b69d"}}
+	return WidgetSettings{Order: defaultDashboardOrder(), Visible: defaultDashboardOrder(), Storage: map[string][]StorageSelection{"radarr": {}, "sonarr": {}}, Colors: map[string]string{"used": "#729acb", "free": "#62b69d"}}
+}
+func defaultDashboardOrder() []string {
+	return []string{"resolution", "codec", "source", "audio", "language", "storage"}
+}
+func normalizeDashboard(cfg *Settings) error {
+	if cfg.PageSize == 0 {
+		cfg.PageSize = 100
+	}
+	if cfg.PageSize < 1 || cfg.PageSize > 1000 {
+		return errors.New("Entries per page must be between 1 and 1000")
+	}
+	defaults := defaultDashboardOrder()
+	if cfg.Widgets.Order == nil {
+		cfg.Widgets.Order = defaults
+	}
+	if cfg.Widgets.Visible == nil {
+		cfg.Widgets.Visible = defaultDashboardOrder()
+	}
+	valid := map[string]bool{}
+	for _, id := range defaults {
+		valid[id] = true
+	}
+	for _, list := range [][]string{cfg.Widgets.Order, cfg.Widgets.Visible} {
+		seen := map[string]bool{}
+		for _, id := range list {
+			if !valid[id] || seen[id] {
+				return errors.New("Invalid dashboard widget selection")
+			}
+			seen[id] = true
+		}
+	}
+	for _, id := range defaults {
+		found := false
+		for _, existing := range cfg.Widgets.Order {
+			if existing == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			cfg.Widgets.Order = append(cfg.Widgets.Order, id)
+			cfg.Widgets.Visible = append(cfg.Widgets.Visible, id)
+		}
+	}
+	return nil
 }
 func normalize070(cfg *Settings) error {
+	if err := normalizeDashboard(cfg); err != nil {
+		return err
+	}
+
 	if cfg.Emby.SyncStart != "" || cfg.Emby.WebhookEnabled {
 		return errors.New("Emby follows the Radarr/Sonarr schedule and has no webhook")
 	}

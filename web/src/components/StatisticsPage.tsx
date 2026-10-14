@@ -1,3 +1,4 @@
+import { dashboardOrder } from "../dashboard-widgets";
 import { StorageWidget } from "./StorageWidget";
 import { getLocale, t, useI18n } from "../i18n";
 import { BarChart3, Database, LoaderCircle } from "lucide-preact";
@@ -54,6 +55,35 @@ export function StatisticsPage({
     status.cacheRevision,
     retry,
   ]);
+  const order = settings?.widgets.order ?? dashboardOrder;
+  const visible = settings?.widgets.visible ?? dashboardOrder;
+  const widgets: Record<string, import("preact").ComponentChildren> = data
+    ? {
+        ...Object.fromEntries(
+          ["resolution", "codec", "source", "audio"].map((field) => [
+            field,
+            <DistributionChart
+              field={field}
+              buckets={data.distributions[scope]?.[field] || []}
+              totalOverride={
+                field === "audio" ? data.fileTotals[scope] || 0 : undefined
+              }
+              onFilter={(value) => onFilter(field, value, scope)}
+            />,
+          ]),
+        ),
+        language: (
+          <LanguageDistribution
+            buckets={data.distributions[scope]?.language || []}
+            total={data.languageTotals[scope] || 0}
+            onFilter={(value) => onFilter("language", value, scope)}
+          />
+        ),
+        storage: settings && (
+          <StorageWidget settings={settings} scope={scope} />
+        ),
+      }
+    : {};
   return (
     <section class="statistics-page" aria-label={t("Dashboard")}>
       <div class="statistics-heading">
@@ -170,29 +200,18 @@ export function StatisticsPage({
               ))}
             </div>
           </div>
-          <div class="distribution-grid">
-            {["resolution", "codec", "source"].map((field) => (
-              <DistributionChart
-                field={field}
-                onFilter={(value) => onFilter(field, value, scope)}
-                buckets={data.distributions[scope]?.[field] || []}
-              />
-            ))}
+          <div class="dashboard-widget-grid">
+            {order
+              .filter((id) => visible.includes(id))
+              .map((id) => (
+                <div key={id} class="dashboard-widget-slot">
+                  {widgets[id]}
+                </div>
+              ))}
           </div>
-          <div class="dashboard-detail-grid">
-            <DistributionChart
-              field="audio"
-              buckets={data.distributions[scope]?.audio || []}
-              totalOverride={data.fileTotals[scope] || 0}
-              onFilter={(value) => onFilter("audio", value, scope)}
-            />
-            <LanguageDistribution
-              buckets={data.distributions[scope]?.language || []}
-              total={data.languageTotals[scope] || 0}
-              onFilter={(value) => onFilter("language", value, scope)}
-            />
-            {settings && <StorageWidget settings={settings} scope={scope} />}
-          </div>
+          {!visible.length && (
+            <p class="quiet">{t("No dashboard widgets selected.")}</p>
+          )}
         </>
       )}
     </section>

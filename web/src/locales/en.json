@@ -686,7 +686,7 @@
     "Storage readings are stale or unavailable": "Storage readings are stale or unavailable",
     "A selected storage path is unavailable": "A selected storage path is unavailable",
     "Shared storage readings have different total capacities": "Shared storage readings have different total capacities",
-    "Choose dashboard storage paths, shared groups and chart colors.": "Choose dashboard storage paths, shared groups and chart colors.",
+    "Choose dashboard storage paths, shared groups and chart colors.": "Choose dashboard widgets, their order, storage paths and chart colors.",
     "Sync timezone": "Sync timezone",
     "Starting at": "Starting at",
     "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.": "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.",
@@ -793,6 +793,15 @@
     "Jellyfin enrichment failed: ": "Jellyfin enrichment failed: ",
     "Media servers sync at the Radarr/Sonarr interval": "Media servers sync at the Radarr/Sonarr interval",
     "Media servers do not support outbound tags": "Media servers do not support outbound tags",
-    "Enable the selected media server and at least one library before matching": "Enable the selected media server and at least one library before matching"
+    "Enable the selected media server and at least one library before matching": "Enable the selected media server and at least one library before matching",
+    "Dashboard widgets": "Dashboard widgets",
+    "Widget": "Widget",
+    "Order": "Order",
+    "Pagination": "Pagination",
+    "Entries per page": "Entries per page",
+    "Shared by movies and TV series. Default: 100. Allowed: 1–1000.": "Shared by movies and TV series. Default: 100. Allowed: 1–1000.",
+    "Entries per page must be between 1 and 1000": "Entries per page must be between 1 and 1000",
+    "Invalid dashboard widget selection": "Invalid dashboard widget selection",
+    "No dashboard widgets selected.": "No dashboard widgets selected."
   }
 }
