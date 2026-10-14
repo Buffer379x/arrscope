@@ -193,7 +193,7 @@ export function RecognitionPage({
         </button>
         <p class="quiet">
           {t(
-            "Rules only read filenames. API metadata fills remaining gaps; Emby audio tracks stay separate. No media scans are triggered.",
+            "Rules only read filenames. API metadata fills remaining gaps; Media server audio tracks stay separate. No media scans are triggered.",
           )}
         </p>
       </header>
@@ -444,7 +444,7 @@ export function RecognitionPage({
             {!rules.length && (
               <p class="quiet empty-rules">
                 {t(
-                  "No filename rules. Only API and Emby metadata will be used.",
+                  "No filename rules. Only API and media server metadata will be used.",
                 )}
               </p>
             )}
@@ -459,7 +459,7 @@ export function RecognitionPage({
             <h2>{t("Preview filename")}</h2>
             <p class="quiet">
               {t(
-                "Preview uses the current rule draft and the filename only. API and Emby enrichment is not included.",
+                "Preview uses the current rule draft and the filename only. API and media server enrichment is not included.",
               )}
             </p>
             <form

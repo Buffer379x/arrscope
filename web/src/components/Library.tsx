@@ -871,7 +871,20 @@ export function Library({
                               return (
                                 <>
                                   {group && (
-                                    <tr class="season-row">
+                                    <tr
+                                      class={
+                                        "season-row" +
+                                        (results.files.some(
+                                          (entry) =>
+                                            entry.mediaId === f.mediaId &&
+                                            entry.season === f.season &&
+                                            (entry.seasonOutlier ||
+                                              entry.languageOutlier),
+                                        )
+                                          ? " has-outlier"
+                                          : "")
+                                      }
+                                    >
                                       <td colSpan={displayColumns.length}>
                                         <Layers size={15} />
                                         <strong>
@@ -897,7 +910,27 @@ export function Library({
                                   >
                                     <tr
                                       key={f.service + f.id}
-                                      class={!f.matched ? "context-row" : ""}
+                                      title={[
+                                        f.seasonOutlier
+                                          ? t("Technical outliers")
+                                          : "",
+                                        f.languageOutlier
+                                          ? t("Language outliers")
+                                          : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                      class={[
+                                        !f.matched ? "context-row" : "",
+                                        f.seasonOutlier
+                                          ? "technical-outlier"
+                                          : "",
+                                        f.languageOutlier
+                                          ? "language-outlier"
+                                          : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
                                     >
                                       {displayColumns.map(
                                         (field) => cells[field],
@@ -1018,6 +1051,10 @@ export function Library({
               {filename && (
                 <TagInformation.Provider value={filename.informationOnly || {}}>
                   <FileDialog
+                    providers={["emby", "jellyfin"].filter(
+                      (provider) =>
+                        settings?.[provider as "emby" | "jellyfin"].enabled,
+                    )}
                     warningColors={
                       settings?.warningColors || defaultWarningColors
                     }

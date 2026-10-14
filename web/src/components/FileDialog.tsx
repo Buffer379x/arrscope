@@ -10,7 +10,9 @@ export function FileDialog({
   file,
   warningColors,
   close,
+  providers,
 }: {
+  providers: string[];
   file: MediaFile;
   warningColors: Record<string, string>;
   close: () => void;
@@ -28,7 +30,7 @@ export function FileDialog({
       </div>
       <p class="quiet">
         {t(
-          "Filename first. Uniquely matched Emby tracks provide more precise audio and language data. Conflicts are marked.",
+          "Filename first. Uniquely matched media server tracks provide more precise audio and language data. Conflicts are marked.",
         )}
       </p>
       {file.metadataIncomplete && (
@@ -39,6 +41,33 @@ export function FileDialog({
           )}
         </p>
       )}
+      {file.mediaServers &&
+        providers.some((provider) => file.mediaServers?.[provider]) && (
+          <section class="media-server-details">
+            <h4>{t("Media server matching")}</h4>
+            {providers
+              .filter((provider) => file.mediaServers?.[provider])
+              .map((provider) => (
+                <p>
+                  <b>{provider === "emby" ? "Emby" : "Jellyfin"}</b> ·{" "}
+                  {embyMatchLabels[file.mediaServers![provider].status] ||
+                    file.mediaServers![provider].status}
+                </p>
+              ))}
+          </section>
+        )}
+      {(file.seasonOutlier || file.languageOutlier) && (
+        <section class="season-outlier-details">
+          <h4>{t("Season outliers")}</h4>
+          {Object.entries(file.seasonReasons || {}).map(([key, value]) => (
+            <p>
+              {key === "codec" ? t("Codec family") : labels[key] || key}:{" "}
+              {t("Season majority")} ·{" "}
+              {key === "language" ? <LanguageFlags value={value} /> : value}
+            </p>
+          ))}
+        </section>
+      )}
       <section
         class="audio-information"
         aria-label={t("Audio track information")}
@@ -48,7 +77,7 @@ export function FileDialog({
           <>
             <p class="quiet">
               {t(
-                "Matched using existing Emby metadata. The file was uniquely identified by filename and size.",
+                "Matched using existing media server metadata. The file was uniquely identified by filename and size.",
               )}
             </p>
             <ul class="audio-track-list">
@@ -89,7 +118,7 @@ export function FileDialog({
                 </>
               )}
               {t(
-                "Language → codec mapping unavailable. Radarr and Sonarr do not provide per-track attributes. Connect Emby in settings to enrich them. Additional codecs may be missing from the metadata.",
+                "Language → codec mapping unavailable. Radarr and Sonarr do not provide per-track attributes. Connect a media server in settings to enrich them. Additional codecs may be missing from the metadata.",
               )}
             </p>
           </>
@@ -130,7 +159,7 @@ export function FileDialog({
           <span>{t("Attribute")}</span>
           <span>{t("Filename")}</span>
           <span>Radarr / Sonarr</span>
-          <span>Emby</span>
+          <span>{t("Media server")}</span>
           <span>{t("Used")}</span>
         </div>
         {Object.entries(file.evidence).map(([k, e]) => (
@@ -138,7 +167,9 @@ export function FileDialog({
             <b>{labels[k] || k}</b>
             <span data-label={t("Filename")}>{e.filename || "—"}</span>
             <span data-label="Radarr / Sonarr">{e.api || "—"}</span>
-            <span data-label="Emby">{e.emby || "—"}</span>
+            <span data-label={t("Media server")}>
+              {e.emby || "—"}
+            </span>
             <span data-label={t("Used")}>
               {e.origin === "rule"
                 ? t("Recognition rule")
@@ -147,10 +178,12 @@ export function FileDialog({
                   : e.origin === "api"
                     ? "API"
                     : e.origin === "emby"
-                      ? "Emby"
-                      : e.origin === "combined"
-                        ? t("Enriched")
-                        : t("Unknown")}
+                      ? t("Media server")
+                      : e.origin === "mediaServer"
+                        ? t("Media server")
+                        : e.origin === "combined"
+                          ? t("Enriched")
+                          : t("Unknown")}
               {e.conflict && (
                 <AlertTriangle
                   size={14}

@@ -15,9 +15,10 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Filename-first resolution, codec/encoder and source detection, supplemented by existing API metadata. Inspect provenance and conflicting values in each file’s details.
 - Combined resolution, codec family, source, processing, year, size, HDR, bit depth, audio codec, channels and audio language filters. Search titles and filenames; select unknown and incomplete metadata.
 - Include/exclude filters and “contains all” / “does not contain all” for audio, HDR and language. Saved presets and CSV use the same filter logic.
+- Indexed [technical and language season-outlier filters](docs/MEDIA-SERVERS.md) with strict majorities, explanations, highlights and CSV flags.
 - Grouped TV seasons, specials and multi-episode files. Show only matching files or complete matching seasons with highlighted matches.
 - Dashboard counts and distributions by resolution, codec, source, audio codecs and language. Click a tag to select its value in the existing library filters. Selections remain unsaved unless you explicitly save a preset.
-- Optional Emby enrichment reads already available audio tracks. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
+- Optional [Emby and Jellyfin enrichment](docs/MEDIA-SERVERS.md) reads already available audio tracks, with independently enabled connections and explicit conflicts. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
 - Persistent configurable columns and an Info action column with new-tab Radarr/Sonarr links, file details and warning icons. Saved icon visibility/order, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers and Info icon-count sorting in both libraries.
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - Optional clock-anchored synchronization and [authenticated realtime webhooks](docs/WEBHOOKS.md) for affected media, with durable retries and atomic scoped updates.
@@ -42,7 +43,7 @@ docker compose up -d
 
 Adapt the local path and UID/GID to your host. The public image is `ghcr.io/buffer379x/scopearr:stable`. Open port 8080, obtain the one-time setup code with `docker exec scopearr cat /data/setup-token`, and enter it with your new credentials directly in the web interface. Under Settings → Services, enter the service URLs and API keys, test, enable and save. The initial sync starts automatically.
 
-Connect exactly one instance per service. URL subpaths are supported, for example `http://radarr:7878/radarr`; do not append `/api/v3` or put credentials/query parameters in the URL. TLS certificates are verified and redirects are rejected. Sync intervals: manual only, 15, 30, 60 (default), 360 or 1440 minutes. Emby follows the corresponding Radarr/Sonarr sync.
+Connect exactly one instance per service. URL subpaths are supported, for example `http://radarr:7878/radarr`; do not append `/api/v3` or put credentials/query parameters in the URL. TLS certificates are verified and redirects are rejected. Sync intervals: manual only, 15, 30, 60 (default), 360 or 1440 minutes. Enabled media servers follow the corresponding Radarr/Sonarr sync.
 
 ## Filters and metadata
 
@@ -52,7 +53,7 @@ Audio, HDR and language also support **contains all** and **does not contain all
 
 Movie titles and years come from Radarr. Episode titles, seasons and first-air years come from Sonarr. One file containing multiple episodes appears once. A dashboard movie count refers to distinct movies, so it may differ from the movie file count. The default page size is 100; CSV exports every actual match, excluding extra season context.
 
-Emby uses exact basename plus identical positive byte size and requires a unique match on both sides. Optional path mappings add a full-path check. Matching respects MediaSources for multiple versions. External audio and subtitle streams are excluded. Missing or ambiguous identity is shown rather than guessed. Without Emby, multiple filename tokens can be recognized, but a reliable language-to-codec mapping is unavailable. The Channels column retains filename/Arr metadata; file details show each Emby track’s own channels.
+Emby and Jellyfin use exact basename plus identical positive byte size and requires a unique match on both sides. Optional path mappings add a full-path check. Matching respects MediaSources for multiple versions. External audio and subtitle streams are excluded. Missing or ambiguous identity is shown rather than guessed. Without a media server, multiple filename tokens can be recognized, but a reliable language-to-codec mapping is unavailable. The Channels column retains filename/Arr metadata; file details show each verified track’s own channels.
 
 Flags are representative language symbols, not claims about a file’s country or dialect. English uses the UK flag; an unrecognized language uses a neutral icon and its original label. Text-based filters retain original stored values across interface languages.
 
@@ -60,7 +61,7 @@ Flags are representative language symbols, not claims about a file’s country o
 
 Mount only `/data` on a local SSD/pool filesystem; SQLite WAL must not be placed on SMB/NFS. Back up the entire Appdata directory including `secret.key`. Database backups alone cannot restore encrypted keys without the matching local key. The last three consistent database snapshots are retained; migrations create a backup first. See [operations and rollback](docs/OPERATIONS.md).
 
-Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag` and tag usage details. Optional incoming checks also read `autotagging` for referenced rules. Optional outbound synchronization can create/delete affected tag definitions and add/remove movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby reads `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
+Scopearr reads allowlisted API-v3 endpoints using GET: `system/status`, `movie`, `moviefile`, `series`, `episode`, `episodefile` and, when tag synchronization is enabled, `tag` and tag usage details. Optional incoming checks also read `autotagging` for referenced rules. Optional outbound synchronization can create/delete affected tag definitions and add/remove movie/series tag assignments through the editor endpoints; see [tag synchronization](docs/TAG-SYNC.md). Emby and Jellyfin read `System/Info` and paginated `Items` using `X-Emby-Token`. No scan, playback, probe, download or rename requests are made. Independent tasks performed by those services remain outside Scopearr’s control.
 
 Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=true` for Secure session cookies. Arbitrary forwarded headers are not trusted; login limiting behind a proxy applies to the proxy address. A failed or inconsistent sync keeps the previous complete cache. Upstream requests cannot provide a single transactional snapshot across a changing remote library.
 
@@ -68,7 +69,7 @@ Designed for LAN/VPN use. If using an HTTPS reverse proxy, set `SCOPEARR_HTTPS=t
 
 Manage rules in **Settings → Tag rules**. Preview a draft before saving. Direct rules, missing-value fallbacks and explicit overrides run by priority; contradictory recognition and metadata disagreements have separate warning icons and colors. Saving reprocesses the existing cache atomically without scans or upstream requests. See [recognition guide](docs/RECOGNITION.md).
 
-The **Audio** column combines verified Emby language/codec pairs. Without track attribution, languages and codecs remain separate. Language flags and a full ISO 639-1/2/3 code registry are bundled locally; [language metadata](docs/LANGUAGES.md) uses readable names and known flag mappings, with neutral icons for unmapped languages. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
+The **Audio** column combines verified media-server language/codec pairs. Without track attribution, languages and codecs remain separate. Language flags and a full ISO 639-1/2/3 code registry are bundled locally; [language metadata](docs/LANGUAGES.md) uses readable names and known flag mappings, with neutral icons for unmapped languages. Language and audio-codec filters keep their original semantics. Dashboard language distribution counts each movie and episode once per language and supports clickable temporary filters.
 
 ## Development
 
@@ -114,6 +115,6 @@ Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=t
 
 ## Settings and dashboard
 
-Settings Save actions sit beside the section heading. Language, colors and display preferences remain drafts until saved; leaving a section warns about unsaved edits. Rule additions/deletions save after their individual confirmation; checkbox edits are batched until Save settings. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and Emby matching under Settings → System.
+Settings Save actions sit beside the section heading. Language, colors and display preferences remain drafts until saved; leaving a section warns about unsaved edits. Rule additions/deletions save after their individual confirmation; checkbox edits are batched until Save settings. Tests, backups and manual synchronization are separate explicit actions. Find manual synchronization and media-server matching under Settings → System.
 
 Dashboard distribution widgets show the top five entries. More/Less expands or collapses the remaining values without changing totals or percentages. Clicking an entry selects the existing library filters without saving a preset. Feedback appears as automatically dismissed bottom-right toasts. Opening Movies or TV series collapses the filters while retaining search and selected criteria.

@@ -50,7 +50,7 @@ func TestEmbyReadOnlyTracksAndVersions(t *testing.T) {
 	if f.EmbyMatch != "matched" || len(f.AudioTracks) != 2 || f.AudioTracks[0].Language != "Deutsch" || f.AudioTracks[0].Codec != "DTS" || f.AudioTracks[1].Language != "Englisch" || f.AudioTracks[1].Codec != "AC-3" {
 		t.Fatal(f)
 	}
-	if f.Audio != "AC-3 + DTS" || f.Language != "Deutsch, Englisch" || f.HDR != "Dolby Vision + HDR10" || f.Evidence["audio"].Origin != "emby" {
+	if f.Audio != "AC-3 + DTS" || f.Language != "Deutsch, Englisch" || f.HDR != "Dolby Vision + HDR10" || f.Evidence["audio"].Origin != "mediaServer" {
 		t.Fatal(f)
 	}
 	if files[1].EmbyMatch != "missing" || files[2].EmbyMatch != "missing" {

@@ -189,6 +189,8 @@ func (s *Store) preserveDeltaEmby(ctx context.Context, service string, files []F
 		}
 		if enabled && old.ID == f.ID && old.Filename == f.Filename && old.Size == f.Size {
 			f.EmbyMatch = old.EmbyMatch
+			f.MediaServers = old.MediaServers
+			f.MediaOrigin = old.MediaOrigin
 			f.AudioTracks = old.AudioTracks
 			e := f.Evidence["hdr"]
 			e.Emby = old.Evidence["hdr"].Emby

@@ -25,3 +25,7 @@ Services retain the existing intervals: manual, 15/30/60 minutes, 6 hours or dai
 Examples: Daily + 01:00 runs at 01:00; every six hours + 12:00 runs at 00:00, 06:00, 12:00 and 18:00. Hourly + 12:15 runs at 15 minutes past each hour. With no start time, the original elapsed-time schedule is retained. Manual only ignores the start time. Initial setup still synchronizes immediately. System shows the next clock slot.
 
 Scheduling checks run every 15 seconds. Jobs queue behind ongoing sync, rule-cache updates and outbound-tag work, so a busy server can delay execution. After downtime, the latest overdue slot triggers one sync; missed slots are not replayed individually. Nonexistent spring DST slots are skipped; repeated autumn slots run once. Webhook updates do not reset the full-sync clock.
+
+## Display names and shared identities
+
+Name labels a selected path in the widget; it does not identify a filesystem. Shared storage group is the deduplication key. Radarr `/downloads` and Sonarr `/downloads` can have different display names but the same group `nvme-downloads` so that the combined view offers one area. Movies and Shows on overlapping parts of an Unraid array should remain separate areas, not be grouped just because they belong to the same array.

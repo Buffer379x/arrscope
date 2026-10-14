@@ -16,23 +16,35 @@ import (
 type EmbyClient struct {
 	transport *ArrClient
 	mappings  []pathMapping
+	provider  string
 }
 
 func NewEmby(c ServiceConfig) *EmbyClient {
 	mappings, _ := parsePathMappings(c.PathMappings)
-	return &EmbyClient{transport: NewArr(c), mappings: mappings}
+	return &EmbyClient{transport: NewArr(c), mappings: mappings, provider: "emby"}
+}
+func NewJellyfin(c ServiceConfig) *EmbyClient {
+	client := NewEmby(c)
+	client.provider = "jellyfin"
+	return client
+}
+func (c *EmbyClient) label() string {
+	if c.provider == "jellyfin" {
+		return "Jellyfin"
+	}
+	return "Emby"
 }
 func (c *EmbyClient) get(ctx context.Context, endpoint string, q url.Values, out any) error {
 	if endpoint != "System/Info" && endpoint != "Items" {
-		return errors.New("Emby endpoint is not allowed")
+		return errors.New(strings.ReplaceAll("Emby endpoint is not allowed", "Emby", c.label()))
 	}
 	base := strings.TrimRight(c.transport.Base, "/")
-	if !strings.HasSuffix(strings.ToLower(base), "/emby") {
+	if c.provider != "jellyfin" && !strings.HasSuffix(strings.ToLower(base), "/emby") {
 		base += "/emby"
 	}
 	u, err := url.Parse(base + "/" + endpoint)
 	if err != nil {
-		return errors.New("Invalid Emby address")
+		return errors.New(strings.ReplaceAll("Invalid Emby address", "Emby", c.label()))
 	}
 	u.RawQuery = q.Encode()
 	return c.transport.readJSON(ctx, u, "X-Emby-Token", out)
@@ -44,19 +56,22 @@ func (c *EmbyClient) Test(ctx context.Context) (string, error) {
 }
 
 type embyStream struct {
-	Type                 string
-	Index                int
-	Codec                string
-	Profile              string
-	Language             string
-	DisplayLanguage      string
-	Channels             int
-	ChannelLayout        string
-	Title                string
-	IsDefault            bool
-	IsExternal           bool
-	ExtendedVideoType    string
-	ExtendedVideoSubType string
+	Type                      string
+	Index                     int
+	Codec                     string
+	Profile                   string
+	Language                  string
+	DisplayLanguage           string
+	Channels                  int
+	ChannelLayout             string
+	Title                     string
+	IsDefault                 bool
+	IsExternal                bool
+	ExtendedVideoType         string
+	ExtendedVideoSubType      string
+	VideoRangeType            string
+	DvBlSignalCompatibilityId *int
+	Hdr10PlusPresentFlag      bool
 }
 type embySource struct {
 	Id           string
@@ -86,6 +101,12 @@ func pathBasename(path string) string {
 func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) error {
 	defer func() {
 		for i := range files {
+			if value := files[i].MediaServers.get(c.provider); value != nil {
+				value.Status = files[i].EmbyMatch
+			} else {
+				files[i].setMediaMatch(c.provider, MediaMatch{Status: files[i].EmbyMatch})
+			}
+			resolveMediaServers(&files[i])
 			updateCompleteness(&files[i])
 		}
 	}()
@@ -95,6 +116,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	wanted := map[fileIdentity][]int{}
 	for i := range files {
 		files[i].EmbyMatch = "missing"
+
 		if files[i].Size <= 0 {
 			files[i].EmbyMatch = "missing_size"
 			continue
@@ -119,7 +141,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	start, expectedTotal := 0, -1
 	seenItems := map[string]bool{}
 	for {
-		q := url.Values{"Recursive": {"true"}, "IncludeItemTypes": {itemType}, "Fields": {"Path,MediaSources,MediaStreams"}, "EnableImages": {"false"}, "EnableUserData": {"false"}, "SortBy": {"SortName"}, "SortOrder": {"Ascending"}, "StartIndex": {strconv.Itoa(start)}, "Limit": {"250"}}
+		q := url.Values{"Recursive": {"true"}, "IncludeItemTypes": {itemType}, "Fields": {"Path,MediaSources,MediaStreams"}, "EnableTotalRecordCount": {"true"}, "EnableImages": {"false"}, "EnableUserData": {"false"}, "SortBy": {"SortName"}, "SortOrder": {"Ascending"}, "StartIndex": {strconv.Itoa(start)}, "Limit": {"250"}}
 		var page struct {
 			Items            []embyItem
 			TotalRecordCount *int
@@ -128,20 +150,20 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 			return err
 		}
 		if page.Items == nil || page.TotalRecordCount == nil || *page.TotalRecordCount < 0 {
-			return errors.New("Emby did not provide a complete page count")
+			return errors.New(strings.ReplaceAll("Emby did not provide a complete page count", "Emby", c.label()))
 		}
 		total := *page.TotalRecordCount
 		if expectedTotal < 0 {
 			expectedTotal = total
 		} else if total != expectedTotal {
-			return errors.New("Emby library changed during sync; sync again")
+			return errors.New(strings.ReplaceAll("Emby library changed during sync; sync again", "Emby", c.label()))
 		}
 		if len(page.Items) > 250 || start+len(page.Items) > total || (len(page.Items) == 0 && start < total) {
-			return errors.New("Incomplete Emby page")
+			return errors.New(strings.ReplaceAll("Incomplete Emby page", "Emby", c.label()))
 		}
 		for _, item := range page.Items {
 			if item.Id == "" || seenItems[item.Id] {
-				return errors.New("Emby pages contain missing or duplicate IDs")
+				return errors.New(strings.ReplaceAll("Emby pages contain missing or duplicate IDs", "Emby", c.label()))
 			}
 			seenItems[item.Id] = true
 			if item.Type != itemType {
@@ -212,7 +234,15 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		if !ok {
 			continue
 		}
-		applyEmbyMetadata(&files[indices[0]], candidate.metadata)
+		metadata := candidate.metadata
+		status := "matched"
+		if metadata.ambiguous {
+			status = "ambiguous"
+		} else if len(metadata.tracks) == 0 {
+			status = "no_tracks"
+		}
+		files[indices[0]].setMediaMatch(c.provider, MediaMatch{Status: status, Tracks: metadata.tracks, HDR: metadata.hdr})
+		files[indices[0]].EmbyMatch = status
 	}
 	return nil
 }
@@ -270,6 +300,28 @@ func parseEmbyMetadata(streams []embyStream) embyMetadata {
 			}
 		}
 		if strings.EqualFold(stream.Type, "Video") {
+			switch strings.ToLower(stream.VideoRangeType) {
+			case "hdr10":
+				hdr["HDR10"] = true
+			case "hdr10plus":
+				hdr["HDR10+"] = true
+			case "hlg":
+				hdr["HLG"] = true
+			case "dovi":
+				hdr["Dolby Vision"] = true
+			case "doviwithhdr10":
+				hdr["Dolby Vision"] = true
+				hdr["HDR10"] = true
+			case "doviwithhdr10plus":
+				hdr["Dolby Vision"] = true
+				hdr["HDR10+"] = true
+			case "doviwithhlg":
+				hdr["Dolby Vision"] = true
+				hdr["HLG"] = true
+			}
+			if stream.Hdr10PlusPresentFlag {
+				hdr["HDR10+"] = true
+			}
 			switch strings.ToLower(stream.ExtendedVideoType) {
 			case "hdr10":
 				hdr["HDR10"] = true

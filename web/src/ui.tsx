@@ -34,16 +34,17 @@ export const tableColumns = [
   ["channels", "Channels"],
   ["custom", "Custom"],
 ];
-export type ConnectionService = Service | "emby";
+export type ConnectionService = Service | "emby" | "jellyfin";
 export const embyMatchLabels: Record<string, string> = translatedLabels({
-  pending: "Awaiting Emby enrichment",
+  conflicting: "Conflicting media server metadata",
+  pending: "Awaiting media server matching",
   unmatched: "All unsuccessful matches",
   matched: "Matched",
-  unconfigured: "Without Emby enrichment",
-  missing: "No unique match in Emby",
+  unconfigured: "Without media server enrichment",
+  missing: "Not found in media server",
   missing_size: "File size missing for matching",
   ambiguous: "Ambiguous file or audio track match",
-  no_tracks: "Emby provides no audio track metadata",
+  no_tracks: "Media server provides no audio tracks",
 });
 export type FilterOperator = "eq" | "not" | "all" | "notAll";
 export const operatorLabels: Record<FilterOperator, string> = translatedLabels({

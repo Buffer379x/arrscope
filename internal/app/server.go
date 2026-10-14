@@ -44,7 +44,7 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 	e = store.Get("settings", &cfg)
 	if e == nil {
 		legacyInfo := cfg.ListInfoOrder == nil
-		encryptedKeys := [3]string{cfg.Radarr.APIKey, cfg.Sonarr.APIKey, cfg.Emby.APIKey}
+		encryptedKeys := [4]string{cfg.Radarr.APIKey, cfg.Sonarr.APIKey, cfg.Emby.APIKey, cfg.Jellyfin.APIKey}
 		cfg.Radarr.APIKey, e = sec.Open(cfg.Radarr.APIKey)
 		if e != nil {
 			return nil, e
@@ -54,6 +54,10 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 			return nil, e
 		}
 		cfg.Emby.APIKey, e = sec.Open(cfg.Emby.APIKey)
+		if e != nil {
+			return nil, e
+		}
+		cfg.Jellyfin.APIKey, e = sec.Open(cfg.Jellyfin.APIKey)
 		if e != nil {
 			return nil, e
 		}
@@ -83,6 +87,7 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 			}
 			persisted := cfg
 			persisted.Radarr.APIKey, persisted.Sonarr.APIKey, persisted.Emby.APIKey = encryptedKeys[0], encryptedKeys[1], encryptedKeys[2]
+			persisted.Jellyfin.APIKey = encryptedKeys[3]
 			if e := store.Put("settings", persisted); e != nil {
 				return nil, e
 			}
@@ -110,7 +115,7 @@ func (s *Server) scheduleDue() {
 			continue
 		}
 		if st.LastAttempt == nil || syncDue(time.Now(), st.LastAttempt, cfg, s.settings.SyncTimezone) {
-			s.Sync.Start(s.ctx, service, cfg, s.settings.Emby)
+			s.Sync.Start(s.ctx, service, cfg, s.settings.Emby, s.settings.Jellyfin)
 		}
 	}
 }
@@ -609,14 +614,14 @@ func (s *Server) Handler() http.Handler {
 						return
 					}
 				}
-				if s.Demo && (cfg.Radarr != old.Radarr || cfg.Sonarr != old.Sonarr || cfg.Emby != old.Emby) {
+				if s.Demo && (cfg.Radarr != old.Radarr || cfg.Sonarr != old.Sonarr || cfg.Emby != old.Emby || cfg.Jellyfin != old.Jellyfin) {
 					s.mu.Unlock()
 					failure(w, r, 403, errors.New("Demo connections cannot be changed"))
 					return
 				}
-				if cfg.Emby.Interval != 0 || cfg.Emby.TagSync.Active() || cfg.Emby.TagImport || cfg.Emby.TagImportInterval != 0 {
+				if invalidMediaConfig(cfg.Emby) || invalidMediaConfig(cfg.Jellyfin) {
 					s.mu.Unlock()
-					failure(w, r, 400, errors.New("Emby syncs at the Radarr/Sonarr interval"))
+					failure(w, r, 400, errors.New("Media servers sync at the Radarr/Sonarr interval"))
 					return
 				}
 
@@ -627,9 +632,9 @@ func (s *Server) Handler() http.Handler {
 						return
 					}
 				}
-				if cfg.Emby.TagSyncMode != "" || cfg.Emby.TagSyncDisable != "" {
+				if cfg.Emby.TagSyncMode != "" || cfg.Emby.TagSyncDisable != "" || cfg.Jellyfin.TagSyncMode != "" || cfg.Jellyfin.TagSyncDisable != "" {
 					s.mu.Unlock()
-					failure(w, r, 400, errors.New("Emby does not support outbound tags"))
+					failure(w, r, 400, errors.New("Media servers do not support outbound tags"))
 					return
 				}
 				stored := cfg
@@ -642,14 +647,14 @@ func (s *Server) Handler() http.Handler {
 					return
 				}
 				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
-					if dataConfig(pair[0]) != dataConfig(pair[1]) || old.Emby != cfg.Emby {
+					if dataConfig(pair[0]) != dataConfig(pair[1]) || (old.Emby != cfg.Emby || old.Jellyfin != cfg.Jellyfin) {
 						s.Sync.Invalidate(service)
 					}
 				}
 				s.settings = cfg
 				for service, pair := range map[string][2]ServiceConfig{"radarr": {old.Radarr, cfg.Radarr}, "sonarr": {old.Sonarr, cfg.Sonarr}} {
-					if pair[1].Enabled && (!pair[0].Enabled || pair[0].URL != pair[1].URL || pair[0].APIKey != pair[1].APIKey || old.Emby != cfg.Emby || pair[0].TagSync != pair[1].TagSync && pair[1].TagSync.Active()) {
-						s.Sync.Start(s.ctx, service, pair[1], cfg.Emby)
+					if pair[1].Enabled && (!pair[0].Enabled || pair[0].URL != pair[1].URL || pair[0].APIKey != pair[1].APIKey || (old.Emby != cfg.Emby || old.Jellyfin != cfg.Jellyfin) || pair[0].TagSync != pair[1].TagSync && pair[1].TagSync.Active()) {
+						s.Sync.Start(s.ctx, service, pair[1], cfg.Emby, cfg.Jellyfin)
 					}
 				}
 				s.mu.Unlock()
@@ -711,7 +716,7 @@ func (s *Server) Handler() http.Handler {
 				failure(w, r, 400, e)
 				return
 			}
-			if (!serviceOK(in.Service) && in.Service != "emby") || s.Demo {
+			if (!serviceOK(in.Service) && !mediaProviderOK(in.Service)) || s.Demo {
 				failure(w, r, 400, errors.New("Invalid service or demo mode"))
 				return
 			}
@@ -721,6 +726,9 @@ func (s *Server) Handler() http.Handler {
 			}
 			if in.Service == "emby" {
 				cfg = s.Config().Emby
+			}
+			if in.Service == "jellyfin" {
+				cfg = s.Config().Jellyfin
 			}
 			if in.APIKey != "" {
 				cfg.APIKey = in.APIKey
@@ -735,6 +743,8 @@ func (s *Server) Handler() http.Handler {
 			var e error
 			if in.Service == "emby" {
 				version, e = NewEmby(cfg).Test(r.Context())
+			} else if in.Service == "jellyfin" {
+				version, e = NewJellyfin(cfg).Test(r.Context())
 			} else {
 				version, e = NewArr(cfg).Test(r.Context())
 			}
@@ -759,13 +769,17 @@ func (s *Server) Handler() http.Handler {
 				failure(w, r, 400, errors.New("Demo data does not need syncing"))
 				return
 			}
-			if in.Service == "emby" {
+			if mediaProviderOK(in.Service) {
 				s.mu.Lock()
 				cfg := s.settings
 				statuses := s.Sync.Statuses()
-				if !cfg.Emby.Enabled || (!cfg.Radarr.Enabled && !cfg.Sonarr.Enabled) {
+				mediaConfig := cfg.Emby
+				if in.Service == "jellyfin" {
+					mediaConfig = cfg.Jellyfin
+				}
+				if !mediaConfig.Enabled || (!cfg.Radarr.Enabled && !cfg.Sonarr.Enabled) {
 					s.mu.Unlock()
-					failure(w, r, 409, errors.New("Enable Emby and at least one library before matching"))
+					failure(w, r, 409, errors.New("Enable the selected media server and at least one library before matching"))
 					return
 				}
 				for _, service := range []string{"radarr", "sonarr"} {
@@ -777,7 +791,7 @@ func (s *Server) Handler() http.Handler {
 				}
 				for service, connection := range map[string]ServiceConfig{"radarr": cfg.Radarr, "sonarr": cfg.Sonarr} {
 					if connection.Enabled {
-						if e := s.Sync.Start(s.ctx, service, connection, cfg.Emby); e != nil {
+						if e := s.Sync.Start(s.ctx, service, connection, cfg.Emby, cfg.Jellyfin); e != nil {
 							s.mu.Unlock()
 							failure(w, r, 409, e)
 							return
@@ -793,7 +807,7 @@ func (s *Server) Handler() http.Handler {
 			if in.Service == "sonarr" {
 				cfg = s.settings.Sonarr
 			}
-			e := s.Sync.Start(s.ctx, in.Service, cfg, s.settings.Emby)
+			e := s.Sync.Start(s.ctx, in.Service, cfg, s.settings.Emby, s.settings.Jellyfin)
 			s.mu.Unlock()
 			if e != nil {
 				failure(w, r, 409, e)
@@ -970,7 +984,7 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		failure(w, r, 400, e)
 		return
 	}
-	rows, e := s.Store.DB.QueryContext(r.Context(), "SELECT f.data,"+customJSON+" FROM files f WHERE "+filter+" ORDER BY "+order, args...)
+	rows, e := s.Store.DB.QueryContext(r.Context(), "SELECT "+fileDataSQL+","+customJSON+" FROM files f WHERE "+filter+" ORDER BY "+order, args...)
 	if e != nil {
 		failure(w, r, 400, e)
 		return
@@ -1003,7 +1017,7 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 	}
 	cw := csv.NewWriter(destination)
 	cw.Comma = ';'
-	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Bytes", "Metadata disagreement", "Recognition conflicts", "Emby matching", "Custom"}
+	headers := []string{"Title", "Series", "Season", "Years", "Filename", "Resolution", "Codec", "Codec family", "Source", "Processing", "HDR", "Bit depth", "Audio", "Channels", "Bytes", "Metadata disagreement", "Recognition conflicts", "Media server matching", "Technical outliers", "Language outliers", "Custom"}
 	if len(locale) > 0 {
 		for i, header := range headers {
 			headers[i] = localizedMessage(locale[0], header)
@@ -1037,7 +1051,7 @@ func (s *Server) writeCSV(ctx context.Context, destination io.Writer, rows *sql.
 		for _, y := range f.Years {
 			years = append(years, strconv.Itoa(y))
 		}
-		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, combinedAudioSummary(f, locale...), f.Channels, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), strconv.FormatBool(f.RuleConflict), f.EmbyMatch, strings.Join(names, " · ")}
+		record := []string{f.Title, f.Series, strconv.Itoa(f.Season), strings.Join(years, ", "), f.Filename, f.Resolution, f.Codec, f.Family, f.Source, f.Processing, f.HDR, f.BitDepth, combinedAudioSummary(f, locale...), f.Channels, strconv.FormatInt(f.Size, 10), strconv.FormatBool(f.Conflict), strconv.FormatBool(f.RuleConflict), f.EmbyMatch, strconv.FormatBool(f.SeasonOutlier), strconv.FormatBool(f.LanguageOutlier), strings.Join(names, " · ")}
 		for i, v := range record {
 			record[i] = safeCell(v)
 		}

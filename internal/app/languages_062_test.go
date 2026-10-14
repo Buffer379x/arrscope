@@ -52,7 +52,7 @@ func TestSchemaElevenNormalizesExistingAPIAndEmbyLanguages(t *testing.T) {
 	defer reopened.DB.Close()
 	var version int
 	reopened.DB.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 13 {
+	if version != 14 {
 		t.Fatal(version)
 	}
 	var one, two, raw string

@@ -59,7 +59,7 @@ func OpenStore(dir string) (*Store, error) {
 		return fail(err)
 	}
 	originalVersion := version
-	if version > 13 {
+	if version > 14 {
 		return fail(fmt.Errorf("Datenbankversion %d ist neuer als diese App; passende Sicherung wiederherstellen", version))
 	}
 	if version < 1 {
@@ -89,6 +89,11 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(err)
 		}
 		version = 1
+	}
+	if originalVersion < 13 {
+		if _, err = db.Exec(strings.TrimSuffix(seasonSchema, "PRAGMA user_version=14;")); err != nil {
+			return fail(err)
+		}
 	}
 	if version < 2 {
 		if originalVersion == 1 {
@@ -444,6 +449,27 @@ PRAGMA user_version=1;COMMIT;`)
 			return fail(err)
 		}
 	}
+	if originalVersion < 14 {
+		if originalVersion == 13 {
+			if err = s.Backup(); err != nil {
+				return fail(err)
+			}
+		}
+		tx, e := db.Begin()
+		if e != nil {
+			return fail(e)
+		}
+		if _, e = tx.Exec(seasonSchema); e == nil {
+			e = rebuildSeasonAnalysis(context.Background(), tx, nil)
+		}
+		if e != nil {
+			tx.Rollback()
+			return fail(e)
+		}
+		if e = tx.Commit(); e != nil {
+			return fail(e)
+		}
+	}
 	// A compact covering index avoids reading full evidence/audio JSON while
 	// counting and selecting IDs for compound filters and season membership.
 	if _, err = db.Exec(`CREATE INDEX IF NOT EXISTS files_traits ON files(service,resolution,codec,source,hdr,audio,language,media_id,season,processing,family,bitDepth,channels,size,conflict,rule_conflict,emby_match,title COLLATE NOCASE,id)`); err != nil {
@@ -599,6 +625,15 @@ func (s *Store) replace(service string, files []File, status SyncStatus, consume
 	if _, e = tx.Exec("DELETE FROM custom_overrides WHERE service=? AND NOT EXISTS(SELECT 1 FROM files f WHERE f.service=custom_overrides.service AND f.id=custom_overrides.file_id)", service); e != nil {
 		return e
 	}
+	if service == "sonarr" {
+		var affected *int
+		if scope != nil {
+			affected = &scope.MediaID
+		}
+		if e = rebuildSeasonAnalysis(context.Background(), tx, affected); e != nil {
+			return e
+		}
+	}
 	if scope == nil {
 		b, _ := json.Marshal(status)
 		if _, e = tx.Exec("INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", "sync:"+service, string(b)); e != nil {
@@ -751,7 +786,7 @@ func where(q url.Values) (string, []any, error) {
 		w = append(w, "f.rule_conflict=?")
 		a = append(a, c == "true")
 	}
-	if state := q.Get("embyMatch"); state != "" {
+	if state := q.Get("embyMatch"); state != "" && q.Get("mediaMatch") == "" {
 		switch state {
 		case "unmatched":
 			w = append(w, "f.emby_match IN ('missing','ambiguous','missing_size','no_tracks','pending')")
@@ -763,6 +798,12 @@ func where(q url.Values) (string, []any, error) {
 		default:
 			return "", nil, fmt.Errorf("Invalid Emby match filter")
 		}
+	}
+	if e := appendMediaFilters(q, &w, &a); e != nil {
+		return "", nil, e
+	}
+	if e := appendSeasonFilters(q, &w); e != nil {
+		return "", nil, e
 	}
 	if q.Get("yearMin") != "" || q.Get("yearMax") != "" {
 		ys := []string{"y.file_rowid=f.rowid"}
@@ -836,12 +877,12 @@ func (s *Store) QueryContext(ctx context.Context, q url.Values, mode string, all
 	if e != nil {
 		return out, e
 	}
-	query := "SELECT f.data,1," + customJSON + " FROM files f WHERE " + filter + " ORDER BY " + order
+	query := "SELECT " + fileDataSQL + ",1," + customJSON + " FROM files f WHERE " + filter + " ORDER BY " + order
 	qa := append([]any{}, args...)
 	if !all {
 		// Sort compact row IDs first, then load and evaluate only the current page.
 		// Carrying large evidence/track JSON through a 50k-row temp sort is avoidable.
-		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT f.data,1," + customJSON + " FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
+		query = "WITH page AS MATERIALIZED (SELECT f.rowid FROM files f WHERE " + filter + " ORDER BY " + order + " LIMIT ? OFFSET ?) SELECT " + fileDataSQL + ",1," + customJSON + " FROM page p JOIN files f ON f.rowid=p.rowid ORDER BY " + order
 		qa = append(qa, out.PageSize, (out.Page-1)*out.PageSize)
 	}
 
@@ -882,7 +923,7 @@ func querySeasonPage(ctx context.Context, tx *sql.Tx, q url.Values, filter strin
 groups AS MATERIALIZED (SELECT DISTINCT media_id,season FROM matched),
 counts AS MATERIALIZED (SELECT (SELECT count(*) FROM matched) AS total,(SELECT count(*) FROM files f INDEXED BY files_group WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups)) AS displayed),
 page AS MATERIALIZED (SELECT f.rowid FROM files f INDEXED BY files_series_sort WHERE f.service='sonarr' AND (f.media_id,f.season) IN (SELECT media_id,season FROM groups) ORDER BY ` + order + ` LIMIT ? OFFSET ?)
-SELECT f.data,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed,` + customJSON + `
+SELECT ` + fileDataSQL + `,coalesce(f.rowid IN (SELECT rowid FROM matched),0),counts.total,counts.displayed,` + customJSON + `
 FROM counts LEFT JOIN page p ON 1 LEFT JOIN files f ON f.rowid=p.rowid ORDER BY ` + order
 	params := append(append([]any{}, args...), out.PageSize, (out.Page-1)*out.PageSize)
 	rows, err := tx.QueryContext(ctx, query, params...)

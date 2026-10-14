@@ -53,7 +53,21 @@ export function canonicalPresetQuery(query: string): string {
       }
     }
   }
-  for (const key of ["conflict", "ruleConflict", "metadata", "embyMatch"]) {
+  for (const key of [
+    "conflict",
+    "ruleConflict",
+    "metadata",
+    "embyMatch",
+    "seasonOutlier",
+    "languageOutlier",
+    "mediaMatched",
+    "mediaMissing",
+    "mediaAmbiguous",
+    "mediaConflicting",
+    "mediaNoTracks",
+    "mediaPending",
+    "mediaUnconfigured",
+  ]) {
     const v = input.get(key);
     if (v) output.set(key, v);
   }

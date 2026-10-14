@@ -337,7 +337,7 @@ func (m *WebhookManager) processOne(ctx context.Context) {
 	scope := &DeltaScope{MediaID: job.MediaID, FileIDs: job.FileIDs, All: job.All}
 	files, e := NewArr(c).FetchDelta(readCtx, job.Service, scope)
 	if e == nil {
-		e = m.s.Store.preserveDeltaEmby(readCtx, job.Service, files, cfg.Emby.Enabled)
+		e = m.s.Store.preserveDeltaEmby(readCtx, job.Service, files, cfg.Emby.Enabled || cfg.Jellyfin.Enabled)
 	}
 	// Settings updates and the commit share the same lock; obsolete endpoints never replace the cache.
 	m.s.mu.Lock()

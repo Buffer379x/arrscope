@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { t, useI18n } from "../i18n";
+import { HelpPopover } from "./HelpPopover";
 import { OperatorButton } from "./OperatorButton";
 import type { FilterUpdate } from "../ui";
 
@@ -10,7 +11,9 @@ export function StateFilter({
   positive,
   negative,
   change,
+  help,
 }: {
+  help?: string;
   name: string;
   label: string;
   value: string;
@@ -26,19 +29,22 @@ export function StateFilter({
   }, [value, active, negative]);
   return (
     <div class="state-filter">
-      <label class="check-field">
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={(e) =>
-            change(
-              name,
-              e.currentTarget.checked ? [exclude ? negative : positive] : [],
-            )
-          }
-        />
-        {t(label)}
-      </label>
+      <span class="state-filter-label">
+        <label class="check-field">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) =>
+              change(
+                name,
+                e.currentTarget.checked ? [exclude ? negative : positive] : [],
+              )
+            }
+          />
+          {t(label)}
+        </label>
+        {help && <HelpPopover label={label} text={help} />}
+      </span>
       <OperatorButton
         field={t(label)}
         value={exclude ? "not" : "eq"}

@@ -76,6 +76,9 @@ export function SettingsDialog({
   initialSection?: string;
 }) {
   const { locale, setLocale } = useI18n();
+  const [mediaProvider, setMediaProvider] = useState<"emby" | "jellyfin">(
+    settings.emby.enabled || !settings.jellyfin.enabled ? "emby" : "jellyfin",
+  );
   const [draftLocale, setDraftLocale] = useState(locale);
   const [tagChanges, setTagChanges] = useState<TagTransition[] | null>(null);
   const settingsFormId = useId();
@@ -441,9 +444,9 @@ export function SettingsDialog({
                   )}
                 </small>
               </section>
-              {(["radarr", "sonarr", "emby"] as ConnectionService[]).map(
+              {(["radarr", "sonarr", mediaProvider] as ConnectionService[]).map(
                 (service) => (
-                  <section class="connection">
+                  <section class="connection" key={service}>
                     <header class="connection-heading">
                       <h3 class="card-title">
                         {service === "radarr" ? (
@@ -455,7 +458,7 @@ export function SettingsDialog({
                           ? "Radarr"
                           : service === "sonarr"
                             ? "Sonarr"
-                            : t("Emby · optional")}
+                            : t("Media server")}
                       </h3>
                       <div class="connection-heading-test">
                         <button
@@ -496,12 +499,29 @@ export function SettingsDialog({
                         </button>
                       </div>
                     </header>
-                    {service === "emby" && (
+                    {(service === "emby" || service === "jellyfin") && (
                       <p class="quiet">
                         {t(
                           "Adds existing audio track metadata. No scans or media access. Matching requires a unique filename and identical file size.",
                         )}
                       </p>
+                    )}
+                    {(service === "emby" || service === "jellyfin") && (
+                      <label class="media-provider-select">
+                        {t("Media server")}
+                        <select
+                          aria-label={t("Media server")}
+                          value={mediaProvider}
+                          onChange={(e) =>
+                            setMediaProvider(
+                              e.currentTarget.value as "emby" | "jellyfin",
+                            )
+                          }
+                        >
+                          <option value="emby">Emby</option>
+                          <option value="jellyfin">Jellyfin</option>
+                        </select>
+                      </label>
                     )}
                     <label class="check-field">
                       <input
@@ -556,9 +576,9 @@ export function SettingsDialog({
                           }
                         />
                         <small>
-                          {service === "emby"
+                          {service === "emby" || service === "jellyfin"
                             ? t(
-                                "Emby dashboard → API keys. Use a dedicated key for Scopearr.",
+                                "Create a dedicated API key in the selected media server dashboard.",
                               )
                             : t("In each service under Settings → General.")}
                         </small>
@@ -590,29 +610,29 @@ export function SettingsDialog({
                         />
                         {t("Delete saved API key on save")}
                       </label>
-                      {service === "emby" && (
+                      {(service === "emby" || service === "jellyfin") && (
                         <label class="path-mapping-field">
                           {t("Optional path mappings")}
                           <textarea
-                            aria-label={t("Emby path mappings")}
+                            aria-label={t("Media server path mappings")}
                             disabled={demo}
                             rows={3}
-                            value={cfg.emby.pathMappings || ""}
+                            value={cfg[service].pathMappings || ""}
                             placeholder="/movies => /media/movies"
                             onInput={(e) =>
-                              update("emby", {
+                              update(service, {
                                 pathMappings: e.currentTarget.value,
                               })
                             }
                           />
                           <small>
                             {t(
-                              "One line per media path: Arr path => Emby path. If configured, the full mapped path must also match. Different folder names inside the library prevent enrichment.",
+                              "One line per media path: Arr path => media server path. If configured, the full mapped path must also match. Different folder names inside the library prevent enrichment.",
                             )}
                           </small>
                         </label>
                       )}
-                      {service !== "emby" ? (
+                      {service === "radarr" || service === "sonarr" ? (
                         <div class="sync-clock-grid">
                           <label>
                             {t("Synchronize")}
@@ -665,7 +685,7 @@ export function SettingsDialog({
                           )}
                         </p>
                       )}
-                      {service !== "emby" && (
+                      {(service === "radarr" || service === "sonarr") && (
                         <div class="tag-integration-settings">
                           <section class="external-tag-settings">
                             <h4>{t("External tags")}</h4>
@@ -717,7 +737,7 @@ export function SettingsDialog({
                             </label>
                             <p class="quiet">
                               {t(
-                                "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or Emby requests are needed for tag checks.",
+                                "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or media server requests are needed for tag checks.",
                               )}
                             </p>
                           </section>
@@ -775,7 +795,7 @@ export function SettingsDialog({
                           </section>
                         </div>
                       )}
-                      {service !== "emby" && (
+                      {(service === "radarr" || service === "sonarr") && (
                         <WebhookSettings
                           service={service}
                           config={cfg[service]}

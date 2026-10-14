@@ -69,11 +69,17 @@ func canonicalPresetQuery(raw, service string) (string, error) {
 			out.Set(key, strconv.FormatInt(number, 10))
 		}
 	}
-	for _, key := range []string{"conflict", "ruleConflict", "metadata", "embyMatch"} {
+	for _, key := range []string{"conflict", "ruleConflict", "metadata", "embyMatch", "seasonOutlier", "languageOutlier"} {
 		if v := q.Get(key); v != "" {
 			out.Set(key, v)
 		}
 	}
+	for key := range mediaStateFilters {
+		if v := q.Get(key); v != "" {
+			out.Set(key, v)
+		}
+	}
+
 	for _, key := range []string{"unknownYear", "unknownSize"} {
 		if q.Get(key) == "true" {
 			out.Set(key, "true")
