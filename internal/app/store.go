@@ -1083,7 +1083,7 @@ func movieOrder(q url.Values) (string, error) {
 		"custom": "(SELECT group_concat(name_sort) FROM (SELECT lower(coalesce(nullif(l.label,''),t.name_key)) name_sort FROM file_custom c JOIN custom_tags t ON t.id=c.tag_id LEFT JOIN custom_tag_labels l ON l.tag_id=t.id WHERE c.file_rowid=f.rowid ORDER BY name_sort))",
 		"title":  "f.title COLLATE NOCASE", "year": "(SELECT min(year) FROM years y WHERE y.file_rowid=f.rowid)",
 		"resolution": "CASE f.resolution WHEN '4320p' THEN 4320 WHEN '2160p' THEN 2160 WHEN '1440p' THEN 1440 WHEN '1080p' THEN 1080 WHEN '720p' THEN 720 WHEN '576p' THEN 576 WHEN '480p' THEN 480 ELSE CAST(f.resolution AS INTEGER) END",
-		"codec":      "f.codec COLLATE NOCASE", "source": "(f.source||' '||f.processing) COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "(f.language||' '||f.audio) COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
+		"codec":      "f.codec COLLATE NOCASE", "source": "f.source COLLATE NOCASE", "processing": "f.processing COLLATE NOCASE", "size": "f.size", "hdr": "f.hdr COLLATE NOCASE", "bitDepth": "CAST(f.bitDepth AS INTEGER)", "audio": "(f.language||' '||f.audio) COLLATE NOCASE", "channels": "CAST(f.channels AS REAL)", "language": "f.language COLLATE NOCASE",
 	}[field]
 	if !ok {
 		return "", fmt.Errorf("Invalid sort field")

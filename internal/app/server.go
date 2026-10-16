@@ -43,7 +43,7 @@ func NewServer(ctx context.Context, store *Store, static fs.FS, version string) 
 	var cfg Settings
 	e = store.Get("settings", &cfg)
 	if e == nil {
-		legacyInfo := cfg.ListInfoOrder == nil
+		legacyInfo := cfg.ListInfoOrder == nil || (cfg.ColumnOrder != nil && !containsColumn(cfg.ColumnOrder["radarr"], "processing")) || (cfg.ColumnOrder != nil && !containsColumn(cfg.ColumnOrder["sonarr"], "processing"))
 		encryptedKeys := [4]string{cfg.Radarr.APIKey, cfg.Sonarr.APIKey, cfg.Emby.APIKey, cfg.Jellyfin.APIKey}
 		cfg.Radarr.APIKey, e = sec.Open(cfg.Radarr.APIKey)
 		if e != nil {

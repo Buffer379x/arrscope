@@ -802,6 +802,17 @@
     "Shared by movies and TV series. Default: 100. Allowed: 1–1000.": "Condiviso tra film e serie TV. Predefinito: 100. Consentito: 1–1000.",
     "Entries per page must be between 1 and 1000": "Gli elementi per pagina devono essere tra 1 e 1000",
     "Invalid dashboard widget selection": "Selezione dei widget della dashboard non valida",
-    "No dashboard widgets selected.": "Nessun widget della dashboard selezionato."
+    "No dashboard widgets selected.": "Nessun widget della dashboard selezionato.",
+    "List display icons": "Icone della lista",
+    "Filename recognition and service metadata disagree on a known value. Excluding this finds files without that disagreement.": "Il nome del file e i metadati del servizio differiscono per un valore noto. Non è seleziona i file senza questa discrepanza.",
+    "Multiple matching recognition rules assign incompatible values to the same attribute. Excluding this finds files without a rule conflict.": "Più regole corrispondenti assegnano valori incompatibili allo stesso attributo. Non è seleziona i file senza conflitti.",
+    "At least one required media attribute is unknown: resolution, codec, source, audio or language. Excluding this selects complete metadata; HDR may be SDR or unknown.": "Manca almeno un attributo: risoluzione, codec, fonte, audio o lingua. Non è seleziona metadati completi; HDR può essere SDR o sconosciuto.",
+    "At least one enabled media server uniquely matches this file by name and size. Excluding this selects files without a successful match.": "Almeno un server attivo identifica il file tramite nome e dimensione. Non è seleziona file senza corrispondenza riuscita.",
+    "No matching file was found, or a required file size is missing. Excluding this removes those cases.": "File non trovato o dimensione necessaria mancante. Non è esclude questi casi.",
+    "Multiple files or audio tracks prevent a unique match. Excluding this removes ambiguous matches.": "Più file o tracce impediscono una corrispondenza univoca. Non è esclude i casi ambigui.",
+    "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.": "I server attivi indicano tracce diverse per lo stesso file. Non è esclude queste discrepanze.",
+    "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.": "Un elemento identificato non offre metadati audio utilizzabili. Non è esclude questi elementi.",
+    "The file is awaiting a media-server match after a cache or file update. Excluding this removes pending items.": "Il file attende un confronto dopo un aggiornamento del file o della cache. Non è esclude gli elementi in attesa.",
+    "The file has no media-server enrichment configured. Excluding this removes those items.": "Per il file non è configurato un arricchimento dal server multimediale. Non è esclude questi elementi."
   }
 }

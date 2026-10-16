@@ -794,15 +794,15 @@ export function Library({
                                 ),
                                 source: (
                                   <td key="source">
-                                    <div class="source-tags">
-                                      <Tag value={f.source} />
-                                      {f.processing && (
-                                        <Tag
-                                          value={f.processing}
-                                          kind="processing"
-                                        />
-                                      )}
-                                    </div>
+                                    <Tag value={f.source} />
+                                  </td>
+                                ),
+                                processing: (
+                                  <td key="processing">
+                                    <Tag
+                                      value={f.processing}
+                                      kind="processing"
+                                    />
                                   </td>
                                 ),
                                 size: (

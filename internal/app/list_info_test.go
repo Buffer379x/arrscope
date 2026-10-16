@@ -23,7 +23,7 @@ func TestInfoLayoutUpgradeAndPersistence(t *testing.T) {
 	if err := normalizeVisibleColumns(&cfg); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(cfg.ColumnOrder["radarr"], ",") != "info,size,title,year,resolution,codec,source,hdr,bitDepth,audio,channels,custom" || strings.Join(cfg.VisibleColumns["radarr"], ",") != "info,size,title" {
+	if strings.Join(cfg.ColumnOrder["radarr"], ",") != "info,size,title,year,resolution,codec,source,processing,hdr,bitDepth,audio,channels,custom" || strings.Join(cfg.VisibleColumns["radarr"], ",") != "info,size,title" {
 		t.Fatal("old layout changed", cfg)
 	}
 	cfg.ListInfoOrder = []string{"recognition", "metadata", "details", "link"}

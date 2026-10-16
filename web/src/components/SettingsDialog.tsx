@@ -660,7 +660,12 @@ export function SettingsDialog({
                           <label>
                             {t("Starting at")}
                             <input
-                              type="time"
+                              type="text"
+                              inputMode="text"
+                              placeholder="HH:MM"
+                              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                              maxLength={5}
+                              autoComplete="off"
                               disabled={demo || cfg[service].interval === 0}
                               value={cfg[service].syncStart || ""}
                               onInput={(e) => {

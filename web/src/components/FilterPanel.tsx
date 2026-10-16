@@ -22,6 +22,7 @@ import {
 } from "../ui";
 import {
   mediaStateFilters,
+  mediaStateHelp,
   seasonTechnicalHelp,
   seasonLanguageHelp,
 } from "../media-filters";
@@ -140,7 +141,35 @@ export function FilterPanel({
       {!collapsed && (
         <div id="filter-controls" class="filter-groups">
           <section class="attribute-filters">
-            <h2>{t("Media attributes")}</h2>
+            <div class="state-filter-heading">
+              <h2>{t("Media attributes")}</h2>
+              <div
+                class={"filter-logic-help" + (helpOpen ? " open" : "")}
+                onMouseEnter={() => setHelpOpen(true)}
+                onMouseLeave={() => setHelpOpen(false)}
+              >
+                <button
+                  type="button"
+                  class="icon-button"
+                  aria-label={t("Filter logic")}
+                  onFocus={() => setHelpOpen(true)}
+                  aria-describedby={helpId}
+                  aria-expanded={helpOpen}
+                  onClick={() => setHelpOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setHelpOpen(false);
+                  }}
+                  onBlur={() => setHelpOpen(false)}
+                >
+                  <CircleHelp size={17} />
+                </button>
+                <p id={helpId} role="tooltip" class="filter-logic-tooltip">
+                  {t(
+                    "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
+                  )}
+                </p>
+              </div>
+            </div>
             <div class="attribute-grid">
               {[
                 "resolution",
@@ -232,38 +261,11 @@ export function FilterPanel({
             </div>
           </section>
           <section class="state-filters">
-            <div class="state-filter-heading">
-              <h2>{t("Status and metadata quality")}</h2>
-              <div
-                class={"filter-logic-help" + (helpOpen ? " open" : "")}
-                onMouseEnter={() => setHelpOpen(true)}
-                onMouseLeave={() => setHelpOpen(false)}
-              >
-                <button
-                  type="button"
-                  class="icon-button"
-                  aria-label={t("Filter logic")}
-                  onFocus={() => setHelpOpen(true)}
-                  aria-describedby={helpId}
-                  aria-expanded={helpOpen}
-                  onClick={() => setHelpOpen(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setHelpOpen(false);
-                  }}
-                  onBlur={() => setHelpOpen(false)}
-                >
-                  <CircleHelp size={17} />
-                </button>
-                <p id={helpId} role="tooltip" class="filter-logic-tooltip">
-                  {t(
-                    "Different fields use AND. For audio, HDR and language, the operator decides whether some or all selected values are required. “Does not contain all” means at least one is missing from the known metadata, which does not prove its absence in the file. “Unknown” also finds partially unknown audio tracks.",
-                  )}
-                </p>
-              </div>
-            </div>
+            <h2>{t("Status and metadata quality")}</h2>
             <StateFilter
               name="conflict"
               label="Metadata disagreement"
+              help="Filename recognition and service metadata disagree on a known value. Excluding this finds files without that disagreement."
               value={q.get("conflict") || ""}
               positive="true"
               negative="false"
@@ -272,6 +274,7 @@ export function FilterPanel({
             <StateFilter
               name="ruleConflict"
               label="Conflicting recognition rules"
+              help="Multiple matching recognition rules assign incompatible values to the same attribute. Excluding this finds files without a rule conflict."
               value={q.get("ruleConflict") || ""}
               positive="true"
               negative="false"
@@ -280,6 +283,7 @@ export function FilterPanel({
             <StateFilter
               name="metadata"
               label="Incomplete metadata"
+              help="At least one required media attribute is unknown: resolution, codec, source, audio or language. Excluding this selects complete metadata; HDR may be SDR or unknown."
               value={q.get("metadata") || ""}
               positive="incomplete"
               negative="complete"
@@ -311,12 +315,13 @@ export function FilterPanel({
               class="media-match-filters"
               aria-label={t("Media server matching")}
             >
-              <h3>{t("Media server matching")}</h3>
+              <h2>{t("Media server matching")}</h2>
               {Object.entries(mediaStateFilters).map(([key, label]) => (
                 <StateFilter
                   key={key}
                   name={key}
                   label={label}
+                  help={mediaStateHelp[key]}
                   value={q.get(key) || ""}
                   positive="true"
                   negative="false"
