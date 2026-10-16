@@ -1,5 +1,6 @@
 import { getLocale, t, useI18n } from "./i18n";
 import { colorStyle } from "./color";
+import { tagDisplayKey, tagIsDisplayed } from "./tag-display";
 import { createContext, type ComponentChildren } from "preact";
 import { useContext } from "preact/hooks";
 import type { Results, Service } from "./types";
@@ -54,7 +55,13 @@ export const operatorLabels: Record<FilterOperator, string> = translatedLabels({
   all: "contains all",
   notAll: "does not contain all",
 });
-export const compoundFields = ["hdr", "audio", "language", "custom"];
+export const compoundFields = [
+  "hdr",
+  "audio",
+  "language",
+  "channels",
+  "custom",
+];
 export type FilterUpdate = string[] | ((current: string[]) => string[]);
 export const defaultColumnOrder = tableColumns.map(([field]) => field);
 export const columnLabels = translatedLabels(Object.fromEntries(tableColumns));
@@ -98,6 +105,7 @@ export const TagVisibility = createContext<Record<string, string[]> | null>(
 export const TagInformation = createContext<Record<string, string[]>>({});
 export const TagColors = createContext<Record<string, string>>({});
 export const TagTextColors = createContext<Record<string, string>>({});
+export const HiddenTags = createContext<Record<string, boolean>>({});
 export const CustomTagNames = createContext<Record<string, string>>({});
 export const colorFields = [
   "resolution",
@@ -134,10 +142,12 @@ export function Tag({
   textColors,
   label,
   forceTag = false,
+  respectHidden = false,
   children,
 }: {
   label?: string;
   forceTag?: boolean;
+  respectHidden?: boolean;
   children?: ComponentChildren;
   colors?: Record<string, string>;
   textColors?: Record<string, string>;
@@ -151,7 +161,9 @@ export function Tag({
   const names = useContext(CustomTagNames);
   const inherited = useContext(TagColors);
   const inheritedText = useContext(TagTextColors);
-  const key = kind.split(" ")[0] + ":" + (value || "__unknown__");
+  const hidden = useContext(HiddenTags);
+  const key = tagDisplayKey(kind, value);
+  if (respectHidden && !tagIsDisplayed(hidden, kind, value)) return null;
   const color =
     (colors || inherited)[key] ||
     (["bitDepth", "channels", "language"].includes(kind)

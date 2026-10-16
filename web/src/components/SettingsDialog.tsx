@@ -364,6 +364,12 @@ export function SettingsDialog({
                         !key.startsWith("custom:") || ids.has(key.slice(7)),
                     ),
                   ),
+                  hiddenTags: Object.fromEntries(
+                    Object.entries(current.hiddenTags || {}).filter(
+                      ([key]) =>
+                        !key.startsWith("custom:") || ids.has(key.slice(7)),
+                    ),
+                  ),
                 }));
               }}
               onDirty={setCustomDirty}
@@ -1162,6 +1168,9 @@ export function SettingsDialog({
                       <tr>
                         <th>{t("Tag preview")}</th>
                         <th>{t("Count")}</th>
+                        <th class="tag-display-column">
+                          {t("Display column")}
+                        </th>
                         <th>{t("Color")}</th>
                         <th>{t("Text")}</th>
                         <th>{t("Reset column")}</th>
@@ -1217,6 +1226,24 @@ export function SettingsDialog({
                                 )}
                               </td>
                               <td class="tag-link-count">{links}</td>
+                              <td class="tag-display-column">
+                                <label class="tag-display-toggle">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t("Display tag: {value}", {
+                                      value: label,
+                                    })}
+                                    checked={!cfg.hiddenTags?.[key]}
+                                    onChange={(e) => {
+                                      const hiddenTags = { ...cfg.hiddenTags };
+                                      if (e.currentTarget.checked)
+                                        delete hiddenTags[key];
+                                      else hiddenTags[key] = true;
+                                      setCfg({ ...cfg, hiddenTags });
+                                    }}
+                                  />
+                                </label>
+                              </td>
                               <td>
                                 <input
                                   type="color"
@@ -1351,6 +1378,13 @@ export function SettingsDialog({
                                         ).filter((v) => v !== value),
                                       }));
                                       setColor(key);
+                                      setCfg((current) => {
+                                        const hiddenTags = {
+                                          ...current.hiddenTags,
+                                        };
+                                        delete hiddenTags[key];
+                                        return { ...current, hiddenTags };
+                                      });
                                       await refresh();
                                       notify(t("Settings saved."));
                                     } catch {}

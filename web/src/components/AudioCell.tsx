@@ -24,7 +24,7 @@ export function AudioCell({ file }: { file: MediaFile }) {
           {tracks.map((track) => (
             <div key={track.index}>
               <LanguageFlag value={track.language} />
-              <Tag value={track.codec} kind="audio" />
+              <Tag value={track.codec} kind="audio" respectHidden />
             </div>
           ))}
         </div>
@@ -33,7 +33,7 @@ export function AudioCell({ file }: { file: MediaFile }) {
           <LanguageFlags value={file.language} />
           <div class="source-tags">
             {(file.audio ? file.audio.split(" + ") : [""]).map((value) => (
-              <Tag key={value} value={value} kind="audio" />
+              <Tag key={value} value={value} kind="audio" respectHidden />
             ))}
           </div>
         </>
@@ -45,7 +45,7 @@ export function AudioCell({ file }: { file: MediaFile }) {
           )}
           <div class="source-tags">
             {unassignedCodecs.map((value) => (
-              <Tag key={value} value={value} kind="audio" />
+              <Tag key={value} value={value} kind="audio" respectHidden />
             ))}
           </div>
           <small class="quiet">

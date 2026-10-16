@@ -689,7 +689,7 @@ func where(q url.Values) (string, []any, error) {
 	for _, field := range fields {
 		opValues := q[field+"Op"]
 		op := q.Get(field + "Op")
-		compound := field == "language" || field == "hdr" || field == "audio" || field == "custom"
+		compound := field == "language" || field == "hdr" || field == "audio" || field == "channels" || field == "custom"
 		if len(opValues) > 1 || (op != "" && op != "eq" && op != "not" && !(compound && (op == "all" || op == "notAll"))) {
 			return "", nil, fmt.Errorf("Invalid filter operator for %s", field)
 		}
@@ -993,7 +993,7 @@ func (s *Store) facets(ctx context.Context, service string) (map[string][]string
 			if field == "language" {
 				values = strings.Split(v, ", ")
 			}
-			if field == "hdr" || field == "audio" {
+			if field == "hdr" || field == "audio" || field == "channels" {
 				values = strings.Split(v, " + ")
 			}
 			for _, value := range values {

@@ -831,6 +831,9 @@
     "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.": "Varios archivos, flujos de vídeo o índices de audio duplicados impiden completar los datos con seguridad. Excluir elimina estos casos ambiguos.",
     "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.": "Los servidores activos indican atributos de vídeo o inventarios de audio contradictorios para el mismo archivo. Excluir elimina estas discrepancias.",
     "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.": "Añade metadatos existentes de vídeo y pistas de audio. Sin escaneos ni acceso a archivos multimedia. La asociación requiere un nombre único y un tamaño idéntico.",
-    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Las importaciones, mejoras y eliminaciones actualizan las entradas afectadas. La sincronización periódica sigue como respaldo. Los nuevos metadatos de vídeo y audio del servidor se añaden en la siguiente sincronización completa."
+    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Las importaciones, mejoras y eliminaciones actualizan las entradas afectadas. La sincronización periódica sigue como respaldo. Los nuevos metadatos de vídeo y audio del servidor se añaden en la siguiente sincronización completa.",
+    "Display tag: {value}": "Mostrar etiqueta: {value}",
+    "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.": "Los canales usan primero el nombre del archivo o Radarr/Sonarr y después todas las distribuciones de audio conocidas del servidor multimedia. Sin distribución indicada, se muestra el número de canales.",
+    "Display column": "Mostrar"
   }
 }

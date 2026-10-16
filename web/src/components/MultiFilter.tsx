@@ -1,11 +1,13 @@
 import { t, useI18n, getLocale } from "../i18n";
 import { audioLanguageLabel, sameAudioLanguage } from "../languages";
 import { OperatorButton } from "./OperatorButton";
+import { tagIsDisplayed } from "../tag-display";
 import { ChevronDown } from "lucide-preact";
 import { useEffect, useRef, useState, useContext } from "preact/hooks";
 
 import {
   CustomTagNames,
+  HiddenTags,
   compoundFields,
   FilterOperator,
   FilterUpdate,
@@ -28,6 +30,8 @@ export function MultiFilter({
 }) {
   useI18n();
   const names = useContext(CustomTagNames);
+  const hidden = useContext(HiddenTags);
+  values = values.filter((value) => tagIsDisplayed(hidden, name, value));
   const equivalent = (left: string, right: string) =>
     name === "language" ? sameAudioLanguage(left, right) : left === right;
   const negative = operator === "not" || operator === "notAll";

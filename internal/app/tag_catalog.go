@@ -26,7 +26,7 @@ func traitValues(field, value string) []string {
 	if value == "" {
 		return []string{"__unknown__"}
 	}
-	if field == "hdr" || field == "audio" {
+	if field == "hdr" || field == "audio" || field == "channels" {
 		return strings.Split(value, " + ")
 	}
 	return []string{value}
@@ -193,6 +193,7 @@ func (s *Store) DeleteCatalogTag(ctx context.Context, field, value string) error
 		}
 		delete(cfg.TagColors, field+":"+value)
 		delete(cfg.TagTextColors, field+":"+value)
+		delete(cfg.HiddenTags, field+":"+value)
 		data, _ := json.Marshal(cfg)
 		if _, e = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(data)); e != nil {
 			return e

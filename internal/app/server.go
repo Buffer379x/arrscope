@@ -309,6 +309,7 @@ func (s *Server) Handler() http.Handler {
 				s.mu.Lock()
 				s.settings.TagColors = stored.TagColors
 				s.settings.TagTextColors = stored.TagTextColors
+				s.settings.HiddenTags = stored.HiddenTags
 				s.mu.Unlock()
 			}
 			s.queueTagSync()
@@ -352,6 +353,7 @@ func (s *Server) Handler() http.Handler {
 						s.mu.Lock()
 						s.settings.TagColors = stored.TagColors
 						s.settings.TagTextColors = stored.TagTextColors
+						s.settings.HiddenTags = stored.HiddenTags
 						s.mu.Unlock()
 					}
 					s.queueTagSync()
@@ -480,6 +482,7 @@ func (s *Server) Handler() http.Handler {
 					if s.Store.Get("settings", &stored) == nil {
 						s.settings.TagColors = stored.TagColors
 						s.settings.TagTextColors = stored.TagTextColors
+						s.settings.HiddenTags = stored.HiddenTags
 					}
 				}
 				s.mu.Unlock()

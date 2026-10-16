@@ -831,6 +831,9 @@
     "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.": "Più file, flussi video o indici audio duplicati impediscono un'integrazione sicura. Escludendo si rimuovono questi casi ambigui.",
     "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.": "I server attivi riportano attributi video o inventari audio discordanti per lo stesso file. Escludendo si rimuovono queste discrepanze.",
     "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.": "Integra metadati video e audio già presenti. Nessuna scansione o accesso ai file multimediali. L'associazione richiede un nome univoco e dimensioni identiche.",
-    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Importazioni, aggiornamenti ed eliminazioni aggiornano le voci interessate. La sincronizzazione periodica resta come riserva. I nuovi metadati video e audio del server vengono aggiunti alla prossima sincronizzazione completa."
+    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Importazioni, aggiornamenti ed eliminazioni aggiornano le voci interessate. La sincronizzazione periodica resta come riserva. I nuovi metadati video e audio del server vengono aggiunti alla prossima sincronizzazione completa.",
+    "Display tag: {value}": "Mostra tag: {value}",
+    "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.": "I canali usano prima il nome del file o Radarr/Sonarr, poi tutte le disposizioni audio note del server multimediale. In assenza di una disposizione, viene mostrato il numero di canali.",
+    "Display column": "Mostra"
   }
 }
