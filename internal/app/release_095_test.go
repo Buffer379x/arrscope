@@ -17,7 +17,7 @@ func TestMediaLinkIdentity095(t *testing.T) {
 				if service == "sonarr" {
 					item.Type = "Episode"
 				}
-				duplicate := false
+				duplicate := 0
 				upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.Method != "GET" || (r.URL.Path != "/Items" && r.URL.Path != "/emby/Items") || r.Header.Get("X-Emby-Token") != "synthetic" {
 						t.Error("unexpected request", r.Method, r.URL.Path)
@@ -25,12 +25,14 @@ func TestMediaLinkIdentity095(t *testing.T) {
 						return
 					}
 					items := []embyItem{item}
-					if duplicate {
+					if duplicate > 0 {
 						other := item
 						other.Id = "other"
 						other.SeriesId = "different-series"
 						other.MediaSources = append([]embySource{}, item.MediaSources...)
-						other.MediaSources[0].Path = "/other/Example.mkv"
+						if duplicate == 2 {
+							other.MediaSources[0].Path = "/other/Example.mkv"
+						}
 						items = append(items, other)
 					}
 					json.NewEncoder(w).Encode(map[string]any{"Items": items, "TotalRecordCount": len(items)})
@@ -69,7 +71,14 @@ func TestMediaLinkIdentity095(t *testing.T) {
 				if !reflect.DeepEqual(restored.MediaServers.get(provider).Link, link) {
 					t.Fatal("reprocessing lost link", restored)
 				}
-				duplicate = true
+				duplicate = 1
+				if err := client.Enrich(context.Background(), service, files); err != nil {
+					t.Fatal(err)
+				}
+				if got := files[0].MediaServers.get(provider); got.Link != nil || got.Status != "matched" {
+					t.Fatal("ambiguous route got link", got)
+				}
+				duplicate = 2
 				if err := client.Enrich(context.Background(), service, files); err != nil {
 					t.Fatal(err)
 				}
