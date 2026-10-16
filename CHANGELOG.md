@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4
+
+- Keep wide settings tables inside their own scroll areas on narrow screens; prevent the new tag display column from widening the page.
+
 ## 0.9.3
 
 - Aggregate known channel layouts across all verified audio tracks, preserving language-to-codec pairing and channel-count fallbacks.
