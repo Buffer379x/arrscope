@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -356,7 +357,8 @@ func TestHTTPAuthCSRFSettingsPresetsCSV(t *testing.T) {
 	cfg.Emby.APIKey = "emby-fake-secret"
 	cfg.Emby.URL = "http://emby.example"
 	cfg.VisibleColumns["radarr"] = []string{"title", "size"}
-	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][6] = cfg.ColumnOrder["radarr"][6], cfg.ColumnOrder["radarr"][0]
+	sizeColumn := slices.Index(cfg.ColumnOrder["radarr"], "size")
+	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][sizeColumn] = cfg.ColumnOrder["radarr"][sizeColumn], cfg.ColumnOrder["radarr"][0]
 	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff"}
 	b, _ = json.Marshal(cfg)
 	check(request("/api/settings", "PUT", string(b), true), 200)
@@ -769,7 +771,8 @@ func TestPermanentPresetsAndTagColors(t *testing.T) {
 	cfg.TagTextColors = map[string]string{"codec:x264": "#ffffff", "resolution:1080p": "#000000"}
 	cfg.VisibleColumns["radarr"] = []string{"title", "size", "audio"}
 	cfg.VisibleColumns["sonarr"] = []string{"title", "codec"}
-	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][6] = cfg.ColumnOrder["radarr"][6], cfg.ColumnOrder["radarr"][0]
+	sizeColumn := slices.Index(cfg.ColumnOrder["radarr"], "size")
+	cfg.ColumnOrder["radarr"][0], cfg.ColumnOrder["radarr"][sizeColumn] = cfg.ColumnOrder["radarr"][sizeColumn], cfg.ColumnOrder["radarr"][0]
 	cfg.ColumnOrder["sonarr"][0], cfg.ColumnOrder["sonarr"][4] = cfg.ColumnOrder["sonarr"][4], cfg.ColumnOrder["sonarr"][0]
 	if err := validateTagColors(cfg.TagColors); err != nil {
 		t.Fatal(err)
