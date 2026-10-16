@@ -116,6 +116,16 @@ func TestHiddenTagsSettingsAndCounts093(t *testing.T) {
 	if !restored.HiddenTags["source:__unknown__"] {
 		t.Fatal(restored)
 	}
+	cfg.HiddenTags["codec:x265"] = true
+	if err := s.Put("settings", cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteCatalogTag(context.Background(), "codec", "x265"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Get("settings", &restored); err != nil || restored.HiddenTags["codec:x265"] || !restored.HiddenTags["source:__unknown__"] {
+		t.Fatal(restored, err)
+	}
 }
 
 func TestAPICodecTagPresentation093(t *testing.T) {

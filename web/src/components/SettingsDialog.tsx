@@ -364,6 +364,12 @@ export function SettingsDialog({
                         !key.startsWith("custom:") || ids.has(key.slice(7)),
                     ),
                   ),
+                  hiddenTags: Object.fromEntries(
+                    Object.entries(current.hiddenTags || {}).filter(
+                      ([key]) =>
+                        !key.startsWith("custom:") || ids.has(key.slice(7)),
+                    ),
+                  ),
                 }));
               }}
               onDirty={setCustomDirty}
@@ -1372,6 +1378,13 @@ export function SettingsDialog({
                                         ).filter((v) => v !== value),
                                       }));
                                       setColor(key);
+                                      setCfg((current) => {
+                                        const hiddenTags = {
+                                          ...current.hiddenTags,
+                                        };
+                                        delete hiddenTags[key];
+                                        return { ...current, hiddenTags };
+                                      });
                                       await refresh();
                                       notify(t("Settings saved."));
                                     } catch {}
