@@ -106,6 +106,7 @@ export type MediaFile = {
     string,
     {
       status: string;
+      link?: { itemId: string; serverId: string };
       hdr?: string;
       video?: {
         width?: number;

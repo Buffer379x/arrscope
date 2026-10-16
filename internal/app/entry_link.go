@@ -119,3 +119,8 @@ func (s *Server) openEntry(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.Redirect(w, r, target, http.StatusFound)
 }
+
+// Provider IDs are opaque route components, never paths or executable URLs.
+var mediaIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+
+func safeMediaID(value string) bool { return mediaIDPattern.MatchString(value) }

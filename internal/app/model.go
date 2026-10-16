@@ -107,7 +107,12 @@ type MediaVideo struct {
 	Codec      string `json:"codec,omitempty"`
 	BitDepth   string `json:"bitDepth,omitempty"`
 }
+type MediaLink struct {
+	ItemID   string `json:"itemId"`
+	ServerID string `json:"serverId"`
+}
 type MediaMatch struct {
+	Link   *MediaLink   `json:"link,omitempty"`
 	Video  *MediaVideo  `json:"video,omitempty"`
 	Status string       `json:"status"`
 	Tracks []AudioTrack `json:"tracks,omitempty"`

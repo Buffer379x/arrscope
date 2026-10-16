@@ -834,6 +834,10 @@
     "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Las importaciones, mejoras y eliminaciones actualizan las entradas afectadas. La sincronización periódica sigue como respaldo. Los nuevos metadatos de vídeo y audio del servidor se añaden en la siguiente sincronización completa.",
     "Display tag: {value}": "Mostrar etiqueta: {value}",
     "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.": "Los canales usan primero el nombre del archivo o Radarr/Sonarr y después todas las distribuciones de audio conocidas del servidor multimedia. Sin distribución indicada, se muestra el número de canales.",
-    "Display column": "Mostrar"
+    "Display column": "Mostrar",
+    "Show link to media server entry": "Mostrar enlace a la entrada del servidor multimedia",
+    "Open media server entry in a new tab": "Abrir entrada del servidor multimedia en una nueva pestaña",
+    "Choose media server": "Elegir servidor multimedia",
+    "Media server link unavailable. Synchronize the library and check the file mapping.": "Enlace al servidor multimedia no disponible. Sincroniza la biblioteca y comprueba la correspondencia del archivo."
   }
 }

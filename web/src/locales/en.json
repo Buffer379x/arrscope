@@ -834,6 +834,10 @@
     "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.",
     "Display tag: {value}": "Display tag: {value}",
     "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.": "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.",
-    "Display column": "Display"
+    "Display column": "Display",
+    "Show link to media server entry": "Show link to media server entry",
+    "Open media server entry in a new tab": "Open media server entry in a new tab",
+    "Choose media server": "Choose media server",
+    "Media server link unavailable. Synchronize the library and check the file mapping.": "Media server link unavailable. Synchronize the library and check the file mapping."
   }
 }
