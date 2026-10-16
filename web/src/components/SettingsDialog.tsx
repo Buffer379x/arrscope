@@ -502,7 +502,7 @@ export function SettingsDialog({
                     {(service === "emby" || service === "jellyfin") && (
                       <p class="quiet">
                         {t(
-                          "Adds existing audio track metadata. No scans or media access. Matching requires a unique filename and identical file size.",
+                          "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.",
                         )}
                       </p>
                     )}

@@ -470,7 +470,7 @@ func mediaResolution(width, height int, interlaced bool) string {
 		return ""
 	}
 	lines := height
-	for _, tier := range []struct{ width, height int }{{7680, 4320}, {3840, 2160}, {2560, 1440}, {1920, 1080}, {1280, 720}, {0, 576}, {0, 480}} {
+	for _, tier := range []struct{ width, height int }{{7680, 4320}, {3840, 2160}, {2560, 1440}, {1920, 1080}, {1280, 720}} {
 		if (tier.width > 0 && width >= tier.width) || height >= tier.height {
 			lines = tier.height
 			break
@@ -499,11 +499,11 @@ func applyMediaVideo(f *File, video *MediaVideo) {
 			if field == "codec" {
 				return other != "" && family(other) != family(value)
 			}
-			if field == "resolution" && video.Width > 0 && video.Width < 1280 && video.Height > 0 && video.Height < 480 && len(other) > 1 {
+			if field == "resolution" && video.Width > 0 && video.Width < 1280 && video.Height > 0 && video.Height < 576 && len(other) > 1 {
 				// Cropped SD pixels cannot distinguish the original 480/576-line
 				// raster. Preserve its explicit label without a false conflict.
 				lines := other[:len(other)-1]
-				if (lines == "480" || lines == "576") && other[len(other)-1] == value[len(value)-1] {
+				if ((lines == "480" && video.Height < 480) || lines == "576") && other[len(other)-1] == value[len(value)-1] {
 					return false
 				}
 			}

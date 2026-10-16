@@ -46,7 +46,7 @@ func TestMediaVideoResolutionAndPriority092(t *testing.T) {
 		w, h int
 		i    bool
 		want string
-	}{{1920, 800, false, "1080p"}, {3840, 1600, false, "2160p"}, {1440, 1080, true, "1080i"}, {720, 576, false, "576p"}, {640, 480, false, "480p"}, {1280, 536, false, "720p"}, {0, 1080, false, ""}, {1920, 0, false, ""}, {576, 244, false, "244p"}} {
+	}{{1920, 800, false, "1080p"}, {3840, 1600, false, "2160p"}, {1440, 1080, true, "1080i"}, {720, 576, false, "576p"}, {720, 544, false, "544p"}, {640, 480, false, "480p"}, {1280, 536, false, "720p"}, {0, 1080, false, ""}, {1920, 0, false, ""}, {576, 244, false, "244p"}} {
 		if got := mediaResolution(tc.w, tc.h, tc.i); got != tc.want {
 			t.Fatalf("%+v: %s", tc, got)
 		}
