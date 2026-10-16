@@ -37,7 +37,7 @@ The existing Items request already includes MediaSources and MediaStreams; no ne
 
 Filename recognition retains first priority, followed by Radarr/Sonarr. Verified media-server video values fill missing resolution, codec and bit depth, with separate evidence and conflict flags. Codec comparison uses families, so AVC does not contradict x264. XVID/DivX/DX50 FourCC values distinguish MPEG-4 Part 2 variants; plain MPEG-4 remains generic. Pixel dimensions classify standard/cropped HD and UHD raster tiers; smaller nonstandard SD frames retain their actual line count (for example 576×244 → 244p), rather than inventing a DVD/480p source. Exact dimensions remain visible per provider. Cropped SD dimensions do not contradict an explicit 480/576-line label of the same scan mode, since the original raster cannot be reconstructed from the crop. Missing dimensions do not imply a resolution.
 
-Channels retain filename/Arr priority, then fall back to the distinct known layouts across every verified internal audio track, regardless of default-track flags. Stereo/mono normalize to 2.0/1.0; a count without a layout is shown as, for example, 6 ch and never guessed as 5.1. Multiple values have separate list tags and share the same compound filter, facet, count and outbound tag-sync logic. Each audio row retains its own language and codec. Source, processing and missing audio languages are not inferred from video streams.
+Channels retain filename/Arr priority, then fall back to the distinct known layouts across every verified internal audio track, regardless of default-track flags. Stereo/mono normalize to 2.0/1.0; a count without a layout is shown as, for example, 6 ch and never guessed as 5.1. The Channels column shows one row per verified audio track, in the same order as the Audio column, retaining duplicates and each track’s own missing values. Without verified tracks it displays the aggregate filename/Arr values. Aggregate channels retain the same compound filter, facet, count and outbound tag-sync logic. Each audio row retains its own language and codec. Source, processing and missing audio languages are not inferred from video streams.
 
 The Dashboard summarizes each cached file exactly once:
 - **Matched**: matched plus no_tracks. A unique file identity exists, regardless of metadata completeness.
@@ -56,4 +56,12 @@ References: [Jellyfin MediaStream](https://typescript-sdk.jellyfin.org/interface
 
 Settings → Display → Tag colors includes a Display checkbox between Count and Color. All values are visible by default. Save settings to persist changes. Turning a value off hides it from movie/episode table cells and the corresponding filter choices, independently for each category. It does not delete metadata, change stored presets or active predicates, modify CSV exports or outbound tag synchronization, or change statistics and assignment counts. Previously selected hidden filters remain removable through the active-filter chips. Settings previews, file details and Dashboard statistics stay available.
 
-API-only codec values such as vp9 receive the same tag presentation as recognized codecs. Explicit information-only filename rules continue to control their presentation.
+Codec frames require enabled tag-color recognition rules, including API-only codecs such as vp9. Metadata remains readable as plain text without a corresponding rule.
+
+## Media-server entry links
+
+The Info column includes a media-server link after the Radarr/Sonarr link by default. Settings → Display → List display icons controls its visibility and order. One enabled provider opens directly; multiple enabled providers use a keyboard-accessible picker, with unavailable matches disabled. Disabled providers are omitted.
+
+A successful library sync retains the provider's `Id`, `SeriesId` and `ServerId` from the existing paginated Items response. Movies open the matched movie; episodes open their parent series. Emby uses `/web/index.html#!/item?id=…&serverId=…`, Jellyfin `/web/#/details?id=…&serverId=…`, under the configured server base URL. Links contain no API keys and use no-referrer/new-tab protection. Old cache entries need a full sync to acquire IDs. Missing or conflicting identities never produce guessed links. Stream metadata ambiguity does not invalidate an otherwise unique file identity.
+
+References: [Emby BaseItemDto](https://dev.emby.media/reference/pluginapi/MediaBrowser.Model.Dto.BaseItemDto.html), [Jellyfin DTO service](https://github.com/jellyfin/jellyfin/blob/master/Emby.Server.Implementations/Dto/DtoService.cs).

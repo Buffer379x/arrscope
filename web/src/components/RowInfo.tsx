@@ -5,11 +5,18 @@ import {
   Link2,
   OctagonAlert,
 } from "lucide-preact";
+import { MediaServerLink } from "./MediaServerLink";
 import type { MediaFile, Settings } from "../types";
 import { defaultWarningColors } from "../ui";
 import { entryLink } from "../entry-link";
 import { t, useI18n } from "../i18n";
-export const infoOrder = ["link", "details", "metadata", "recognition"];
+export const infoOrder = [
+  "link",
+  "media",
+  "details",
+  "metadata",
+  "recognition",
+];
 export function RowInfo({
   file,
   settings,
@@ -51,6 +58,7 @@ export function RowInfo({
         <Link2 size={15} />
       </button>
     ),
+    media: <MediaServerLink file={file} settings={settings} />,
     details: (
       <button
         class="row-icon file-button info-action"

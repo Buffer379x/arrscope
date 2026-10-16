@@ -125,6 +125,7 @@
   gap: 5px;
 }
 .track-language-list > div {
+  min-height: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -190,4 +191,43 @@
   .system-details {
     grid-template-columns: 1fr;
   }
+}
+
+.media-link-control {
+  position: relative;
+  display: inline-flex;
+}
+.media-link-icon {
+  position: relative;
+  display: inline-flex;
+}
+.media-link-icon .media-link-play {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  background: var(--panel);
+  border-radius: 2px;
+}
+.media-link-popover {
+  min-width: 180px;
+  padding: 6px;
+}
+.media-link-popover a,
+.media-link-popover .media-link-unavailable {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.media-link-popover a:hover,
+.media-link-popover a:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel2));
+}
+.media-link-popover .media-link-unavailable {
+  opacity: 0.5;
+}
+
+td.audio-tracks-cell {
+  vertical-align: top;
 }

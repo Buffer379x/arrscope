@@ -4,6 +4,7 @@ import type { Settings } from "../types";
 import { t, useI18n } from "../i18n";
 const labels: Record<string, string> = {
   link: "Show link to Radarr / Sonarr entry",
+  media: "Show link to media server entry",
   details: "Show file details",
   metadata: "Show metadata disagreement warning",
   recognition: "Show recognition conflict warning",
@@ -90,8 +91,20 @@ export function ListLayoutSettings({
           if (await confirmReset(t("Restore defaults?")))
             changed({
               ...settings,
-              listInfoOrder: ["link", "details", "metadata", "recognition"],
-              listInfoVisible: ["link", "details", "metadata", "recognition"],
+              listInfoOrder: [
+                "link",
+                "media",
+                "details",
+                "metadata",
+                "recognition",
+              ],
+              listInfoVisible: [
+                "link",
+                "media",
+                "details",
+                "metadata",
+                "recognition",
+              ],
             });
         }}
       >

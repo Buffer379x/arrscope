@@ -87,6 +87,8 @@ type embySource struct {
 	MediaStreams []embyStream
 }
 type embyItem struct {
+	ServerId     string
+	SeriesId     string
 	Id           string
 	Type         string
 	Path         string
@@ -211,6 +213,14 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 				signature := sha256.Sum256(raw)
 				if old, ok := matches[key]; ok {
 					samePath := strings.ReplaceAll(old.path, "\\", "/") == strings.ReplaceAll(source.Path, "\\", "/")
+					if indices := wanted[key]; len(indices) == 1 {
+						if matched := files[indices[0]].MediaServers.get(c.provider); matched != nil && matched.Link != nil {
+							nextLink := mediaLinkForItem(item, service)
+							if nextLink == nil || *nextLink != *matched.Link {
+								matched.Link = nil
+							}
+						}
+					}
 					if old.ambiguous || !samePath || old.signature != signature {
 						old.ambiguous = true
 						matches[key] = old
@@ -220,7 +230,10 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 					if indices := wanted[key]; len(indices) == 1 {
 						// Retain normalized metadata once. A later duplicate can invalidate it;
 						// pagination failures still discard the entire uncommitted snapshot.
-						files[indices[0]].setMediaMatch(c.provider, pool.intern(mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams))))
+						value := mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams))
+						// UI identity belongs to the uniquely matched file, not to its stream traits.
+						value.Link = mediaLinkForItem(item, service)
+						files[indices[0]].setMediaMatch(c.provider, pool.intern(value))
 					}
 				}
 			}
@@ -256,13 +269,21 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 type mediaPool struct {
 	videos map[MediaVideo]*MediaVideo
 	tracks map[[32]byte][]AudioTrack
+	links  map[MediaLink]*MediaLink
 }
 
 func newMediaPool() *mediaPool {
-	return &mediaPool{videos: map[MediaVideo]*MediaVideo{}, tracks: map[[32]byte][]AudioTrack{}}
+	return &mediaPool{videos: map[MediaVideo]*MediaVideo{}, tracks: map[[32]byte][]AudioTrack{}, links: map[MediaLink]*MediaLink{}}
 }
 func (p *mediaPool) intern(value MediaMatch) MediaMatch {
 	const maxEntries = 4096
+	if value.Link != nil {
+		if existing, ok := p.links[*value.Link]; ok {
+			value.Link = existing
+		} else if len(p.links) < maxEntries {
+			p.links[*value.Link] = value.Link
+		}
+	}
 	if value.Video != nil {
 		if existing, ok := p.videos[*value.Video]; ok {
 			value.Video = existing
@@ -618,4 +639,15 @@ func audioTrackSummary(tracks []AudioTrack, locale ...string) string {
 		values = append(values, fmt.Sprintf("#%d %s → %s%s", t.Index, language, codec, channel))
 	}
 	return strings.Join(values, " | ")
+}
+
+func mediaLinkForItem(item embyItem, service string) *MediaLink {
+	id := item.Id
+	if service == "sonarr" {
+		id = item.SeriesId
+	}
+	if !safeMediaID(id) || !safeMediaID(item.ServerId) {
+		return nil
+	}
+	return &MediaLink{ItemID: id, ServerID: item.ServerId}
 }

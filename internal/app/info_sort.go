@@ -14,6 +14,10 @@ func infoMask(cfg Settings) int {
 		switch key {
 		case "link":
 			mask |= 1
+		case "media":
+			if cfg.Emby.Enabled || cfg.Jellyfin.Enabled {
+				mask |= 16
+			}
 		case "details":
 			mask |= 2
 		case "metadata":
@@ -29,7 +33,7 @@ func infoOrderSQL(q url.Values) (string, error) {
 	if q.Get("_infoMask") != "" {
 		var e error
 		mask, e = strconv.Atoi(q.Get("_infoMask"))
-		if e != nil || mask < 0 || mask > 15 {
+		if e != nil || mask < 0 || mask > 31 {
 			return "", errors.New("Invalid Info action mask")
 		}
 	}
@@ -42,6 +46,9 @@ func infoOrderSQL(q url.Values) (string, error) {
 	}
 	constant := 0
 	if mask&1 != 0 {
+		constant++
+	}
+	if mask&16 != 0 {
 		constant++
 	}
 	if mask&2 != 0 {

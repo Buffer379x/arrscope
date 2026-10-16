@@ -1,4 +1,5 @@
 import { AutoTagMark, autoTagHint } from "./AutoTagMark";
+import { ChannelsCell } from "./ChannelsCell";
 import { RowInfo } from "./RowInfo";
 import { applyInterfaceTheme } from "../themes";
 import { TagInformation, TagVisibility, HiddenTags } from "../ui";
@@ -853,7 +854,7 @@ export function Library({
                                     </td>
                                   ),
                                   audio: (
-                                    <td key="audio">
+                                    <td key="audio" class="audio-tracks-cell">
                                       <AudioCell file={f} />
                                     </td>
                                   ),
@@ -899,20 +900,11 @@ export function Library({
                                     </td>
                                   ),
                                   channels: (
-                                    <td key="channels">
-                                      <div class="source-tags">
-                                        {(f.channels
-                                          ? f.channels.split(" + ")
-                                          : [""]
-                                        ).map((value) => (
-                                          <Tag
-                                            key={value}
-                                            respectHidden
-                                            kind="channels"
-                                            value={value}
-                                          />
-                                        ))}
-                                      </div>
+                                    <td
+                                      key="channels"
+                                      class="audio-tracks-cell"
+                                    >
+                                      <ChannelsCell file={f} />
                                     </td>
                                   ),
                                 };

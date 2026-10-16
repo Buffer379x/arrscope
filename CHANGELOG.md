@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.5
+
+- Require a tag-color recognition rule for codec frames again, including API-only codecs.
+- Align channel rows with their verified audio tracks, preserving duplicate channel layouts.
+- Add configurable media-server links to the Info column, with a provider picker for multiple enabled servers.
+
 ## 0.9.4
 
 - Keep wide settings tables inside their own scroll areas on narrow screens; prevent the new tag display column from widening the page.

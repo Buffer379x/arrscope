@@ -128,7 +128,7 @@ func TestHiddenTagsSettingsAndCounts093(t *testing.T) {
 	}
 }
 
-func TestAPICodecTagPresentation093(t *testing.T) {
+func TestCodecFramesRequireRecognitionRule095(t *testing.T) {
 	s := testStore(t)
 	f := sample(1, "Example.mkv")
 	Enrich(&f, APIInfo{VideoCodec: "vp9"})
@@ -136,6 +136,15 @@ func TestAPICodecTagPresentation093(t *testing.T) {
 		t.Fatal(err)
 	}
 	tags, err := s.DisplayTags(context.Background())
+	if err != nil || containsString(tags["codec"], "vp9") {
+		t.Fatal(tags, err)
+	}
+	config := s.recognition.Config()
+	config.Rules = append(config.Rules, RecognitionRule{ID: "vp9-color", Name: "Codec / VP9", Field: "codec", Match: "token", Pattern: "vp9", Value: "vp9", Mode: "direct", Priority: 95, Enabled: true})
+	if _, err := s.SaveRecognition(context.Background(), config.Rules, config.Revision); err != nil {
+		t.Fatal(err)
+	}
+	tags, err = s.DisplayTags(context.Background())
 	if err != nil || !containsString(tags["codec"], "vp9") {
 		t.Fatal(tags, err)
 	}
