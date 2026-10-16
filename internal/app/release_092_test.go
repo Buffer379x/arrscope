@@ -61,6 +61,12 @@ func TestMediaVideoResolutionAndPriority092(t *testing.T) {
 	if f.Codec != "x264" || f.Resolution != "1080p" || !f.Conflict {
 		t.Fatal(f)
 	}
+	f = File{Filename: "Movie.480p.XviD.mkv"}
+	Enrich(&f, APIInfo{})
+	applyEmby(&f, []embyStream{{Type: "Video", Width: 576, Height: 244, Codec: "mpeg4", CodecTag: "XVID"}})
+	if f.Resolution != "480p" || f.Conflict || f.Evidence["resolution"].Emby != "244p" {
+		t.Fatal("cropped SD produced a false conflict", f)
+	}
 	f = File{Filename: "Movie.mkv"}
 	Enrich(&f, APIInfo{Quality: "Bluray-720p", VideoCodec: "AVC"})
 	applyEmby(&f, []embyStream{{Type: "Video", Width: 1920, Height: 1080, Codec: "h264"}})

@@ -499,6 +499,14 @@ func applyMediaVideo(f *File, video *MediaVideo) {
 			if field == "codec" {
 				return other != "" && family(other) != family(value)
 			}
+			if field == "resolution" && video.Width > 0 && video.Width < 1280 && video.Height > 0 && video.Height < 480 && len(other) > 1 {
+				// Cropped SD pixels cannot distinguish the original 480/576-line
+				// raster. Preserve its explicit label without a false conflict.
+				lines := other[:len(other)-1]
+				if (lines == "480" || lines == "576") && other[len(other)-1] == value[len(value)-1] {
+					return false
+				}
+			}
 			return other != "" && other != value
 		}
 		e.Conflict = e.Conflict || different(e.Filename) || different(e.API)
