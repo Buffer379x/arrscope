@@ -23,6 +23,7 @@ def arrfile(i, service, series=0):
 
 class Fixture(BaseHTTPRequestHandler):
     calls = 0
+    last_request = {}
 
     def log_message(self, *a):
         pass
@@ -31,6 +32,7 @@ class Fixture(BaseHTTPRequestHandler):
         Fixture.calls += 1
         u = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(u.query)
+        Fixture.last_request = {'path': u.path, 'item_type': q.get('IncludeItemTypes', [''])[0], 'offset': q.get('StartIndex', [''])[0]}
         if u.path == '/api/v3/movie':
             data = [{'id': i, 'title': f'Movie {i:05d}', 'year': 2020} for i in range(1, N + 1)]
         elif u.path == '/api/v3/moviefile':
@@ -195,6 +197,7 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
     except Exception as e:
         result['test_error'] = str(e)
     finally:
+        result['fixture_last_request'] = Fixture.last_request
         result['container_state'] = json.loads(docker('inspect', name))[0]['State']
         result['oom_killed'] = result.get('oom_killed', False) or result['container_state']['OOMKilled']
         print(json.dumps(result, indent=2), flush=True)

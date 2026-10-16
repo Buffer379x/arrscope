@@ -124,6 +124,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 
 		if files[i].Size <= 0 {
 			files[i].EmbyMatch = "missing_size"
+			files[i].setMediaMatch(c.provider, MediaMatch{Status: "missing_size"})
 			continue
 		}
 		key := fileIdentity{files[i].Filename, files[i].Size}
@@ -135,7 +136,6 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	type candidate struct {
 		path      string
 		signature [32]byte
-		metadata  embyMetadata
 		ambiguous bool
 	}
 	matches := map[fileIdentity]candidate{}
@@ -214,7 +214,12 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 						matches[key] = old
 					}
 				} else {
-					matches[key] = candidate{path: source.Path, signature: signature, metadata: parseEmbyMetadata(source.MediaStreams)}
+					matches[key] = candidate{path: source.Path, signature: signature}
+					if indices := wanted[key]; len(indices) == 1 {
+						// Retain normalized metadata once. A later duplicate can invalidate it;
+						// pagination failures still discard the entire uncommitted snapshot.
+						files[indices[0]].setMediaMatch(c.provider, mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams)))
+					}
 				}
 			}
 		}
@@ -228,28 +233,30 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	}
 	for key, indices := range wanted {
 		candidate, ok := matches[key]
-		// Release raw stream records as verified tracks replace them.
+		// Candidate fingerprints are no longer needed after duplicate validation.
 		delete(matches, key)
 		if len(indices) != 1 || (ok && candidate.ambiguous) {
 			for _, i := range indices {
 				files[i].EmbyMatch = "ambiguous"
+				files[i].setMediaMatch(c.provider, MediaMatch{Status: "ambiguous"})
 			}
 			continue
 		}
 		if !ok {
-			continue
+			files[indices[0]].setMediaMatch(c.provider, MediaMatch{Status: "missing"})
 		}
-		metadata := candidate.metadata
-		status := "matched"
-		if metadata.ambiguous {
-			status = "ambiguous"
-		} else if len(metadata.tracks) == 0 {
-			status = "no_tracks"
-		}
-		files[indices[0]].setMediaMatch(c.provider, MediaMatch{Status: status, Tracks: metadata.tracks, HDR: metadata.hdr, Video: metadata.video, Channels: metadata.channels})
-		files[indices[0]].EmbyMatch = status
 	}
 	return nil
+}
+func mediaMatchFromMetadata(metadata embyMetadata) MediaMatch {
+	status := "matched"
+	if metadata.ambiguous {
+		return MediaMatch{Status: "ambiguous"}
+	}
+	if len(metadata.tracks) == 0 {
+		status = "no_tracks"
+	}
+	return MediaMatch{Status: status, Tracks: metadata.tracks, HDR: metadata.hdr, Video: metadata.video}
 }
 func trackCodec(stream embyStream) string {
 	codec := normAudio(stream.Codec)
@@ -267,7 +274,6 @@ func trackCodec(stream embyStream) string {
 // Retain only normalized traits; raw stream structs are much larger than tracks.
 // A separate raw-data fingerprint still detects conflicting duplicate sources.
 type embyMetadata struct {
-	channels             string
 	video                *MediaVideo
 	tracks               []AudioTrack
 	audio, language, hdr string
@@ -337,7 +343,7 @@ func parseEmbyMetadata(streams []embyStream) embyMetadata {
 			video = &value
 		}
 	}
-	return embyMetadata{channels: mediaChannels(tracks), video: video, tracks: tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: joinEmbyTraits(hdr, " + ")}
+	return embyMetadata{video: video, tracks: tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: joinEmbyTraits(hdr, " + ")}
 }
 func addVideoHDR(stream embyStream, hdr map[string]bool) {
 	switch strings.ToLower(stream.VideoRangeType) {
@@ -484,13 +490,13 @@ func applyEmbyMetadata(f *File, metadata embyMetadata) {
 		return
 	}
 	applyMediaVideo(f, metadata.video)
-	if f.Channels == "" && metadata.channels != "" {
-		f.Channels = metadata.channels
+	if channels := mediaChannels(metadata.tracks); f.Channels == "" && channels != "" {
+		f.Channels = channels
 		if f.Evidence == nil {
 			f.Evidence = map[string]Evidence{}
 		}
 		e := f.Evidence["channels"]
-		e.Emby = metadata.channels
+		e.Emby = channels
 		e.Origin = "emby"
 		f.Evidence["channels"] = e
 	}

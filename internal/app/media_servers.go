@@ -55,9 +55,6 @@ func resolveMediaServers(f *File) {
 			if len(selected.Tracks) == 0 {
 				selected.Tracks = value.Tracks
 			}
-			if selected.Channels == "" {
-				selected.Channels = value.Channels
-			}
 			selected.Video = mergeMediaVideo(selected.Video, value.Video)
 		}
 		providers = append(providers, provider)
@@ -72,7 +69,7 @@ func resolveMediaServers(f *File) {
 				languages[track.Language] = true
 			}
 		}
-		metadata := embyMetadata{channels: selected.Channels, video: selected.Video, tracks: selected.Tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: selected.HDR}
+		metadata := embyMetadata{video: selected.Video, tracks: selected.Tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: selected.HDR}
 		applyEmbyMetadata(f, metadata)
 		f.MediaOrigin = strings.Join(providers, " + ")
 		for field, e := range f.Evidence {

@@ -124,6 +124,11 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 					err = errors.New(client.label() + " enrichment failed: " + err.Error())
 					break
 				}
+				if len(files) >= 10000 {
+					// Provider candidate indexes are no longer live. Return their
+					// backing pages before building another provider's indexes.
+					debug.FreeOSMemory()
+				}
 			}
 		}
 		// Arr catalog indexes and Emby candidate maps are no longer needed.

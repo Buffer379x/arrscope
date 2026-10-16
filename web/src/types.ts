@@ -106,7 +106,6 @@ export type MediaFile = {
     {
       status: string;
       hdr?: string;
-      channels?: string;
       video?: {
         width?: number;
         height?: number;

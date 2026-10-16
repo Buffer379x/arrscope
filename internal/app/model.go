@@ -107,11 +107,10 @@ type MediaVideo struct {
 	BitDepth   string `json:"bitDepth,omitempty"`
 }
 type MediaMatch struct {
-	Channels string       `json:"channels,omitempty"`
-	Video    *MediaVideo  `json:"video,omitempty"`
-	Status   string       `json:"status"`
-	Tracks   []AudioTrack `json:"tracks,omitempty"`
-	HDR      string       `json:"hdr,omitempty"`
+	Video  *MediaVideo  `json:"video,omitempty"`
+	Status string       `json:"status"`
+	Tracks []AudioTrack `json:"tracks,omitempty"`
+	HDR    string       `json:"hdr,omitempty"`
 }
 type MediaMatches struct {
 	Emby     *MediaMatch `json:"emby,omitempty"`

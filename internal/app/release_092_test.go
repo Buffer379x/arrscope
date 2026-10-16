@@ -18,7 +18,7 @@ func TestMediaVideoFallback092(t *testing.T) {
 	f := File{Filename: "Sechs Tage, Sieben Nächte.avi"}
 	Enrich(&f, APIInfo{})
 	parsed := parseEmbyMetadata(streams)
-	f.setMediaMatch("emby", MediaMatch{Status: "matched", Tracks: parsed.tracks, Video: parsed.video, Channels: parsed.channels})
+	f.setMediaMatch("emby", MediaMatch{Status: "matched", Tracks: parsed.tracks, Video: parsed.video})
 	resolveMediaServers(&f)
 	if f.Resolution != "244p" || f.Codec != "XviD" || f.Family != "MPEG-4 Part 2" || f.BitDepth != "8" || f.Audio != "MP3" || f.Channels != "2.0" || f.Source != "" || f.Language != "" {
 		t.Fatalf("%+v", f)
