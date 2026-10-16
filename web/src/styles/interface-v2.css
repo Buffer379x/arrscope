@@ -903,6 +903,9 @@ select {
 }
 
 /* Match the adjacent color controls without enlarging the checkbox itself. */
+.tag-color-settings .color-settings-table {
+  min-width: 520px;
+}
 .color-settings-table th.tag-display-column,
 .color-settings-table td.tag-display-column {
   width: 64px;
