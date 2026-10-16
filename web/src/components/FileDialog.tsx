@@ -30,7 +30,7 @@ export function FileDialog({
       </div>
       <p class="quiet">
         {t(
-          "Filename first. Uniquely matched media server tracks provide more precise audio and language data. Conflicts are marked.",
+          "Filename first, then Radarr/Sonarr. Uniquely matched media servers fill missing video metadata and provide per-track audio and languages. Conflicts are marked.",
         )}
       </p>
       {file.metadataIncomplete && (
@@ -52,6 +52,30 @@ export function FileDialog({
                   <b>{provider === "emby" ? "Emby" : "Jellyfin"}</b> ·{" "}
                   {embyMatchLabels[file.mediaServers![provider].status] ||
                     file.mediaServers![provider].status}
+                  {file.mediaServers![provider].video && (
+                    <span class="quiet media-video-summary">
+                      {" · "}
+                      {t("Video")}
+                      {": "}
+                      {[
+                        file.mediaServers![provider].video!.width &&
+                        file.mediaServers![provider].video!.height
+                          ? file.mediaServers![provider].video!.width +
+                            " × " +
+                            file.mediaServers![provider].video!.height
+                          : file.mediaServers![provider].video!.resolution,
+                        file.mediaServers![provider].video!.codec,
+                        file.mediaServers![provider].video!.bitDepth
+                          ? t("{value} bit", {
+                              value:
+                                file.mediaServers![provider].video!.bitDepth!,
+                            })
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || t("Unknown")}
+                    </span>
+                  )}
                 </p>
               ))}
           </section>
@@ -125,7 +149,7 @@ export function FileDialog({
         )}
         <p class="quiet">
           {t(
-            "The Channels column still uses the filename or primary audio track from Radarr/Sonarr.",
+            "Channels use the filename or Radarr/Sonarr first, then an explicit layout from a single or uniquely default media-server audio track.",
           )}
         </p>
       </section>
@@ -167,9 +191,7 @@ export function FileDialog({
             <b>{labels[k] || k}</b>
             <span data-label={t("Filename")}>{e.filename || "—"}</span>
             <span data-label="Radarr / Sonarr">{e.api || "—"}</span>
-            <span data-label={t("Media server")}>
-              {e.emby || "—"}
-            </span>
+            <span data-label={t("Media server")}>{e.emby || "—"}</span>
             <span data-label={t("Used")}>
               {e.origin === "rule"
                 ? t("Recognition rule")

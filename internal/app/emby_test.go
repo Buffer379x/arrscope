@@ -32,7 +32,7 @@ func TestEmbyReadOnlyTracksAndVersions(t *testing.T) {
 			if r.URL.Query().Get("IncludeItemTypes") != "Movie" || r.URL.Query().Get("Fields") != "Path,MediaSources,MediaStreams" {
 				t.Error("wrong fields")
 			}
-			w.Write([]byte(`{"TotalRecordCount":1,"Items":[{"Id":"movie1","Type":"Movie","Path":"/library/primary.mkv","MediaStreams":[{"Type":"Audio","Index":1,"Codec":"aac","Language":"fra"}],"MediaSources":[{"Id":"primary","Path":"/library/primary.mkv","Size":500},{"Id":"secondary","Path":"/different/Movie.1080p.DTS.AC3.German.English.mkv","Size":1234,"MediaStreams":[{"Type":"Audio","Index":2,"Codec":"ac3","Language":"eng","Channels":6,"ChannelLayout":"5.1"},{"Type":"Audio","Index":1,"Codec":"dts","Language":"ger","Channels":6,"IsDefault":true},{"Type":"Subtitle","Index":3,"Codec":"subrip","Language":"fra"},{"Type":"Audio","Index":4,"Codec":"aac","Language":"fra","IsExternal":true},{"Type":"Video","Index":0,"ExtendedVideoType":"DolbyVision","ExtendedVideoSubType":"Hdr10"}]},{"Id":"wrong","Path":"/library/WrongVersion.mkv","Size":999,"MediaStreams":[{"Type":"Audio","Index":1,"Codec":"aac","Language":"fra"}]}]}]}`))
+			w.Write([]byte(`{"TotalRecordCount":1,"Items":[{"Id":"movie1","Type":"Movie","Path":"/library/primary.mkv","MediaStreams":[{"Type":"Audio","Index":1,"Codec":"aac","Language":"fra"}],"MediaSources":[{"Id":"primary","Path":"/library/primary.mkv","Size":500},{"Id":"secondary","Path":"/different/Movie.1080p.DTS.AC3.German.English.mkv","Size":1234,"MediaStreams":[{"Type":"Audio","Index":2,"Codec":"ac3","Language":"eng","Channels":6,"ChannelLayout":"5.1"},{"Type":"Audio","Index":1,"Codec":"dts","Language":"ger","Channels":6,"IsDefault":true},{"Type":"Subtitle","Index":3,"Codec":"subrip","Language":"fra"},{"Type":"Audio","Index":4,"Codec":"aac","Language":"fra","IsExternal":true},{"Type":"Video","Index":0,"Width":1920,"Height":800,"Codec":"h264","BitDepth":8,"ExtendedVideoType":"DolbyVision","ExtendedVideoSubType":"Hdr10"}]},{"Id":"wrong","Path":"/library/WrongVersion.mkv","Size":999,"MediaStreams":[{"Type":"Audio","Index":1,"Codec":"aac","Language":"fra"}]}]}]}`))
 		default:
 			t.Errorf("unexpected endpoint %s", r.URL.Path)
 		}
@@ -50,7 +50,7 @@ func TestEmbyReadOnlyTracksAndVersions(t *testing.T) {
 	if f.EmbyMatch != "matched" || len(f.AudioTracks) != 2 || f.AudioTracks[0].Language != "Deutsch" || f.AudioTracks[0].Codec != "DTS" || f.AudioTracks[1].Language != "Englisch" || f.AudioTracks[1].Codec != "AC-3" {
 		t.Fatal(f)
 	}
-	if f.Audio != "AC-3 + DTS" || f.Language != "Deutsch, Englisch" || f.HDR != "Dolby Vision + HDR10" || f.Evidence["audio"].Origin != "mediaServer" {
+	if f.Audio != "AC-3 + DTS" || f.Language != "Deutsch, Englisch" || f.HDR != "Dolby Vision + HDR10" || f.Evidence["audio"].Origin != "mediaServer" || f.Evidence["codec"].Emby != "AVC" || f.BitDepth != "8" {
 		t.Fatal(f)
 	}
 	if files[1].EmbyMatch != "missing" || files[2].EmbyMatch != "missing" {

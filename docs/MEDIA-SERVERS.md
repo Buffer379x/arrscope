@@ -10,7 +10,7 @@ A full Radarr/Sonarr snapshot reads all enabled media servers in sequence. The p
 
 Matching uses a unique basename and positive identical byte size. Optional path mappings add a full-path requirement; alternate versions are matched to their own MediaSources. External audio and subtitles do not become audio tracks. Existing audio language codes are resolved through the bundled ISO registry.
 
-Provider results are retained separately in `mediaServers`. The combined result is matched if at least one provider supplies a unique track inventory and other uniquely matched providers agree. Different reported language/codec/channel inventories produce Conflicting media server metadata and fall back to filename/Arr traits, instead of creating nonexistent combinations. Differing stream order, indices, titles and default flags alone do not conflict. Matching providers can contribute explicit HDR profiles. Details list only active providers. Legacy `embyMatch` and evidence fields remain available internally and in the API for cache/preset compatibility; their combined meaning is media-server matching, not Emby-only matching.
+Provider results are retained separately in `mediaServers`. The combined result is matched if at least one provider supplies a unique track inventory and other uniquely matched providers agree. Different reported language/codec/channel inventories or incompatible known video resolution/codec-family/bit-depth values produce Conflicting media server metadata and fall back to filename/Arr traits, instead of creating nonexistent combinations. Differing stream order, indices, titles and default flags alone do not conflict. A provider with no audio inventory does not contradict a provider that reports tracks. Matching providers can contribute explicit HDR profiles. Details list only active providers. Legacy `embyMatch` and evidence fields remain available internally and in the API for cache/preset compatibility; their combined meaning is media-server matching, not Emby-only matching.
 
 ## Matching filters
 
@@ -30,3 +30,23 @@ Nine 1080p HEVC E-AC-3 5.1 episodes and one 720p H.264 AAC 2.0 episode flag the 
 Affected file rows and visible season headings are highlighted; file details show the differing attributes and majority values. Indexed `season_analysis` rows are refreshed atomically with full syncs, scoped webhook updates and recognition-rule reprocessing. Match-only lists, full-season context, CSV, presets and custom-tag bulk selections use the same predicates. CSV excludes context-only rows and adds both outlier flags. Schema 14 migrates cached seasons with a consistent pre-upgrade backup.
 
 The first-party implementation references are [Jellyfin ItemsController](https://github.com/jellyfin/jellyfin/blob/master/Jellyfin.Api/Controllers/ItemsController.cs) and [Jellyfin MediaStream](https://typescript-sdk.jellyfin.org/interfaces/generated-client.MediaStream.html).
+
+## Video metadata and matching summary (0.9.2)
+
+The existing Items request already includes MediaSources and MediaStreams; no new endpoints, playback requests, probing or media-server scans are needed. Scopearr now retains the selected internal video stream's Width, Height, Codec, CodecTag, BitDepth and IsInterlaced values. A unique default video stream can disambiguate multiple internal video streams; otherwise enrichment is marked ambiguous. HDR comes from that same selected stream.
+
+Filename recognition retains first priority, followed by Radarr/Sonarr. Verified media-server video values fill missing resolution, codec and bit depth, with separate evidence and conflict flags. Codec comparison uses families, so AVC does not contradict x264. XVID/DivX/DX50 FourCC values distinguish MPEG-4 Part 2 variants; plain MPEG-4 remains generic. Pixel dimensions classify standard/cropped HD and UHD raster tiers; smaller nonstandard SD frames retain their actual line count (for example 576×244 → 244p), rather than inventing a DVD/480p source. Exact dimensions remain visible per provider. Missing dimensions do not imply a resolution.
+
+Channels fall back only to an explicit speaker layout from a single or uniquely default audio track. Stereo/mono normalize to 2.0/1.0; channel count alone cannot establish an LFE arrangement. Source, processing and missing audio languages are not inferred from video streams.
+
+The Dashboard summarizes each cached file exactly once:
+- **Matched**: matched plus no_tracks. A unique file identity exists, regardless of metadata completeness.
+- **Not found**: missing plus missing_size.
+- **Needs review**: ambiguous plus conflicting.
+- **Not checked**: pending plus unconfigured.
+
+Each group has an accessible explanation; detailed states remain in filters and per-provider file details. Matching and metadata completeness answer different questions and are not expected to have the same totals. The summary counts files, not movie titles or individual episodes in multi-episode files. Existing mediaMatched presets still select the original matched state (with audio tracks), clearly named in the filter UI.
+
+Upgrade requires a regular full library sync to acquire previously discarded video fields. Existing caches remain readable. Saved media-server video values survive recognition reprocessing and unchanged-file webhook updates.
+
+References: [Jellyfin MediaStream](https://typescript-sdk.jellyfin.org/interfaces/generated-client.MediaStream.html), [Emby VideoStream](https://dev.emby.media/reference/pluginapi/Emby.Media.Model.Streams.VideoStream.html).

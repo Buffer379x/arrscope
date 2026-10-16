@@ -1,9 +1,9 @@
 export const mediaStateFilters: Record<string, string> = {
-  mediaMatched: "Matched",
+  mediaMatched: "Matched with audio tracks",
   mediaMissing: "Not found",
   mediaAmbiguous: "Ambiguous",
   mediaConflicting: "Conflicting media server metadata",
-  mediaNoTracks: "Audio tracks missing",
+  mediaNoTracks: "Matched, audio tracks missing",
   mediaPending: "Awaiting media server matching",
   mediaUnconfigured: "Without media server enrichment",
 };
@@ -14,13 +14,13 @@ export const seasonLanguageHelp =
 
 export const mediaStateHelp: Record<string, string> = {
   mediaMatched:
-    "At least one enabled media server uniquely matches this file by name and size. Excluding this selects files without a successful match.",
+    "A unique file match includes audio tracks. Other attributes may still be unknown. Matched files without audio tracks have their own filter.",
   mediaMissing:
     "No matching file was found, or a required file size is missing. Excluding this removes those cases.",
   mediaAmbiguous:
-    "Multiple files or audio tracks prevent a unique match. Excluding this removes ambiguous matches.",
+    "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.",
   mediaConflicting:
-    "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.",
+    "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.",
   mediaNoTracks:
     "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.",
   mediaPending:

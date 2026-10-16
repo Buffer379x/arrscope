@@ -51,7 +51,7 @@ class Fixture(BaseHTTPRequestHandler):
                     overlap.wait(timeout=15)
                 except threading.BrokenBarrierError:
                     pass
-            data = {'Items': [{'Id': str(i), 'Type': itemtype, 'MediaSources': [{'Path': '/media/' + media_name(i, service), 'Size': 4000000000, 'MediaStreams': [{'Type': 'Audio', 'Index': 1, 'Codec': 'dts', 'Language': 'ger', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Audio', 'Index': 2, 'Codec': 'ac3', 'Language': 'eng', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Video', 'Index': 0, 'ExtendedVideoType': 'DolbyVision', 'ExtendedVideoSubType': 'Hdr10'}]}]} for i in range(start + 1, min(start + limit, N) + 1)], 'TotalRecordCount': N}
+            data = {'Items': [{'Id': str(i), 'Type': itemtype, 'MediaSources': [{'Path': '/media/' + media_name(i, service), 'Size': 4000000000, 'MediaStreams': [{'Type': 'Audio', 'Index': 1, 'Codec': 'dts', 'Language': 'ger', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Audio', 'Index': 2, 'Codec': 'ac3', 'Language': 'eng', 'Channels': 6, 'ChannelLayout': '5.1'}, {'Type': 'Video', 'Index': 0, 'Codec': 'h264', 'Width': 1920, 'Height': 800, 'BitDepth': 8, 'ExtendedVideoType': 'DolbyVision', 'ExtendedVideoSubType': 'Hdr10'}]}]} for i in range(start + 1, min(start + limit, N) + 1)], 'TotalRecordCount': N}
         else:
             data = {'version': 'synthetic'}
         raw = json.dumps(data).encode()
@@ -185,6 +185,8 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
                 assert out['total'] == N
                 assert len(out['files'][0]['audioTracks']) == 2
                 assert out['files'][0]['embyMatch'] == 'matched'
+                assert out['files'][0]['evidence']['codec']['emby'] == 'AVC'
+                assert out['files'][0]['mediaServers']['emby']['video']['width'] == 1920
             result['recognition_preserved_emby'] = True
             result['recognition_upstream_requests'] = Fixture.calls - before_calls
             raw = docker('exec', name, 'cat', '/sys/fs/cgroup/memory.peak', check=False)

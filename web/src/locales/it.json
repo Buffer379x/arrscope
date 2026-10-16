@@ -813,6 +813,22 @@
     "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.": "I server attivi indicano tracce diverse per lo stesso file. Non è esclude queste discrepanze.",
     "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.": "Un elemento identificato non offre metadati audio utilizzabili. Non è esclude questi elementi.",
     "The file is awaiting a media-server match after a cache or file update. Excluding this removes pending items.": "Il file attende un confronto dopo un aggiornamento del file o della cache. Non è esclude gli elementi in attesa.",
-    "The file has no media-server enrichment configured. Excluding this removes those items.": "Per il file non è configurato un arricchimento dal server multimediale. Non è esclude questi elementi."
+    "The file has no media-server enrichment configured. Excluding this removes those items.": "Per il file non è configurato un arricchimento dal server multimediale. Non è esclude questi elementi.",
+    "Needs review": "Da verificare",
+    "Not checked": "Non verificato",
+    "Matched with audio tracks": "Associato con tracce audio",
+    "Matched, audio tracks missing": "Associato, tracce audio mancanti",
+    "Ambiguous file or stream match": "Associazione di file o flusso ambigua",
+    "Video": "Video",
+    "{value} bit": "{value} bit",
+    "A unique file match was found. Audio tracks may be missing; matching does not mean that every metadata attribute is known.": "Il file è stato identificato univocamente. Le tracce audio possono mancare; l'associazione non implica che tutti i metadati siano noti.",
+    "No identical filename and byte size was found, or the required byte size is missing. A title match in the media server alone is not sufficient.": "Non è stato trovato lo stesso nome e la stessa dimensione in byte, oppure manca la dimensione richiesta. La sola corrispondenza del titolo nel server multimediale non basta.",
+    "Multiple candidate files or streams, or conflicting metadata from enabled media servers, prevent safe enrichment. See file details for the reason.": "Più file o flussi candidati, oppure metadati discordanti dei server attivi, impediscono un'integrazione sicura. Il motivo è visibile nei dettagli del file.",
+    "Matching is pending after a file change, or no media server enrichment is configured for this file.": "L'associazione è in attesa dopo una modifica del file, oppure non è configurata l'integrazione per questo file.",
+    "Filename first, then Radarr/Sonarr. Uniquely matched media servers fill missing video metadata and provide per-track audio and languages. Conflicts are marked.": "Prima il nome del file, poi Radarr/Sonarr. I server associati univocamente completano i dati video mancanti e forniscono audio e lingue per traccia. Le discrepanze sono segnalate.",
+    "Channels use the filename or Radarr/Sonarr first, then an explicit layout from a single or uniquely default media-server audio track.": "I canali usano prima il nome o Radarr/Sonarr, poi una disposizione esplicita dell'unica traccia audio o dell'unica traccia predefinita del server.",
+    "A unique file match includes audio tracks. Other attributes may still be unknown. Matched files without audio tracks have their own filter.": "Il file è associato univocamente e include tracce audio. Altri attributi possono restare sconosciuti. I file associati senza tracce audio hanno un filtro dedicato.",
+    "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.": "Più file, flussi video o indici audio duplicati impediscono un'integrazione sicura. Escludendo si rimuovono questi casi ambigui.",
+    "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.": "I server attivi riportano attributi video o inventari audio discordanti per lo stesso file. Escludendo si rimuovono queste discrepanze."
   }
 }
