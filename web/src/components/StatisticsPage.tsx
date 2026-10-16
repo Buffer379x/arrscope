@@ -1,3 +1,5 @@
+import { HelpPopover } from "./HelpPopover";
+import { matchingGroups, matchingCount } from "../media-matching";
 import { dashboardOrder } from "../dashboard-widgets";
 import { StorageWidget } from "./StorageWidget";
 import { getLocale, t, useI18n } from "../i18n";
@@ -154,25 +156,15 @@ export function StatisticsPage({
             <article class="stat-widget">
               <span>{t("Media server matching")}</span>
               <dl>
-                {[
-                  ["matched", t("Matched")],
-                  ["missing", t("Not found")],
-                  ["ambiguous", t("Ambiguous")],
-                  ["conflicting", t("Conflicting media server metadata")],
-                  ["missing_size", t("Size missing")],
-                  ["no_tracks", t("Audio tracks missing")],
-                  ["unconfigured", t("Without media server enrichment")],
-                  ["pending", t("Awaiting media server matching")],
-                ]
-                  .sort(
-                    (a, b) => (data.emby[b[0]] || 0) - (data.emby[a[0]] || 0),
-                  )
-                  .map(([key, label]) => (
-                    <div>
-                      <dt>{label}</dt>
-                      <dd>{count(data.emby[key] || 0)}</dd>
-                    </div>
-                  ))}
+                {matchingGroups.map((group) => (
+                  <div>
+                    <dt>
+                      {t(group.label)}{" "}
+                      <HelpPopover label={group.label} text={group.help} />
+                    </dt>
+                    <dd>{count(matchingCount(data.emby, group.states))}</dd>
+                  </div>
+                ))}
               </dl>
             </article>
           </section>

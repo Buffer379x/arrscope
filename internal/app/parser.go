@@ -63,6 +63,8 @@ func normCodec(s string) string {
 		return "DivX"
 	case "vc1":
 		return "VC-1"
+	case "mpeg4":
+		return "MPEG-4"
 	case "mpeg2", "mpeg2video":
 		return "MPEG-2"
 	}
@@ -70,6 +72,8 @@ func normCodec(s string) string {
 }
 func family(s string) string {
 	switch s {
+	case "MPEG-4", "XviD", "DivX":
+		return "MPEG-4 Part 2"
 	case "AVC", "x264":
 		return "H.264/AVC"
 	case "HEVC", "x265":

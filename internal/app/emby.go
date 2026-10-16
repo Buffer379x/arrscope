@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -56,6 +57,11 @@ func (c *EmbyClient) Test(ctx context.Context) (string, error) {
 }
 
 type embyStream struct {
+	Width                     int
+	Height                    int
+	BitDepth                  int
+	IsInterlaced              bool
+	CodecTag                  string
 	Type                      string
 	Index                     int
 	Codec                     string
@@ -102,7 +108,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	defer func() {
 		for i := range files {
 			if value := files[i].MediaServers.get(c.provider); value != nil {
-				value.Status = files[i].EmbyMatch
+				files[i].EmbyMatch = value.Status
 			} else {
 				files[i].setMediaMatch(c.provider, MediaMatch{Status: files[i].EmbyMatch})
 			}
@@ -119,6 +125,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 
 		if files[i].Size <= 0 {
 			files[i].EmbyMatch = "missing_size"
+			files[i].setMediaMatch(c.provider, MediaMatch{Status: "missing_size"})
 			continue
 		}
 		key := fileIdentity{files[i].Filename, files[i].Size}
@@ -130,10 +137,10 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	type candidate struct {
 		path      string
 		signature [32]byte
-		metadata  embyMetadata
 		ambiguous bool
 	}
 	matches := map[fileIdentity]candidate{}
+	pool := newMediaPool()
 	itemType := "Movie"
 	if service == "sonarr" {
 		itemType = "Episode"
@@ -209,7 +216,12 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 						matches[key] = old
 					}
 				} else {
-					matches[key] = candidate{path: source.Path, signature: signature, metadata: parseEmbyMetadata(source.MediaStreams)}
+					matches[key] = candidate{path: source.Path, signature: signature}
+					if indices := wanted[key]; len(indices) == 1 {
+						// Retain normalized metadata once. A later duplicate can invalidate it;
+						// pagination failures still discard the entire uncommitted snapshot.
+						files[indices[0]].setMediaMatch(c.provider, pool.intern(mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams))))
+					}
 				}
 			}
 		}
@@ -223,28 +235,61 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	}
 	for key, indices := range wanted {
 		candidate, ok := matches[key]
-		// Release raw stream records as verified tracks replace them.
+		// Candidate fingerprints are no longer needed after duplicate validation.
 		delete(matches, key)
 		if len(indices) != 1 || (ok && candidate.ambiguous) {
 			for _, i := range indices {
 				files[i].EmbyMatch = "ambiguous"
+				files[i].setMediaMatch(c.provider, MediaMatch{Status: "ambiguous"})
 			}
 			continue
 		}
 		if !ok {
-			continue
+			files[indices[0]].setMediaMatch(c.provider, MediaMatch{Status: "missing"})
 		}
-		metadata := candidate.metadata
-		status := "matched"
-		if metadata.ambiguous {
-			status = "ambiguous"
-		} else if len(metadata.tracks) == 0 {
-			status = "no_tracks"
-		}
-		files[indices[0]].setMediaMatch(c.provider, MediaMatch{Status: status, Tracks: metadata.tracks, HDR: metadata.hdr})
-		files[indices[0]].EmbyMatch = status
 	}
 	return nil
+}
+
+// Scope each pool to one provider snapshot. Shared values are immutable;
+// bounded indexes avoid retaining an unbounded catalog of distinct traits.
+type mediaPool struct {
+	videos map[MediaVideo]*MediaVideo
+	tracks map[[32]byte][]AudioTrack
+}
+
+func newMediaPool() *mediaPool {
+	return &mediaPool{videos: map[MediaVideo]*MediaVideo{}, tracks: map[[32]byte][]AudioTrack{}}
+}
+func (p *mediaPool) intern(value MediaMatch) MediaMatch {
+	const maxEntries = 4096
+	if value.Video != nil {
+		if existing, ok := p.videos[*value.Video]; ok {
+			value.Video = existing
+		} else if len(p.videos) < maxEntries {
+			p.videos[*value.Video] = value.Video
+		}
+	}
+	if len(value.Tracks) > 0 {
+		raw, _ := json.Marshal(value.Tracks)
+		key := sha256.Sum256(raw)
+		if existing, ok := p.tracks[key]; ok && slices.Equal(existing, value.Tracks) {
+			value.Tracks = existing
+		} else if len(p.tracks) < maxEntries {
+			p.tracks[key] = value.Tracks
+		}
+	}
+	return value
+}
+func mediaMatchFromMetadata(metadata embyMetadata) MediaMatch {
+	status := "matched"
+	if metadata.ambiguous {
+		return MediaMatch{Status: "ambiguous"}
+	}
+	if len(metadata.tracks) == 0 {
+		status = "no_tracks"
+	}
+	return MediaMatch{Status: status, Tracks: metadata.tracks, HDR: metadata.hdr, Video: metadata.video}
 }
 func trackCodec(stream embyStream) string {
 	codec := normAudio(stream.Codec)
@@ -262,6 +307,7 @@ func trackCodec(stream embyStream) string {
 // Retain only normalized traits; raw stream structs are much larger than tracks.
 // A separate raw-data fingerprint still detects conflicting duplicate sources.
 type embyMetadata struct {
+	video                *MediaVideo
 	tracks               []AudioTrack
 	audio, language, hdr string
 	ambiguous            bool
@@ -279,6 +325,7 @@ func parseEmbyMetadata(streams []embyStream) embyMetadata {
 	tracks := []AudioTrack{}
 	codecs, languages, hdr := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	indices := map[int]bool{}
+	var videos []embyStream
 	for _, stream := range streams {
 		if strings.EqualFold(stream.Type, "Audio") && !stream.IsExternal {
 			if indices[stream.Index] {
@@ -299,52 +346,181 @@ func parseEmbyMetadata(streams []embyStream) embyMetadata {
 				languages[language] = true
 			}
 		}
-		if strings.EqualFold(stream.Type, "Video") {
-			switch strings.ToLower(stream.VideoRangeType) {
-			case "hdr10":
-				hdr["HDR10"] = true
-			case "hdr10plus":
-				hdr["HDR10+"] = true
-			case "hlg":
-				hdr["HLG"] = true
-			case "dovi":
-				hdr["Dolby Vision"] = true
-			case "doviwithhdr10":
-				hdr["Dolby Vision"] = true
-				hdr["HDR10"] = true
-			case "doviwithhdr10plus":
-				hdr["Dolby Vision"] = true
-				hdr["HDR10+"] = true
-			case "doviwithhlg":
-				hdr["Dolby Vision"] = true
-				hdr["HLG"] = true
-			}
-			if stream.Hdr10PlusPresentFlag {
-				hdr["HDR10+"] = true
-			}
-			switch strings.ToLower(stream.ExtendedVideoType) {
-			case "hdr10":
-				hdr["HDR10"] = true
-			case "hdr10plus":
-				hdr["HDR10+"] = true
-			case "hyperloggamma":
-				hdr["HLG"] = true
-			case "dolbyvision":
-				hdr["Dolby Vision"] = true
-			}
-			// Only explicit base-layer subtype values are used, not a guessed DV profile fallback.
-			switch strings.ToLower(stream.ExtendedVideoSubType) {
-			case "hdr10":
-				hdr["HDR10"] = true
-			case "hdr10plus0":
-				hdr["HDR10+"] = true
-			case "hyperloggamma":
-				hdr["HLG"] = true
-			}
+		if strings.EqualFold(stream.Type, "Video") && !stream.IsExternal {
+			videos = append(videos, stream)
+
 		}
 	}
 	sort.Slice(tracks, func(i, j int) bool { return tracks[i].Index < tracks[j].Index })
-	return embyMetadata{tracks: tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: joinEmbyTraits(hdr, " + ")}
+	var video *MediaVideo
+	if len(videos) > 0 {
+		selected := videos[0]
+		if len(videos) > 1 {
+			defaults := 0
+			for _, stream := range videos {
+				if stream.IsDefault {
+					selected = stream
+					defaults++
+				}
+			}
+			if defaults != 1 {
+				return embyMetadata{ambiguous: true}
+			}
+		}
+		addVideoHDR(selected, hdr)
+		value := MediaVideo{Width: selected.Width, Height: selected.Height, Resolution: mediaResolution(selected.Width, selected.Height, selected.IsInterlaced), Codec: mediaVideoCodec(selected)}
+		if selected.BitDepth > 0 {
+			value.BitDepth = strconv.Itoa(selected.BitDepth)
+		}
+		if value != (MediaVideo{}) {
+			video = &value
+		}
+	}
+	return embyMetadata{video: video, tracks: tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: joinEmbyTraits(hdr, " + ")}
+}
+func addVideoHDR(stream embyStream, hdr map[string]bool) {
+	switch strings.ToLower(stream.VideoRangeType) {
+	case "hdr10":
+		hdr["HDR10"] = true
+	case "hdr10plus":
+		hdr["HDR10+"] = true
+	case "hlg":
+		hdr["HLG"] = true
+	case "dovi":
+		hdr["Dolby Vision"] = true
+	case "doviwithhdr10":
+		hdr["Dolby Vision"] = true
+		hdr["HDR10"] = true
+	case "doviwithhdr10plus":
+		hdr["Dolby Vision"] = true
+		hdr["HDR10+"] = true
+	case "doviwithhlg":
+		hdr["Dolby Vision"] = true
+		hdr["HLG"] = true
+	}
+	if stream.Hdr10PlusPresentFlag {
+		hdr["HDR10+"] = true
+	}
+	switch strings.ToLower(stream.ExtendedVideoType) {
+	case "hdr10":
+		hdr["HDR10"] = true
+	case "hdr10plus":
+		hdr["HDR10+"] = true
+	case "hyperloggamma":
+		hdr["HLG"] = true
+	case "dolbyvision":
+		hdr["Dolby Vision"] = true
+	}
+	// Only explicit base-layer subtype values are used, not a guessed DV profile fallback.
+	switch strings.ToLower(stream.ExtendedVideoSubType) {
+	case "hdr10":
+		hdr["HDR10"] = true
+	case "hdr10plus0":
+		hdr["HDR10+"] = true
+	case "hyperloggamma":
+		hdr["HLG"] = true
+	}
+}
+func mediaVideoCodec(stream embyStream) string {
+	if strings.EqualFold(stream.Codec, "mpeg4") {
+		switch strings.ToLower(strings.TrimSpace(stream.CodecTag)) {
+		case "xvid":
+			return "XviD"
+		case "divx", "dx50":
+			return "DivX"
+		}
+	}
+	return normCodec(stream.Codec)
+}
+func mediaChannels(tracks []AudioTrack) string {
+	var selected *AudioTrack
+	if len(tracks) == 1 {
+		selected = &tracks[0]
+	} else {
+		for i := range tracks {
+			if tracks[i].Default {
+				if selected != nil {
+					return ""
+				}
+				selected = &tracks[i]
+			}
+		}
+	}
+	if selected == nil {
+		return ""
+	}
+	layout := strings.ToLower(strings.TrimSpace(selected.ChannelLayout))
+	switch layout {
+	case "mono":
+		return "1.0"
+	case "stereo":
+		return "2.0"
+	}
+	// Do not turn a channel count into an assumed speaker/LFE layout.
+	if len(layout) == 3 && layout[0] >= '1' && layout[0] <= '9' && layout[1] == '.' && layout[2] >= '0' && layout[2] <= '9' {
+		return layout
+	}
+	return ""
+}
+
+// Classify the coded raster, including cropped widescreen releases. Missing
+// dimensions remain unknown; a codec never implies an encoder or source.
+func mediaResolution(width, height int, interlaced bool) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
+	lines := height
+	for _, tier := range []struct{ width, height int }{{7680, 4320}, {3840, 2160}, {2560, 1440}, {1920, 1080}, {1280, 720}, {0, 576}, {0, 480}} {
+		if (tier.width > 0 && width >= tier.width) || height >= tier.height {
+			lines = tier.height
+			break
+		}
+	}
+	suffix := "p"
+	if interlaced {
+		suffix = "i"
+	}
+	return strconv.Itoa(lines) + suffix
+}
+func applyMediaVideo(f *File, video *MediaVideo) {
+	if video == nil {
+		return
+	}
+	if f.Evidence == nil {
+		f.Evidence = map[string]Evidence{}
+	}
+	set := func(field, value, current string) string {
+		if value == "" {
+			return current
+		}
+		e := f.Evidence[field]
+		e.Emby = value
+		different := func(other string) bool {
+			if field == "codec" {
+				return other != "" && family(other) != family(value)
+			}
+			if field == "resolution" && video.Width > 0 && video.Width < 1280 && video.Height > 0 && video.Height < 480 && len(other) > 1 {
+				// Cropped SD pixels cannot distinguish the original 480/576-line
+				// raster. Preserve its explicit label without a false conflict.
+				lines := other[:len(other)-1]
+				if (lines == "480" || lines == "576") && other[len(other)-1] == value[len(value)-1] {
+					return false
+				}
+			}
+			return other != "" && other != value
+		}
+		e.Conflict = e.Conflict || different(e.Filename) || different(e.API)
+		if current == "" {
+			current = value
+			e.Origin = "emby"
+		}
+		f.Evidence[field] = e
+		return current
+	}
+	f.Resolution = set("resolution", video.Resolution, f.Resolution)
+	f.Codec = set("codec", video.Codec, f.Codec)
+	f.Family = family(f.Codec)
+	f.BitDepth = set("bitDepth", video.BitDepth, f.BitDepth)
 }
 func applyEmby(f *File, streams []embyStream) {
 	applyEmbyMetadata(f, parseEmbyMetadata(streams))
@@ -353,6 +529,17 @@ func applyEmbyMetadata(f *File, metadata embyMetadata) {
 	if metadata.ambiguous {
 		f.EmbyMatch = "ambiguous"
 		return
+	}
+	applyMediaVideo(f, metadata.video)
+	if channels := mediaChannels(metadata.tracks); f.Channels == "" && channels != "" {
+		f.Channels = channels
+		if f.Evidence == nil {
+			f.Evidence = map[string]Evidence{}
+		}
+		e := f.Evidence["channels"]
+		e.Emby = channels
+		e.Origin = "emby"
+		f.Evidence["channels"] = e
 	}
 	tracks := metadata.tracks
 	if len(tracks) == 0 {

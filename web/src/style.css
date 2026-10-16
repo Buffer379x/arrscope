@@ -485,3 +485,6 @@
 .sync-clock-grid input, .sync-clock-grid select { min-width:0; max-width:100%; width:100%; box-sizing:border-box; }
 
 @media(max-width:700px) { .attribute-filters > .state-filter-heading .filter-logic-tooltip { position:fixed; left:24px; right:24px; top:auto; bottom:24px; width:auto; } }
+
+.quality-widgets dt { display:flex; align-items:center; gap:6px; min-width:0; }
+.media-video-summary { overflow-wrap:anywhere; }

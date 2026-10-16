@@ -42,7 +42,7 @@ func resolveMediaServers(f *File) {
 		if value.Status != "matched" && value.Status != "no_tracks" {
 			continue
 		}
-		if selected != nil && trackInventory(selected.Tracks) != trackInventory(value.Tracks) {
+		if selected != nil && ((len(selected.Tracks) > 0 && len(value.Tracks) > 0 && trackInventory(selected.Tracks) != trackInventory(value.Tracks)) || mediaVideoConflict(selected.Video, value.Video)) {
 			f.EmbyMatch = "conflicting"
 			updateCompleteness(f)
 			return
@@ -52,6 +52,10 @@ func resolveMediaServers(f *File) {
 			selected = &copy
 		} else {
 			selected.HDR = mergeHDR(selected.HDR, value.HDR)
+			if len(selected.Tracks) == 0 {
+				selected.Tracks = value.Tracks
+			}
+			selected.Video = mergeMediaVideo(selected.Video, value.Video)
 		}
 		providers = append(providers, provider)
 	}
@@ -65,11 +69,11 @@ func resolveMediaServers(f *File) {
 				languages[track.Language] = true
 			}
 		}
-		metadata := embyMetadata{tracks: selected.Tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: selected.HDR}
+		metadata := embyMetadata{video: selected.Video, tracks: selected.Tracks, audio: joinEmbyTraits(codecs, " + "), language: joinEmbyTraits(languages, ", "), hdr: selected.HDR}
 		applyEmbyMetadata(f, metadata)
 		f.MediaOrigin = strings.Join(providers, " + ")
 		for field, e := range f.Evidence {
-			if e.Emby != "" {
+			if e.Origin == "emby" {
 				e.Origin = "mediaServer"
 				f.Evidence[field] = e
 			}
@@ -133,4 +137,41 @@ func appendMediaFilters(q url.Values, w *[]string, a *[]any) error {
 		}
 	}
 	return nil
+}
+
+// Compare only attributes reported by both providers. An absent stream inventory
+// is incomplete data, not evidence of a different file.
+func mediaVideoConflict(a, b *MediaVideo) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return (a.Resolution != "" && b.Resolution != "" && a.Resolution != b.Resolution) ||
+		(a.Codec != "" && b.Codec != "" && family(a.Codec) != family(b.Codec)) ||
+		(a.BitDepth != "" && b.BitDepth != "" && a.BitDepth != b.BitDepth)
+}
+func mergeMediaVideo(a, b *MediaVideo) *MediaVideo {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	merged := *a
+	if merged.Width == 0 && merged.Height == 0 {
+		merged.Width = b.Width
+		merged.Height = b.Height
+	}
+	if merged.Resolution == "" {
+		merged.Resolution = b.Resolution
+	}
+	if merged.Codec == "" {
+		merged.Codec = b.Codec
+	}
+	if merged.BitDepth == "" {
+		merged.BitDepth = b.BitDepth
+	}
+	if merged == *a {
+		return a
+	}
+	return &merged
 }

@@ -99,7 +99,15 @@ type CustomTag struct {
 	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
 }
+type MediaVideo struct {
+	Width      int    `json:"width,omitempty"`
+	Height     int    `json:"height,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
+	Codec      string `json:"codec,omitempty"`
+	BitDepth   string `json:"bitDepth,omitempty"`
+}
 type MediaMatch struct {
+	Video  *MediaVideo  `json:"video,omitempty"`
 	Status string       `json:"status"`
 	Tracks []AudioTrack `json:"tracks,omitempty"`
 	HDR    string       `json:"hdr,omitempty"`
@@ -123,6 +131,9 @@ func (f *File) setMediaMatch(provider string, value MediaMatch) {
 		f.MediaServers = &MediaMatches{}
 	}
 	if provider == "jellyfin" {
+		if other := f.MediaServers.Emby; other != nil && other.Video != nil && value.Video != nil && *other.Video == *value.Video {
+			value.Video = other.Video
+		}
 		if f.MediaServers.Emby != nil && trackInventory(f.MediaServers.Emby.Tracks) == trackInventory(value.Tracks) {
 			value.Tracks = f.MediaServers.Emby.Tracks
 		}

@@ -103,7 +103,18 @@ export type MediaFile = {
   embyMatch?: string;
   mediaServers?: Record<
     string,
-    { status: string; hdr?: string; tracks?: MediaFile["audioTracks"] }
+    {
+      status: string;
+      hdr?: string;
+      video?: {
+        width?: number;
+        height?: number;
+        resolution?: string;
+        codec?: string;
+        bitDepth?: string;
+      };
+      tracks?: MediaFile["audioTracks"];
+    }
   >;
   mediaOrigin?: string;
   seasonOutlier?: boolean;

@@ -813,6 +813,22 @@
     "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.": "Aktivierte Medienserver melden unterschiedliche Tonspur-Bestände für dieselbe Datei. IST NICHT schließt diese Abweichungen aus.",
     "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.": "Ein zugeordneter Medienserver-Eintrag liefert keine nutzbaren Tonspurmetadaten. IST NICHT schließt diese Einträge aus.",
     "The file is awaiting a media-server match after a cache or file update. Excluding this removes pending items.": "Die Datei wartet nach einer Cache- oder Dateiänderung auf den Medienserver-Abgleich. IST NICHT schließt ausstehende Einträge aus.",
-    "The file has no media-server enrichment configured. Excluding this removes those items.": "Für die Datei ist keine Medienserver-Ergänzung konfiguriert. IST NICHT schließt diese Einträge aus."
+    "The file has no media-server enrichment configured. Excluding this removes those items.": "Für die Datei ist keine Medienserver-Ergänzung konfiguriert. IST NICHT schließt diese Einträge aus.",
+    "Needs review": "Prüfung nötig",
+    "Not checked": "Nicht abgeglichen",
+    "Matched with audio tracks": "Zugeordnet mit Tonspuren",
+    "Matched, audio tracks missing": "Zugeordnet, Tonspuren fehlen",
+    "Ambiguous file or stream match": "Mehrdeutige Datei- oder Stream-Zuordnung",
+    "Video": "Video",
+    "{value} bit": "{value} Bit",
+    "A unique file match was found. Audio tracks may be missing; matching does not mean that every metadata attribute is known.": "Die Datei wurde eindeutig zugeordnet. Tonspuren können fehlen; eine Zuordnung bedeutet nicht, dass alle Metadaten bekannt sind.",
+    "No identical filename and byte size was found, or the required byte size is missing. A title match in the media server alone is not sufficient.": "Es wurde keine Datei mit gleichem Namen und gleicher Byte-Größe gefunden, oder die benötigte Größe fehlt. Ein zugeordneter Filmtitel im Medienserver allein reicht nicht aus.",
+    "Multiple candidate files or streams, or conflicting metadata from enabled media servers, prevent safe enrichment. See file details for the reason.": "Mehrere mögliche Dateien oder Streams bzw. widersprüchliche Angaben aktivierter Medienserver verhindern eine sichere Ergänzung. Die Dateidetails zeigen den Grund.",
+    "Matching is pending after a file change, or no media server enrichment is configured for this file.": "Nach einer Dateiänderung steht der Abgleich noch aus, oder für diese Datei ist keine Medienserver-Ergänzung eingerichtet.",
+    "Filename first, then Radarr/Sonarr. Uniquely matched media servers fill missing video metadata and provide per-track audio and languages. Conflicts are marked.": "Dateiname zuerst, danach Radarr/Sonarr. Eindeutig zugeordnete Medienserver ergänzen fehlende Videoangaben sowie Audio und Sprachen je Tonspur. Abweichungen sind markiert.",
+    "Channels use the filename or Radarr/Sonarr first, then an explicit layout from a single or uniquely default media-server audio track.": "Kanäle stammen zuerst aus dem Dateinamen oder Radarr/Sonarr, danach aus einer expliziten Kanalbelegung der einzigen bzw. eindeutig als Standard markierten Medienserver-Tonspur.",
+    "A unique file match includes audio tracks. Other attributes may still be unknown. Matched files without audio tracks have their own filter.": "Die Datei ist eindeutig zugeordnet und enthält Tonspurangaben. Andere Merkmale können unbekannt bleiben. Zugeordnete Dateien ohne Tonspuren haben einen eigenen Filter.",
+    "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.": "Mehrere Dateien, Videostreams oder doppelte Tonspurindizes verhindern eine sichere Ergänzung. Ausschließen entfernt diese mehrdeutigen Fälle.",
+    "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.": "Aktivierte Medienserver melden widersprüchliche Videoangaben oder Tonspurbelegungen derselben Datei. Ausschließen entfernt diese Widersprüche."
   }
 }

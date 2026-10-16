@@ -40,12 +40,12 @@ export const embyMatchLabels: Record<string, string> = translatedLabels({
   conflicting: "Conflicting media server metadata",
   pending: "Awaiting media server matching",
   unmatched: "All unsuccessful matches",
-  matched: "Matched",
+  matched: "Matched with audio tracks",
   unconfigured: "Without media server enrichment",
   missing: "Not found in media server",
   missing_size: "File size missing for matching",
-  ambiguous: "Ambiguous file or audio track match",
-  no_tracks: "Media server provides no audio tracks",
+  ambiguous: "Ambiguous file or stream match",
+  no_tracks: "Matched, audio tracks missing",
 });
 export type FilterOperator = "eq" | "not" | "all" | "notAll";
 export const operatorLabels: Record<FilterOperator, string> = translatedLabels({

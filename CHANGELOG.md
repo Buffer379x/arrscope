@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2
+
+- Fill missing video resolution, codec and bit depth from verified Emby/Jellyfin file matches, with provider evidence and safe cache reprocessing.
+- Read MPEG-4 FourCC identifiers and explicit audio layouts without guessing source or language.
+- Group the matching widget into four explained, non-overlapping states while retaining detailed filters.
+
 ## 0.9.1
 
 - Fix dashboard widget alignment and filter operator alignment; add localized filter explanations.
