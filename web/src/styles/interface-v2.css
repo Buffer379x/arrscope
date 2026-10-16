@@ -901,3 +901,26 @@ select {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Match the adjacent color controls without enlarging the checkbox itself. */
+.color-settings-table .tag-display-column {
+  width: 64px;
+}
+.color-settings-table td > .tag-display-toggle {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.color-settings-table .tag-display-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+}

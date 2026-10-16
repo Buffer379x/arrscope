@@ -433,23 +433,16 @@ func mediaVideoCodec(stream embyStream) string {
 	return normCodec(stream.Codec)
 }
 func mediaChannels(tracks []AudioTrack) string {
-	var selected *AudioTrack
-	if len(tracks) == 1 {
-		selected = &tracks[0]
-	} else {
-		for i := range tracks {
-			if tracks[i].Default {
-				if selected != nil {
-					return ""
-				}
-				selected = &tracks[i]
-			}
+	values := map[string]bool{}
+	for _, track := range tracks {
+		if value := mediaChannelLayout(track); value != "" {
+			values[value] = true
 		}
 	}
-	if selected == nil {
-		return ""
-	}
-	layout := strings.ToLower(strings.TrimSpace(selected.ChannelLayout))
+	return joinEmbyTraits(values, " + ")
+}
+func mediaChannelLayout(track AudioTrack) string {
+	layout := strings.ToLower(strings.TrimSpace(track.ChannelLayout))
 	switch layout {
 	case "mono":
 		return "1.0"
@@ -459,6 +452,9 @@ func mediaChannels(tracks []AudioTrack) string {
 	// Do not turn a channel count into an assumed speaker/LFE layout.
 	if len(layout) == 3 && layout[0] >= '1' && layout[0] <= '9' && layout[1] == '.' && layout[2] >= '0' && layout[2] <= '9' {
 		return layout
+	}
+	if track.Channels > 0 {
+		return strconv.Itoa(track.Channels) + " ch"
 	}
 	return ""
 }
@@ -531,14 +527,16 @@ func applyEmbyMetadata(f *File, metadata embyMetadata) {
 		return
 	}
 	applyMediaVideo(f, metadata.video)
-	if channels := mediaChannels(metadata.tracks); f.Channels == "" && channels != "" {
-		f.Channels = channels
+	if channels := mediaChannels(metadata.tracks); channels != "" {
 		if f.Evidence == nil {
 			f.Evidence = map[string]Evidence{}
 		}
 		e := f.Evidence["channels"]
 		e.Emby = channels
-		e.Origin = "emby"
+		if f.Channels == "" {
+			f.Channels = channels
+			e.Origin = "emby"
+		}
 		f.Evidence["channels"] = e
 	}
 	tracks := metadata.tracks

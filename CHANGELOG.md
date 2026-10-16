@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.3
+
+- Aggregate known channel layouts across all verified audio tracks, preserving language-to-codec pairing and channel-count fallbacks.
+- Render API-only codecs such as vp9 with the regular tag style.
+- Add saved per-tag display checkboxes for library cells and filter choices without changing totals or stored data.
+
 ## 0.9.2
 
 - Fill missing video resolution, codec and bit depth from verified Emby/Jellyfin file matches, with provider evidence and safe cache reprocessing.

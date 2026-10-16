@@ -59,6 +59,7 @@ type Settings struct {
 	VisibleColumns  map[string][]string `json:"visibleColumns"`
 	TagColors       map[string]string   `json:"tagColors"`
 	TagTextColors   map[string]string   `json:"tagTextColors"`
+	HiddenTags      map[string]bool     `json:"hiddenTags"`
 	Radarr          ServiceConfig       `json:"radarr"`
 	Sonarr          ServiceConfig       `json:"sonarr"`
 	Emby            ServiceConfig       `json:"emby"`
@@ -218,7 +219,7 @@ type Preset struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{PageSize: 100, Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, Radarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Sonarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Emby: ServiceConfig{}, SeasonMode: "matches"}
+	return Settings{PageSize: 100, Widgets: defaultWidgets(), ListInfoOrder: defaultListInfoOrder(), ListInfoVisible: defaultListInfoOrder(), InterfaceTheme: "default", WarningColors: defaultWarningColors(), ColumnOrder: defaultColumnOrder(), VisibleColumns: defaultVisibleColumns(), TagColors: map[string]string{}, TagTextColors: map[string]string{}, HiddenTags: map[string]bool{}, Radarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Sonarr: ServiceConfig{Interval: 60, TagImportInterval: 5}, Emby: ServiceConfig{}, SeasonMode: "matches"}
 }
 
 func (s *Settings) Connections() []*ServiceConfig {
@@ -352,6 +353,20 @@ func validateTagColors(colors map[string]string) error {
 }
 
 func normalizeTagTextColors(cfg *Settings) error {
+	if cfg.HiddenTags == nil {
+		cfg.HiddenTags = map[string]bool{}
+	}
+	if len(cfg.HiddenTags) > 2048 {
+		return fmt.Errorf("Too many tag display settings")
+	}
+	for key, hidden := range cfg.HiddenTags {
+		if err := validateTagColors(map[string]string{key: "#000000"}); err != nil {
+			return fmt.Errorf("Invalid tag display setting")
+		}
+		if !hidden {
+			delete(cfg.HiddenTags, key)
+		}
+	}
 	if cfg.TagTextColors == nil {
 		cfg.TagTextColors = map[string]string{}
 	}

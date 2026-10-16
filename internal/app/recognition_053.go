@@ -90,6 +90,25 @@ func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
 			sets[f]["__unknown__"] = true
 		}
 	}
+	// API-only codecs also have a normal tag presentation. Per-file information
+	// rules and the informationFields check below still control plain values.
+	codecRows, codecErr := s.DB.QueryContext(ctx, "SELECT DISTINCT codec FROM files WHERE codec<>''")
+	if codecErr != nil {
+		return nil, codecErr
+	}
+	for codecRows.Next() {
+		var value string
+		if err := codecRows.Scan(&value); err != nil {
+			codecRows.Close()
+			return nil, err
+		}
+		sets["codec"][value] = true
+	}
+	codecErr = codecRows.Err()
+	codecRows.Close()
+	if codecErr != nil {
+		return nil, codecErr
+	}
 	// Dynamic captures use only filename evidence from enabled, tag-marked rules.
 	for _, r := range engine.Rules {
 		if !r.Enabled || !ruleIsTag(r) || !strings.Contains(r.Value, "$") {

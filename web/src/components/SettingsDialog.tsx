@@ -1162,6 +1162,9 @@ export function SettingsDialog({
                       <tr>
                         <th>{t("Tag preview")}</th>
                         <th>{t("Count")}</th>
+                        <th class="tag-display-column">
+                          {t("Display column")}
+                        </th>
                         <th>{t("Color")}</th>
                         <th>{t("Text")}</th>
                         <th>{t("Reset column")}</th>
@@ -1217,6 +1220,24 @@ export function SettingsDialog({
                                 )}
                               </td>
                               <td class="tag-link-count">{links}</td>
+                              <td class="tag-display-column">
+                                <label class="tag-display-toggle">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t("Display tag: {value}", {
+                                      value: label,
+                                    })}
+                                    checked={!cfg.hiddenTags?.[key]}
+                                    onChange={(e) => {
+                                      const hiddenTags = { ...cfg.hiddenTags };
+                                      if (e.currentTarget.checked)
+                                        delete hiddenTags[key];
+                                      else hiddenTags[key] = true;
+                                      setCfg({ ...cfg, hiddenTags });
+                                    }}
+                                  />
+                                </label>
+                              </td>
                               <td>
                                 <input
                                   type="color"

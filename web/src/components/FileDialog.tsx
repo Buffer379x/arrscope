@@ -149,7 +149,7 @@ export function FileDialog({
         )}
         <p class="quiet">
           {t(
-            "Channels use the filename or Radarr/Sonarr first, then an explicit layout from a single or uniquely default media-server audio track.",
+            "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.",
           )}
         </p>
       </section>

@@ -831,6 +831,9 @@
     "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.": "Multiple files, video streams or duplicate audio-track indices prevent safe enrichment. Excluding this removes ambiguous matches.",
     "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.": "Enabled media servers report conflicting video attributes or audio-track inventories for the same file. Excluding this removes these disagreements.",
     "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.": "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.",
-    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync."
+    "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.": "Imports, upgrades and file deletions refresh affected entries. Regular sync remains the fallback. New media server stream metadata is added during the next full sync.",
+    "Display tag: {value}": "Display tag: {value}",
+    "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.": "Channels use the filename or Radarr/Sonarr first, then all known media-server audio layouts. Counts without a reported layout remain channel counts.",
+    "Display column": "Display"
   }
 }

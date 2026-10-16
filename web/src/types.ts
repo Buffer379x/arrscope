@@ -39,6 +39,7 @@ export type Settings = {
   warningColors: Record<string, string>;
   tagColors: Record<string, string>;
   tagTextColors: Record<string, string>;
+  hiddenTags?: Record<string, boolean>;
   radarr: Connection;
   sonarr: Connection;
   emby: Connection;

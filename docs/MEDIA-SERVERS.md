@@ -37,7 +37,7 @@ The existing Items request already includes MediaSources and MediaStreams; no ne
 
 Filename recognition retains first priority, followed by Radarr/Sonarr. Verified media-server video values fill missing resolution, codec and bit depth, with separate evidence and conflict flags. Codec comparison uses families, so AVC does not contradict x264. XVID/DivX/DX50 FourCC values distinguish MPEG-4 Part 2 variants; plain MPEG-4 remains generic. Pixel dimensions classify standard/cropped HD and UHD raster tiers; smaller nonstandard SD frames retain their actual line count (for example 576×244 → 244p), rather than inventing a DVD/480p source. Exact dimensions remain visible per provider. Cropped SD dimensions do not contradict an explicit 480/576-line label of the same scan mode, since the original raster cannot be reconstructed from the crop. Missing dimensions do not imply a resolution.
 
-Channels fall back only to an explicit speaker layout from a single or uniquely default audio track. Stereo/mono normalize to 2.0/1.0; channel count alone cannot establish an LFE arrangement. Source, processing and missing audio languages are not inferred from video streams.
+Channels retain filename/Arr priority, then fall back to the distinct known layouts across every verified internal audio track, regardless of default-track flags. Stereo/mono normalize to 2.0/1.0; a count without a layout is shown as, for example, 6 ch and never guessed as 5.1. Multiple values have separate list tags and share the same compound filter, facet, count and outbound tag-sync logic. Each audio row retains its own language and codec. Source, processing and missing audio languages are not inferred from video streams.
 
 The Dashboard summarizes each cached file exactly once:
 - **Matched**: matched plus no_tracks. A unique file identity exists, regardless of metadata completeness.
@@ -50,3 +50,10 @@ Each group has an accessible explanation; detailed states remain in filters and 
 Upgrade requires a regular full library sync to acquire previously discarded video fields. Existing caches remain readable. Saved media-server video values survive recognition reprocessing and unchanged-file webhook updates.
 
 References: [Jellyfin MediaStream](https://typescript-sdk.jellyfin.org/interfaces/generated-client.MediaStream.html), [Emby VideoStream](https://dev.emby.media/reference/pluginapi/Emby.Media.Model.Streams.VideoStream.html).
+
+
+## Tag display preferences (0.9.3)
+
+Settings → Display → Tag colors includes a Display checkbox between Count and Color. All values are visible by default. Save settings to persist changes. Turning a value off hides it from movie/episode table cells and the corresponding filter choices, independently for each category. It does not delete metadata, change stored presets or active predicates, modify CSV exports or outbound tag synchronization, or change statistics and assignment counts. Previously selected hidden filters remain removable through the active-filter chips. Settings previews, file details and Dashboard statistics stay available.
+
+API-only codec values such as vp9 receive the same tag presentation as recognized codecs. Explicit information-only filename rules continue to control their presentation.

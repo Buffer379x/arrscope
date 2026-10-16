@@ -95,6 +95,7 @@ func rebuildSeasonAnalysis(ctx context.Context, tx *sql.Tx, mediaID *int) error 
 			}
 		}
 		entry.traits[2] = canonicalSet(entry.traits[2], " + ")
+		entry.traits[3] = canonicalSet(entry.traits[3], " + ")
 		entry.traits[4] = canonicalSet(normLanguage(entry.traits[4]), ", ")
 		group = append(group, entry)
 	}

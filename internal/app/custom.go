@@ -130,6 +130,7 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 		key := "custom:" + strconv.FormatInt(id, 10)
 		delete(cfg.TagColors, key)
 		delete(cfg.TagTextColors, key)
+		delete(cfg.HiddenTags, key)
 		raw, _ := json.Marshal(cfg)
 		if _, err = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(raw)); err != nil {
 			return err
@@ -557,6 +558,7 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 				key := "custom:" + strconv.FormatInt(id, 10)
 				delete(cfg.TagColors, key)
 				delete(cfg.TagTextColors, key)
+				delete(cfg.HiddenTags, key)
 			}
 			raw, err = json.Marshal(cfg)
 			if err != nil {

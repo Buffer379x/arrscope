@@ -1,7 +1,7 @@
 import { AutoTagMark, autoTagHint } from "./AutoTagMark";
 import { RowInfo } from "./RowInfo";
 import { applyInterfaceTheme } from "../themes";
-import { TagInformation, TagVisibility } from "../ui";
+import { TagInformation, TagVisibility, HiddenTags } from "../ui";
 import { confirmDeletion } from "../confirmation";
 import { notify } from "../notifications";
 import { CustomBulk } from "./CustomBulk";
@@ -463,652 +463,702 @@ export function Library({
       )}
     >
       <TagVisibility.Provider value={tagVisibility}>
-        <TagColors.Provider value={settings?.tagColors || {}}>
-          <TagTextColors.Provider value={settings?.tagTextColors || {}}>
-            <div class="shell">
-              <header class="header">
-                <a href="/" class="brand" aria-label={t("Scopearr home")}>
-                  <img
-                    src="/icon-64.png"
-                    srcSet="/icon-64.png 1x, /icon-256.png 2x"
-                    width="34"
-                    height="34"
-                    alt=""
-                  />
-                  <b>
-                    Scopearr<span> / </span>
-                  </b>
-                  <span class="brand-caption">{t("LIBRARY EXPLORER")}</span>
-                </a>
-                <nav class="tabs" aria-label={t("Main navigation")}>
-                  <button
-                    class={view === "statistics" ? "active" : ""}
-                    onClick={() => {
-                      if (!canLeaveRules()) return;
-                      setView("statistics");
-                    }}
-                  >
-                    <BarChart3 size={17} />
-                    {t("Dashboard")}
-                  </button>
-
-                  <button
-                    class={
-                      view === "library" && service === "radarr" ? "active" : ""
-                    }
-                    onClick={() => {
-                      if (!canLeaveRules()) return;
-                      setCollapsed(true);
-                      setView("library");
-                      if (service === "radarr") return;
-                      setService("radarr");
-                      setPage(1);
-                      setResults(emptyResults);
-                    }}
-                  >
-                    <Film size={17} /> {t("Movies")}
-                  </button>
-                  <button
-                    class={
-                      view === "library" && service === "sonarr" ? "active" : ""
-                    }
-                    onClick={() => {
-                      if (!canLeaveRules()) return;
-                      setCollapsed(true);
-                      setView("library");
-                      if (service === "sonarr") return;
-                      setService("sonarr");
-                      setPage(1);
-                      setResults(emptyResults);
-                    }}
-                  >
-                    <Tv size={17} /> {t("TV series")}
-                  </button>
-                </nav>
-                <div class="header-actions">
-                  <button
-                    class="icon-button"
-                    aria-label={
-                      theme === "dark" ? t("Light theme") : t("Dark theme")
-                    }
-                    onClick={() =>
-                      setTheme(theme === "dark" ? "light" : "dark")
-                    }
-                  >
-                    {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-                  </button>
-                  <button
-                    class="icon-button"
-                    aria-label={t("Settings")}
-                    onClick={() => {
-                      if (canLeaveRules()) openSettings();
-                    }}
-                  >
-                    <SettingsIcon size={18} />
-                  </button>
-                  <button
-                    class="icon-button"
-                    aria-label={t("Sign out")}
-                    onClick={async () => {
-                      await api("logout", "POST");
-                      await refresh();
-                    }}
-                  >
-                    <LogOut size={18} />
-                  </button>
-                </div>
-              </header>
-              {status.demo && (
-                <div class="demo-bar">
-                  <span>
-                    <Info size={14} />
-                    {t("Demo · sample data, no connection to your services")}
-                  </span>
-                </div>
-              )}
-              <main class="main">
-                {settingsOpen && settings ? (
-                  <SettingsDialog
-                    customTags={customTags}
-                    customChanged={async () => {
-                      await loadCustom();
-                      await loadSettings();
-                      await loadPresets();
-                      await refresh();
-                    }}
-                    settings={settings}
-                    initialSection={settingsSection}
-                    onDirty={setSettingsDirty}
-                    refresh={refresh}
-                    status={status}
-                    connectionError={connectionError}
-                    demo={status.demo}
-                    saved={async () => {
-                      await loadSettings();
-                      await refresh();
-                    }}
-                  />
-                ) : view === "recognition" ? (
-                  <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
-                ) : view === "statistics" ? (
-                  <StatisticsPage
-                    status={status}
-                    settings={settings}
-                    onFilter={openDashboardFilter}
-                  />
-                ) : (
-                  <>
-                    <section class="library-intro">
-                      <h1>
-                        {service === "radarr"
-                          ? t("Movie library")
-                          : t("TV library")}
-                      </h1>
-                      <span>
-                        {count(sync?.count || 0)} {t("files in cache")}
-                      </span>
-                    </section>
-                    {!status.demo && settings && !configured && (
-                      <div class="connect-card">
-                        <Database size={24} />
-                        <div>
-                          <b>
-                            {t(
-                              service === "radarr"
-                                ? "Connect your movie library."
-                                : "Connect your TV library.",
-                            )}
-                          </b>
-                          <p>
-                            {t(
-                              "An address and API key are enough. Scopearr only reads existing data.",
-                            )}
-                          </p>
-                        </div>
-                        <button
-                          class="primary"
-                          onClick={() => {
-                            if (canLeaveRules()) openSettings();
-                          }}
-                        >
-                          {t("Set up service")}
-                          <ArrowUpRight size={16} />
-                        </button>
-                      </div>
-                    )}
-                    <FilterPanel
-                      q={q}
-                      collapsed={collapsed}
-                      setCollapsed={setCollapsed}
-                      active={active}
-                      service={service}
-                      facets={facets}
-                      presets={presets}
-                      selectedPreset={selectedPreset}
-                      applyPreset={applyPreset}
-                      reset={reset}
-                      setSavePreset={(value) => {
-                        setPresetError("");
-                        setSavePreset(value);
-                      }}
-                      deletePreset={deletePreset}
-                      change={change}
+        <HiddenTags.Provider value={settings?.hiddenTags || {}}>
+          <TagColors.Provider value={settings?.tagColors || {}}>
+            <TagTextColors.Provider value={settings?.tagTextColors || {}}>
+              <div class="shell">
+                <header class="header">
+                  <a href="/" class="brand" aria-label={t("Scopearr home")}>
+                    <img
+                      src="/icon-64.png"
+                      srcSet="/icon-64.png 1x, /icon-256.png 2x"
+                      width="34"
+                      height="34"
+                      alt=""
                     />
-                    <section class="library-section">
-                      <div class="results-heading">
-                        <div>
-                          <h2>
-                            {t(
-                              service === "radarr"
-                                ? "Your movies"
-                                : "Your TV series",
-                            )}{" "}
-                            <span>{count(results.total)}</span>
-                            {busy && <LoaderCircle size={16} class="spin" />}
-                          </h2>
-                        </div>
-                        <div class="results-tools">
-                          <button
-                            class="button"
-                            aria-pressed={showAllColumns[service]}
-                            disabled={
-                              visibleColumns.length === columnOrder.length &&
-                              !showAllColumns[service]
-                            }
-                            title={
-                              showAllColumns[service]
-                                ? t("Return to saved columns")
-                                : t("Show hidden columns in the saved order")
-                            }
-                            onClick={() =>
-                              setShowAllColumns({
-                                ...showAllColumns,
-                                [service]: !showAllColumns[service],
-                              })
-                            }
-                          >
-                            <Columns3 size={15} />{" "}
-                            {showAllColumns[service]
-                              ? t("Default view")
-                              : t("All columns")}
-                          </button>
-                          <button
-                            type="button"
-                            class="button"
-                            disabled={!results.total}
-                            onClick={() => setCustomOpen(true)}
-                          >
-                            <TagIcon size={15} />
-                            {t("Set tag")}
-                          </button>
-                          <a class="button" href={"/api/export?" + exportQuery}>
-                            <Download size={15} />
-                            {t("Export CSV")}
-                          </a>
-                        </div>
-                      </div>
-                      <div
-                        class={"table-wrap" + (busy ? " busy" : "")}
-                        aria-busy={busy}
-                      >
-                        <table
-                          class={
-                            displayColumns.includes("custom")
-                              ? "with-custom"
-                              : ""
-                          }
-                        >
-                          <thead>
-                            <tr>
-                              {displayColumns.map((field) =>
-                                columnHeader(
-                                  field,
-                                  field === "title"
-                                    ? service === "radarr"
-                                      ? t("Title")
-                                      : t("Episode")
-                                    : columnLabels[field],
-                                  field === "title",
-                                ),
+                    <b>
+                      Scopearr<span> / </span>
+                    </b>
+                    <span class="brand-caption">{t("LIBRARY EXPLORER")}</span>
+                  </a>
+                  <nav class="tabs" aria-label={t("Main navigation")}>
+                    <button
+                      class={view === "statistics" ? "active" : ""}
+                      onClick={() => {
+                        if (!canLeaveRules()) return;
+                        setView("statistics");
+                      }}
+                    >
+                      <BarChart3 size={17} />
+                      {t("Dashboard")}
+                    </button>
+
+                    <button
+                      class={
+                        view === "library" && service === "radarr"
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => {
+                        if (!canLeaveRules()) return;
+                        setCollapsed(true);
+                        setView("library");
+                        if (service === "radarr") return;
+                        setService("radarr");
+                        setPage(1);
+                        setResults(emptyResults);
+                      }}
+                    >
+                      <Film size={17} /> {t("Movies")}
+                    </button>
+                    <button
+                      class={
+                        view === "library" && service === "sonarr"
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => {
+                        if (!canLeaveRules()) return;
+                        setCollapsed(true);
+                        setView("library");
+                        if (service === "sonarr") return;
+                        setService("sonarr");
+                        setPage(1);
+                        setResults(emptyResults);
+                      }}
+                    >
+                      <Tv size={17} /> {t("TV series")}
+                    </button>
+                  </nav>
+                  <div class="header-actions">
+                    <button
+                      class="icon-button"
+                      aria-label={
+                        theme === "dark" ? t("Light theme") : t("Dark theme")
+                      }
+                      onClick={() =>
+                        setTheme(theme === "dark" ? "light" : "dark")
+                      }
+                    >
+                      {theme === "dark" ? (
+                        <Sun size={18} />
+                      ) : (
+                        <Moon size={18} />
+                      )}
+                    </button>
+                    <button
+                      class="icon-button"
+                      aria-label={t("Settings")}
+                      onClick={() => {
+                        if (canLeaveRules()) openSettings();
+                      }}
+                    >
+                      <SettingsIcon size={18} />
+                    </button>
+                    <button
+                      class="icon-button"
+                      aria-label={t("Sign out")}
+                      onClick={async () => {
+                        await api("logout", "POST");
+                        await refresh();
+                      }}
+                    >
+                      <LogOut size={18} />
+                    </button>
+                  </div>
+                </header>
+                {status.demo && (
+                  <div class="demo-bar">
+                    <span>
+                      <Info size={14} />
+                      {t("Demo · sample data, no connection to your services")}
+                    </span>
+                  </div>
+                )}
+                <main class="main">
+                  {settingsOpen && settings ? (
+                    <SettingsDialog
+                      customTags={customTags}
+                      customChanged={async () => {
+                        await loadCustom();
+                        await loadSettings();
+                        await loadPresets();
+                        await refresh();
+                      }}
+                      settings={settings}
+                      initialSection={settingsSection}
+                      onDirty={setSettingsDirty}
+                      refresh={refresh}
+                      status={status}
+                      connectionError={connectionError}
+                      demo={status.demo}
+                      saved={async () => {
+                        await loadSettings();
+                        await refresh();
+                      }}
+                    />
+                  ) : view === "recognition" ? (
+                    <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
+                  ) : view === "statistics" ? (
+                    <StatisticsPage
+                      status={status}
+                      settings={settings}
+                      onFilter={openDashboardFilter}
+                    />
+                  ) : (
+                    <>
+                      <section class="library-intro">
+                        <h1>
+                          {service === "radarr"
+                            ? t("Movie library")
+                            : t("TV library")}
+                        </h1>
+                        <span>
+                          {count(sync?.count || 0)} {t("files in cache")}
+                        </span>
+                      </section>
+                      {!status.demo && settings && !configured && (
+                        <div class="connect-card">
+                          <Database size={24} />
+                          <div>
+                            <b>
+                              {t(
+                                service === "radarr"
+                                  ? "Connect your movie library."
+                                  : "Connect your TV library.",
                               )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {results.files.map((f, i) => {
-                              const prev = results.files[i - 1];
-                              const group =
-                                service === "sonarr" &&
-                                (!prev ||
-                                  prev.mediaId !== f.mediaId ||
-                                  prev.season !== f.season);
-                              const cells: Record<string, JSX.Element> = {
-                                title: (
-                                  <td key="title" class="title-cell">
-                                    <div class="title-line">
-                                      <b>{f.title}</b>
-                                    </div>
-                                    {service === "sonarr" && (
-                                      <small class="episode-filename">
-                                        {f.filename}
-                                      </small>
-                                    )}
-                                    {!f.matched && (
-                                      <small class="context-label">
-                                        {t(
-                                          "Season context · not a filter match",
-                                        )}
-                                      </small>
-                                    )}
-                                  </td>
-                                ),
-                                info: (
-                                  <td key="info" class="info-cell">
-                                    <RowInfo
-                                      file={f}
-                                      settings={settings}
-                                      details={() => setFilename(f)}
-                                    />
-                                  </td>
-                                ),
-                                year: (
-                                  <td key="year" class="year-cell">
-                                    {f.years.length ? f.years.join(" / ") : "—"}
-                                  </td>
-                                ),
-                                resolution: (
-                                  <td key="resolution">
-                                    <Tag
-                                      value={f.resolution}
-                                      kind={"resolution r" + f.resolution}
-                                    />
-                                  </td>
-                                ),
-                                codec: (
-                                  <td key="codec">
-                                    <Tag
-                                      value={f.codec}
-                                      kind="codec"
-                                      title={f.family}
-                                    />
-                                  </td>
-                                ),
-                                source: (
-                                  <td key="source">
-                                    <Tag value={f.source} />
-                                  </td>
-                                ),
-                                processing: (
-                                  <td key="processing">
-                                    <Tag
-                                      value={f.processing}
-                                      kind="processing"
-                                    />
-                                  </td>
-                                ),
-                                size: (
-                                  <td key="size" class="nowrap">
-                                    {bytes(f.size)}
-                                  </td>
-                                ),
-                                hdr: (
-                                  <td key="hdr">
-                                    <div class="source-tags">
-                                      {(f.hdr ? f.hdr.split(" + ") : [""]).map(
-                                        (value) => (
-                                          <Tag value={value} kind="hdr" />
-                                        ),
-                                      )}
-                                    </div>
-                                  </td>
-                                ),
-                                bitDepth: (
-                                  <td key="bitDepth">
-                                    <Tag kind="bitDepth" value={f.bitDepth} />
-                                  </td>
-                                ),
-                                audio: (
-                                  <td key="audio">
-                                    <AudioCell file={f} />
-                                  </td>
-                                ),
-                                custom: (
-                                  <td key="custom" class="custom-cell">
-                                    <div class="source-tags">
-                                      <button
-                                        class="icon-button single-tag-button"
-                                        aria-label={t(
-                                          "Edit custom tags: {title}",
-                                          { title: f.title },
-                                        )}
-                                        title={t("Edit custom tags: {title}", {
-                                          title: f.title,
-                                        })}
-                                        onClick={() => setSingleCustom(f.id)}
-                                      >
-                                        <TagIcon size={15} />
-                                      </button>
-                                      {(f.custom || []).map((tag) => (
-                                        <Tag
-                                          kind="custom"
-                                          value={String(tag.id)}
-                                          forceTag={tag.manual || tag.protected}
-                                          label={tag.displayName || tag.name}
-                                          title={
-                                            tag.protected
-                                              ? autoTagHint(tag)
-                                              : tag.displayName || tag.name
-                                          }
-                                        >
-                                          <AutoTagMark tag={tag} />
-                                          {tag.displayName || tag.name}
-                                        </Tag>
-                                      ))}
-                                    </div>
-                                  </td>
-                                ),
-                                channels: (
-                                  <td key="channels">
-                                    <Tag kind="channels" value={f.channels} />
-                                  </td>
-                                ),
-                              };
-                              return (
-                                <>
-                                  {group && (
-                                    <tr
-                                      class={
-                                        "season-row" +
-                                        (results.files.some(
-                                          (entry) =>
-                                            entry.mediaId === f.mediaId &&
-                                            entry.season === f.season &&
-                                            (entry.seasonOutlier ||
-                                              entry.languageOutlier),
-                                        )
-                                          ? " has-outlier"
-                                          : "")
-                                      }
-                                    >
-                                      <td colSpan={displayColumns.length}>
-                                        <Layers size={15} />
-                                        <strong>
-                                          {f.series} <span>—</span>{" "}
-                                          {f.season === 0
-                                            ? t("Specials")
-                                            : t("Season {number}", {
-                                                number: String(
-                                                  f.season,
-                                                ).padStart(2, "0"),
-                                              })}
-                                        </strong>
-                                        <span class="season-note">
-                                          {settings?.seasonMode === "season"
-                                            ? t("Season context enabled")
-                                            : t("Matching files")}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  )}
-                                  <TagInformation.Provider
-                                    value={f.informationOnly || {}}
-                                  >
-                                    <tr
-                                      key={f.service + f.id}
-                                      title={[
-                                        f.seasonOutlier
-                                          ? t("Technical outliers")
-                                          : "",
-                                        f.languageOutlier
-                                          ? t("Language outliers")
-                                          : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" · ")}
-                                      class={[
-                                        !f.matched ? "context-row" : "",
-                                        f.seasonOutlier
-                                          ? "technical-outlier"
-                                          : "",
-                                        f.languageOutlier
-                                          ? "language-outlier"
-                                          : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" ")}
-                                    >
-                                      {displayColumns.map(
-                                        (field) => cells[field],
-                                      )}
-                                    </tr>
-                                  </TagInformation.Provider>
-                                </>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                        {!results.files.length && !busy && (
-                          <div class="empty-state">
-                            <Search size={32} />
-                            <h3>
-                              {active.length
-                                ? t("No matching files.")
-                                : t("Your overview starts here.")}
-                            </h3>
+                            </b>
                             <p>
-                              {active.length
-                                ? t("Adjust or reset your filters.")
-                                : t(
-                                    "Connect a service and start the first sync.",
-                                  )}
+                              {t(
+                                "An address and API key are enough. Scopearr only reads existing data.",
+                              )}
                             </p>
+                          </div>
+                          <button
+                            class="primary"
+                            onClick={() => {
+                              if (canLeaveRules()) openSettings();
+                            }}
+                          >
+                            {t("Set up service")}
+                            <ArrowUpRight size={16} />
+                          </button>
+                        </div>
+                      )}
+                      <FilterPanel
+                        q={q}
+                        collapsed={collapsed}
+                        setCollapsed={setCollapsed}
+                        active={active}
+                        service={service}
+                        facets={facets}
+                        presets={presets}
+                        selectedPreset={selectedPreset}
+                        applyPreset={applyPreset}
+                        reset={reset}
+                        setSavePreset={(value) => {
+                          setPresetError("");
+                          setSavePreset(value);
+                        }}
+                        deletePreset={deletePreset}
+                        change={change}
+                      />
+                      <section class="library-section">
+                        <div class="results-heading">
+                          <div>
+                            <h2>
+                              {t(
+                                service === "radarr"
+                                  ? "Your movies"
+                                  : "Your TV series",
+                              )}{" "}
+                              <span>{count(results.total)}</span>
+                              {busy && <LoaderCircle size={16} class="spin" />}
+                            </h2>
+                          </div>
+                          <div class="results-tools">
                             <button
-                              class={active.length ? "icon-button" : "button"}
+                              class="button"
+                              aria-pressed={showAllColumns[service]}
+                              disabled={
+                                visibleColumns.length === columnOrder.length &&
+                                !showAllColumns[service]
+                              }
                               title={
-                                active.length ? t("Reset filters") : undefined
+                                showAllColumns[service]
+                                  ? t("Return to saved columns")
+                                  : t("Show hidden columns in the saved order")
                               }
-                              aria-label={
-                                active.length
-                                  ? t("Reset filters")
-                                  : t("Open settings")
-                              }
-                              onClick={
-                                active.length ? reset : () => openSettings()
+                              onClick={() =>
+                                setShowAllColumns({
+                                  ...showAllColumns,
+                                  [service]: !showAllColumns[service],
+                                })
                               }
                             >
-                              {active.length ? (
-                                <RotateCcw size={16} />
-                              ) : (
-                                t("Open settings")
-                              )}
+                              <Columns3 size={15} />{" "}
+                              {showAllColumns[service]
+                                ? t("Default view")
+                                : t("All columns")}
+                            </button>
+                            <button
+                              type="button"
+                              class="button"
+                              disabled={!results.total}
+                              onClick={() => setCustomOpen(true)}
+                            >
+                              <TagIcon size={15} />
+                              {t("Set tag")}
+                            </button>
+                            <a
+                              class="button"
+                              href={"/api/export?" + exportQuery}
+                            >
+                              <Download size={15} />
+                              {t("Export CSV")}
+                            </a>
+                          </div>
+                        </div>
+                        <div
+                          class={"table-wrap" + (busy ? " busy" : "")}
+                          aria-busy={busy}
+                        >
+                          <table
+                            class={
+                              displayColumns.includes("custom")
+                                ? "with-custom"
+                                : ""
+                            }
+                          >
+                            <thead>
+                              <tr>
+                                {displayColumns.map((field) =>
+                                  columnHeader(
+                                    field,
+                                    field === "title"
+                                      ? service === "radarr"
+                                        ? t("Title")
+                                        : t("Episode")
+                                      : columnLabels[field],
+                                    field === "title",
+                                  ),
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {results.files.map((f, i) => {
+                                const prev = results.files[i - 1];
+                                const group =
+                                  service === "sonarr" &&
+                                  (!prev ||
+                                    prev.mediaId !== f.mediaId ||
+                                    prev.season !== f.season);
+                                const cells: Record<string, JSX.Element> = {
+                                  title: (
+                                    <td key="title" class="title-cell">
+                                      <div class="title-line">
+                                        <b>{f.title}</b>
+                                      </div>
+                                      {service === "sonarr" && (
+                                        <small class="episode-filename">
+                                          {f.filename}
+                                        </small>
+                                      )}
+                                      {!f.matched && (
+                                        <small class="context-label">
+                                          {t(
+                                            "Season context · not a filter match",
+                                          )}
+                                        </small>
+                                      )}
+                                    </td>
+                                  ),
+                                  info: (
+                                    <td key="info" class="info-cell">
+                                      <RowInfo
+                                        file={f}
+                                        settings={settings}
+                                        details={() => setFilename(f)}
+                                      />
+                                    </td>
+                                  ),
+                                  year: (
+                                    <td key="year" class="year-cell">
+                                      {f.years.length
+                                        ? f.years.join(" / ")
+                                        : "—"}
+                                    </td>
+                                  ),
+                                  resolution: (
+                                    <td key="resolution">
+                                      <Tag
+                                        respectHidden
+                                        value={f.resolution}
+                                        kind={"resolution r" + f.resolution}
+                                      />
+                                    </td>
+                                  ),
+                                  codec: (
+                                    <td key="codec">
+                                      <Tag
+                                        respectHidden
+                                        value={f.codec}
+                                        kind="codec"
+                                        title={f.family}
+                                      />
+                                    </td>
+                                  ),
+                                  source: (
+                                    <td key="source">
+                                      <Tag respectHidden value={f.source} />
+                                    </td>
+                                  ),
+                                  processing: (
+                                    <td key="processing">
+                                      <Tag
+                                        respectHidden
+                                        value={f.processing}
+                                        kind="processing"
+                                      />
+                                    </td>
+                                  ),
+                                  size: (
+                                    <td key="size" class="nowrap">
+                                      {bytes(f.size)}
+                                    </td>
+                                  ),
+                                  hdr: (
+                                    <td key="hdr">
+                                      <div class="source-tags">
+                                        {(f.hdr
+                                          ? f.hdr.split(" + ")
+                                          : [""]
+                                        ).map((value) => (
+                                          <Tag
+                                            respectHidden
+                                            value={value}
+                                            kind="hdr"
+                                          />
+                                        ))}
+                                      </div>
+                                    </td>
+                                  ),
+                                  bitDepth: (
+                                    <td key="bitDepth">
+                                      <Tag
+                                        respectHidden
+                                        kind="bitDepth"
+                                        value={f.bitDepth}
+                                      />
+                                    </td>
+                                  ),
+                                  audio: (
+                                    <td key="audio">
+                                      <AudioCell file={f} />
+                                    </td>
+                                  ),
+                                  custom: (
+                                    <td key="custom" class="custom-cell">
+                                      <div class="source-tags">
+                                        <button
+                                          class="icon-button single-tag-button"
+                                          aria-label={t(
+                                            "Edit custom tags: {title}",
+                                            { title: f.title },
+                                          )}
+                                          title={t(
+                                            "Edit custom tags: {title}",
+                                            {
+                                              title: f.title,
+                                            },
+                                          )}
+                                          onClick={() => setSingleCustom(f.id)}
+                                        >
+                                          <TagIcon size={15} />
+                                        </button>
+                                        {(f.custom || []).map((tag) => (
+                                          <Tag
+                                            respectHidden
+                                            kind="custom"
+                                            value={String(tag.id)}
+                                            forceTag={
+                                              tag.manual || tag.protected
+                                            }
+                                            label={tag.displayName || tag.name}
+                                            title={
+                                              tag.protected
+                                                ? autoTagHint(tag)
+                                                : tag.displayName || tag.name
+                                            }
+                                          >
+                                            <AutoTagMark tag={tag} />
+                                            {tag.displayName || tag.name}
+                                          </Tag>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  ),
+                                  channels: (
+                                    <td key="channels">
+                                      <div class="source-tags">
+                                        {(f.channels
+                                          ? f.channels.split(" + ")
+                                          : [""]
+                                        ).map((value) => (
+                                          <Tag
+                                            key={value}
+                                            respectHidden
+                                            kind="channels"
+                                            value={value}
+                                          />
+                                        ))}
+                                      </div>
+                                    </td>
+                                  ),
+                                };
+                                return (
+                                  <>
+                                    {group && (
+                                      <tr
+                                        class={
+                                          "season-row" +
+                                          (results.files.some(
+                                            (entry) =>
+                                              entry.mediaId === f.mediaId &&
+                                              entry.season === f.season &&
+                                              (entry.seasonOutlier ||
+                                                entry.languageOutlier),
+                                          )
+                                            ? " has-outlier"
+                                            : "")
+                                        }
+                                      >
+                                        <td colSpan={displayColumns.length}>
+                                          <Layers size={15} />
+                                          <strong>
+                                            {f.series} <span>—</span>{" "}
+                                            {f.season === 0
+                                              ? t("Specials")
+                                              : t("Season {number}", {
+                                                  number: String(
+                                                    f.season,
+                                                  ).padStart(2, "0"),
+                                                })}
+                                          </strong>
+                                          <span class="season-note">
+                                            {settings?.seasonMode === "season"
+                                              ? t("Season context enabled")
+                                              : t("Matching files")}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    )}
+                                    <TagInformation.Provider
+                                      value={f.informationOnly || {}}
+                                    >
+                                      <tr
+                                        key={f.service + f.id}
+                                        title={[
+                                          f.seasonOutlier
+                                            ? t("Technical outliers")
+                                            : "",
+                                          f.languageOutlier
+                                            ? t("Language outliers")
+                                            : "",
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" · ")}
+                                        class={[
+                                          !f.matched ? "context-row" : "",
+                                          f.seasonOutlier
+                                            ? "technical-outlier"
+                                            : "",
+                                          f.languageOutlier
+                                            ? "language-outlier"
+                                            : "",
+                                        ]
+                                          .filter(Boolean)
+                                          .join(" ")}
+                                      >
+                                        {displayColumns.map(
+                                          (field) => cells[field],
+                                        )}
+                                      </tr>
+                                    </TagInformation.Provider>
+                                  </>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          {!results.files.length && !busy && (
+                            <div class="empty-state">
+                              <Search size={32} />
+                              <h3>
+                                {active.length
+                                  ? t("No matching files.")
+                                  : t("Your overview starts here.")}
+                              </h3>
+                              <p>
+                                {active.length
+                                  ? t("Adjust or reset your filters.")
+                                  : t(
+                                      "Connect a service and start the first sync.",
+                                    )}
+                              </p>
+                              <button
+                                class={active.length ? "icon-button" : "button"}
+                                title={
+                                  active.length ? t("Reset filters") : undefined
+                                }
+                                aria-label={
+                                  active.length
+                                    ? t("Reset filters")
+                                    : t("Open settings")
+                                }
+                                onClick={
+                                  active.length ? reset : () => openSettings()
+                                }
+                              >
+                                {active.length ? (
+                                  <RotateCcw size={16} />
+                                ) : (
+                                  t("Open settings")
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div class="pagination">
+                          <span>
+                            {results.displayTotal
+                              ? t("{from}–{to} of {total} files", {
+                                  from: count(
+                                    (page - 1) * results.pageSize + 1,
+                                  ),
+                                  to: count(
+                                    Math.min(
+                                      page * results.pageSize,
+                                      results.displayTotal,
+                                    ),
+                                  ),
+                                  total: count(results.displayTotal),
+                                })
+                              : t("0 files")}
+                            {service === "sonarr" &&
+                              t(" · by series and season")}
+                          </span>
+                          <div>
+                            <button
+                              class="icon-button"
+                              aria-label={t("Previous page")}
+                              disabled={page <= 1}
+                              onClick={() => setPage(page - 1)}
+                            >
+                              <ArrowLeft size={16} />
+                            </button>
+                            <span>
+                              {t("Page {page} / {pages}", { page, pages })}
+                            </span>
+                            <button
+                              class="icon-button"
+                              aria-label={t("Next page")}
+                              disabled={page >= pages}
+                              onClick={() => setPage(page + 1)}
+                            >
+                              <ArrowRight size={16} />
                             </button>
                           </div>
-                        )}
-                      </div>
-                      <div class="pagination">
-                        <span>
-                          {results.displayTotal
-                            ? t("{from}–{to} of {total} files", {
-                                from: count((page - 1) * results.pageSize + 1),
-                                to: count(
-                                  Math.min(
-                                    page * results.pageSize,
-                                    results.displayTotal,
-                                  ),
-                                ),
-                                total: count(results.displayTotal),
-                              })
-                            : t("0 files")}
-                          {service === "sonarr" && t(" · by series and season")}
-                        </span>
-                        <div>
-                          <button
-                            class="icon-button"
-                            aria-label={t("Previous page")}
-                            disabled={page <= 1}
-                            onClick={() => setPage(page - 1)}
-                          >
-                            <ArrowLeft size={16} />
-                          </button>
-                          <span>
-                            {t("Page {page} / {pages}", { page, pages })}
-                          </span>
-                          <button
-                            class="icon-button"
-                            aria-label={t("Next page")}
-                            disabled={page >= pages}
-                            onClick={() => setPage(page + 1)}
-                          >
-                            <ArrowRight size={16} />
-                          </button>
                         </div>
-                      </div>
-                    </section>
-                  </>
-                )}
-              </main>
-              {(customOpen || singleCustom !== null) && (
-                <CustomBulk
-                  query={
-                    singleCustom !== null
-                      ? new URLSearchParams({
-                          service,
-                          fileId: String(singleCustom),
-                        }).toString()
-                      : exportQuery.toString()
-                  }
-                  single={singleCustom !== null}
-                  close={() => {
-                    setCustomOpen(false);
-                    setSingleCustom(null);
-                  }}
-                  saved={async (total) => {
-                    setNotice(
-                      t("Custom tags updated for {count} matching files.", {
-                        count: count(total),
-                      }),
-                    );
-                    await loadCustom();
-                    await refresh();
-                    if (singleCustom === null) setPage(1);
-                    setCustomOpen(false);
-                    setSingleCustom(null);
-                  }}
-                />
-              )}
-              {filename && (
-                <TagInformation.Provider value={filename.informationOnly || {}}>
-                  <FileDialog
-                    providers={["emby", "jellyfin"].filter(
-                      (provider) =>
-                        settings?.[provider as "emby" | "jellyfin"].enabled,
-                    )}
-                    warningColors={
-                      settings?.warningColors || defaultWarningColors
+                      </section>
+                    </>
+                  )}
+                </main>
+                {(customOpen || singleCustom !== null) && (
+                  <CustomBulk
+                    query={
+                      singleCustom !== null
+                        ? new URLSearchParams({
+                            service,
+                            fileId: String(singleCustom),
+                          }).toString()
+                        : exportQuery.toString()
                     }
-                    file={filename}
-                    close={() => setFilename(null)}
+                    single={singleCustom !== null}
+                    close={() => {
+                      setCustomOpen(false);
+                      setSingleCustom(null);
+                    }}
+                    saved={async (total) => {
+                      setNotice(
+                        t("Custom tags updated for {count} matching files.", {
+                          count: count(total),
+                        }),
+                      );
+                      await loadCustom();
+                      await refresh();
+                      if (singleCustom === null) setPage(1);
+                      setCustomOpen(false);
+                      setSingleCustom(null);
+                    }}
                   />
-                </TagInformation.Provider>
-              )}{" "}
-              {savePreset && (
-                <Modal
-                  title={t("Save filter view")}
-                  close={() => setSavePreset(false)}
-                >
-                  <form onSubmit={doSavePreset}>
-                    {presetError && (
-                      <p class="error" role="alert">
-                        {presetError}
-                      </p>
-                    )}
-                    <p class="quiet">
-                      {t(
-                        service === "radarr"
-                          ? "Save the current filter combination for movies."
-                          : "Save the current filter combination for TV series.",
+                )}
+                {filename && (
+                  <TagInformation.Provider
+                    value={filename.informationOnly || {}}
+                  >
+                    <FileDialog
+                      providers={["emby", "jellyfin"].filter(
+                        (provider) =>
+                          settings?.[provider as "emby" | "jellyfin"].enabled,
                       )}
-                    </p>
-                    <label>
-                      {t("Name")}
-                      <input
-                        autoFocus
-                        maxLength={80}
-                        required
-                        value={presetName}
-                        placeholder={t("For example: 1080p · x264")}
-                        onInput={(e) => setPresetName(e.currentTarget.value)}
-                      />
-                    </label>
-                    <button class="primary">
-                      <Bookmark size={16} />
-                      {t("Save view")}
-                    </button>
-                  </form>
-                </Modal>
-              )}
-            </div>
-          </TagTextColors.Provider>
-        </TagColors.Provider>
+                      warningColors={
+                        settings?.warningColors || defaultWarningColors
+                      }
+                      file={filename}
+                      close={() => setFilename(null)}
+                    />
+                  </TagInformation.Provider>
+                )}{" "}
+                {savePreset && (
+                  <Modal
+                    title={t("Save filter view")}
+                    close={() => setSavePreset(false)}
+                  >
+                    <form onSubmit={doSavePreset}>
+                      {presetError && (
+                        <p class="error" role="alert">
+                          {presetError}
+                        </p>
+                      )}
+                      <p class="quiet">
+                        {t(
+                          service === "radarr"
+                            ? "Save the current filter combination for movies."
+                            : "Save the current filter combination for TV series.",
+                        )}
+                      </p>
+                      <label>
+                        {t("Name")}
+                        <input
+                          autoFocus
+                          maxLength={80}
+                          required
+                          value={presetName}
+                          placeholder={t("For example: 1080p · x264")}
+                          onInput={(e) => setPresetName(e.currentTarget.value)}
+                        />
+                      </label>
+                      <button class="primary">
+                        <Bookmark size={16} />
+                        {t("Save view")}
+                      </button>
+                    </form>
+                  </Modal>
+                )}
+              </div>
+            </TagTextColors.Provider>
+          </TagColors.Provider>
+        </HiddenTags.Provider>
       </TagVisibility.Provider>
     </CustomTagNames.Provider>
   );
