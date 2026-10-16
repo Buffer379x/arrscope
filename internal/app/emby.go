@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -107,7 +108,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 	defer func() {
 		for i := range files {
 			if value := files[i].MediaServers.get(c.provider); value != nil {
-				value.Status = files[i].EmbyMatch
+				files[i].EmbyMatch = value.Status
 			} else {
 				files[i].setMediaMatch(c.provider, MediaMatch{Status: files[i].EmbyMatch})
 			}
@@ -139,6 +140,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		ambiguous bool
 	}
 	matches := map[fileIdentity]candidate{}
+	pool := newMediaPool()
 	itemType := "Movie"
 	if service == "sonarr" {
 		itemType = "Episode"
@@ -218,7 +220,7 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 					if indices := wanted[key]; len(indices) == 1 {
 						// Retain normalized metadata once. A later duplicate can invalidate it;
 						// pagination failures still discard the entire uncommitted snapshot.
-						files[indices[0]].setMediaMatch(c.provider, mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams)))
+						files[indices[0]].setMediaMatch(c.provider, pool.intern(mediaMatchFromMetadata(parseEmbyMetadata(source.MediaStreams))))
 					}
 				}
 			}
@@ -247,6 +249,37 @@ func (c *EmbyClient) Enrich(ctx context.Context, service string, files []File) e
 		}
 	}
 	return nil
+}
+
+// Scope each pool to one provider snapshot. Shared values are immutable;
+// bounded indexes avoid retaining an unbounded catalog of distinct traits.
+type mediaPool struct {
+	videos map[MediaVideo]*MediaVideo
+	tracks map[[32]byte][]AudioTrack
+}
+
+func newMediaPool() *mediaPool {
+	return &mediaPool{videos: map[MediaVideo]*MediaVideo{}, tracks: map[[32]byte][]AudioTrack{}}
+}
+func (p *mediaPool) intern(value MediaMatch) MediaMatch {
+	const maxEntries = 4096
+	if value.Video != nil {
+		if existing, ok := p.videos[*value.Video]; ok {
+			value.Video = existing
+		} else if len(p.videos) < maxEntries {
+			p.videos[*value.Video] = value.Video
+		}
+	}
+	if len(value.Tracks) > 0 {
+		raw, _ := json.Marshal(value.Tracks)
+		key := sha256.Sum256(raw)
+		if existing, ok := p.tracks[key]; ok && slices.Equal(existing, value.Tracks) {
+			value.Tracks = existing
+		} else if len(p.tracks) < maxEntries {
+			p.tracks[key] = value.Tracks
+		}
+	}
+	return value
 }
 func mediaMatchFromMetadata(metadata embyMetadata) MediaMatch {
 	status := "matched"

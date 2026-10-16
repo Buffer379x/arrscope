@@ -136,3 +136,16 @@ func TestMediaVideoReadOnlyCache092(t *testing.T) {
 		})
 	}
 }
+
+func TestMediaPoolPreservesExactTrackMetadata092(t *testing.T) {
+	pool := newMediaPool()
+	first := pool.intern(MediaMatch{Video: &MediaVideo{Width: 1920, Height: 800, Codec: "AVC"}, Tracks: []AudioTrack{{Index: 1, Codec: "DTS", Language: "Deutsch", Title: "Main"}}})
+	same := pool.intern(MediaMatch{Video: &MediaVideo{Width: 1920, Height: 800, Codec: "AVC"}, Tracks: []AudioTrack{{Index: 1, Codec: "DTS", Language: "Deutsch", Title: "Main"}}})
+	if first.Video != same.Video || &first.Tracks[0] != &same.Tracks[0] {
+		t.Fatal("equal immutable values duplicated")
+	}
+	other := pool.intern(MediaMatch{Video: &MediaVideo{Width: 3840, Height: 1600, Codec: "HEVC"}, Tracks: []AudioTrack{{Index: 1, Codec: "DTS", Language: "Deutsch", Title: "Commentary"}}})
+	if first.Video == other.Video || &first.Tracks[0] == &other.Tracks[0] || first.Tracks[0].Title != "Main" {
+		t.Fatal("distinct metadata aliased")
+	}
+}
