@@ -18,7 +18,7 @@ export function ListLayoutSettings({
   useI18n();
   return (
     <section class="connection list-layout-settings">
-      <h3 class="card-title">{t("List display")}</h3>
+      <h3 class="card-title">{t("List display icons")}</h3>
       <p class="quiet">
         {t(
           "Choose the icons in the Info column. Move them with the arrows to set their left-to-right order in both libraries. Warnings appear only for affected files.",

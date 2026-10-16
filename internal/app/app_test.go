@@ -928,7 +928,7 @@ func TestStatisticsUniqueMediaAndEpisodes(t *testing.T) {
 func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.VisibleColumns = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "info,title,year,resolution,codec,source,custom" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || strings.Join(cfg.VisibleColumns["radarr"], ",") != "info,title,year,resolution,codec,source,processing,custom" {
 		t.Fatal("legacy defaults missing", err)
 	}
 	for _, columns := range []map[string][]string{
@@ -941,7 +941,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		}
 	}
 	cfg.VisibleColumns = map[string][]string{"sonarr": {"title"}}
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 7 || len(cfg.VisibleColumns["sonarr"]) != 1 {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.VisibleColumns["radarr"]) != 8 || len(cfg.VisibleColumns["sonarr"]) != 1 {
 		t.Fatal("partial choices not normalized", err)
 	}
 	s := testStore(t)
@@ -956,7 +956,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().VisibleColumns["radarr"]) != 7 {
+	if len(server.Config().VisibleColumns["radarr"]) != 8 {
 		t.Fatal("legacy server layout missing")
 	}
 }
@@ -964,7 +964,7 @@ func TestVisibleColumnsLegacyAndValidation(t *testing.T) {
 func TestColumnOrderLegacyAndValidation(t *testing.T) {
 	cfg := DefaultSettings()
 	cfg.ColumnOrder = nil
-	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 12 || cfg.ColumnOrder["radarr"][0] != "info" {
+	if err := normalizeVisibleColumns(&cfg); err != nil || len(cfg.ColumnOrder["radarr"]) != 13 || cfg.ColumnOrder["radarr"][0] != "info" {
 		t.Fatal("missing legacy column order", err)
 	}
 	duplicate := defaultColumnOrder()["radarr"]
@@ -996,7 +996,7 @@ func TestColumnOrderLegacyAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Sync.Shutdown()
-	if len(server.Config().ColumnOrder["sonarr"]) != 12 {
+	if len(server.Config().ColumnOrder["sonarr"]) != 13 {
 		t.Fatal("legacy server order missing")
 	}
 }

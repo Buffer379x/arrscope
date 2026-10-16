@@ -176,7 +176,7 @@
   overflow-wrap: anywhere;
 }
 .language-distribution {
-  margin-top: 20px;
+  margin-top: 0;
 }
 .language-distribution .distribution-list {
   display: grid;

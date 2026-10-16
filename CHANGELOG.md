@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+- Fix dashboard widget alignment and filter operator alignment; add localized filter explanations.
+- Add a separate sortable Processing column and preserve existing layouts.
+- Refine display settings labels and use an iPad-friendly sync time text input.
+
 ## 0.9.0
 
 - Configure visibility and order of the six graphical dashboard widgets, with a restore-defaults control.

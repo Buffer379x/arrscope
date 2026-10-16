@@ -228,21 +228,44 @@ func mergeConnection(in *ServiceConfig, old ServiceConfig) error {
 
 func defaultColumnOrder() map[string][]string {
 	return map[string][]string{
-		"radarr": {"info", "title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
-		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
+		"radarr": {"info", "title", "year", "resolution", "codec", "source", "processing", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
+		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "processing", "size", "hdr", "bitDepth", "audio", "channels", "custom"},
 	}
 }
 
 func defaultVisibleColumns() map[string][]string {
 	return map[string][]string{
-		"radarr": {"info", "title", "year", "resolution", "codec", "source", "custom"},
-		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "custom"},
+		"radarr": {"info", "title", "year", "resolution", "codec", "source", "processing", "custom"},
+		"sonarr": {"info", "title", "year", "resolution", "codec", "source", "processing", "custom"},
 	}
 }
 
 // Missing selections preserve the original layout for existing installations.
 func normalizeVisibleColumns(cfg *Settings) error {
 	migrateAudioColumns(cfg)
+	// Split processing out of Source while retaining each existing layout.
+	for service, order := range cfg.ColumnOrder {
+		if !containsColumn(order, "processing") && containsColumn(order, "source") {
+			next := []string{}
+			for _, column := range order {
+				next = append(next, column)
+				if column == "source" {
+					next = append(next, "processing")
+				}
+			}
+			cfg.ColumnOrder[service] = next
+			if containsColumn(cfg.VisibleColumns[service], "source") {
+				visible := []string{}
+				for _, column := range cfg.VisibleColumns[service] {
+					visible = append(visible, column)
+					if column == "source" {
+						visible = append(visible, "processing")
+					}
+				}
+				cfg.VisibleColumns[service] = visible
+			}
+		}
+	}
 	if err := normalizeListInfo(cfg); err != nil {
 		return err
 	}
@@ -254,7 +277,7 @@ func normalizeVisibleColumns(cfg *Settings) error {
 	if cfg.VisibleColumns == nil {
 		cfg.VisibleColumns = defaultVisibleColumns()
 	}
-	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "custom": true, "info": true}
+	allowed := map[string]bool{"title": true, "year": true, "resolution": true, "codec": true, "source": true, "processing": true, "size": true, "hdr": true, "bitDepth": true, "audio": true, "channels": true, "custom": true, "info": true}
 	for service, columns := range cfg.VisibleColumns {
 		if service != "radarr" && service != "sonarr" {
 			return fmt.Errorf("Invalid service for column selection")

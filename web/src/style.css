@@ -464,8 +464,8 @@
 .media-provider-select { display:block; max-width:240px; margin-bottom:16px; }
 .media-provider-select select { width:100%; }
 .media-match-filters { border-top:1px solid var(--line); margin-top:16px; padding-top:16px; }
-.media-match-filters h3 { margin:0 0 12px; font-size:inherit; }
-.state-filter-label { display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.media-match-filters h2 { margin:0 0 12px; }
+.state-filter-label { display:inline-flex; align-items:center; gap:5px; min-width:0; flex:1; }
 .state-filter-label .check-field { margin:0; }
 .inline-help { display:inline-flex; flex:none; }
 .inline-help .icon-button { padding:3px; width:24px; min-height:24px; border:0; background:transparent; }
@@ -477,3 +477,11 @@
 .media-system-entry + .media-system-entry { border-top:1px solid var(--line); }
 @media(max-width:700px) { .tag-integration-settings {grid-template-columns:minmax(0,1fr);} .inline-help .filter-logic-tooltip { position:fixed;left:24px;right:24px;top:auto;bottom:24px;width:auto;} }
 .tag-integration-settings h4 { margin:0 0 12px; }
+
+.state-filter-label .check-field { flex: initial; }
+.attribute-filters > .state-filter-heading { justify-content:flex-start; }
+.attribute-filters > .state-filter-heading .filter-logic-tooltip { left:0; right:auto; }
+.sync-clock-grid > label { min-width:0; }
+.sync-clock-grid input, .sync-clock-grid select { min-width:0; max-width:100%; width:100%; box-sizing:border-box; }
+
+@media(max-width:700px) { .attribute-filters > .state-filter-heading .filter-logic-tooltip { position:fixed; left:24px; right:24px; top:auto; bottom:24px; width:auto; } }

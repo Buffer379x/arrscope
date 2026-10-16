@@ -27,6 +27,7 @@ export const tableColumns = [
   ["resolution", "Resolution"],
   ["codec", "Codec"],
   ["source", "Source"],
+  ["processing", "Processing"],
   ["size", "Size"],
   ["hdr", "HDR"],
   ["bitDepth", "Bit depth"],
@@ -64,6 +65,7 @@ export const defaultColumns = [
   "resolution",
   "codec",
   "source",
+  "processing",
   "custom",
 ];
 export const emptyResults: Results = {

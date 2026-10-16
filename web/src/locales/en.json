@@ -802,6 +802,17 @@
     "Shared by movies and TV series. Default: 100. Allowed: 1–1000.": "Shared by movies and TV series. Default: 100. Allowed: 1–1000.",
     "Entries per page must be between 1 and 1000": "Entries per page must be between 1 and 1000",
     "Invalid dashboard widget selection": "Invalid dashboard widget selection",
-    "No dashboard widgets selected.": "No dashboard widgets selected."
+    "No dashboard widgets selected.": "No dashboard widgets selected.",
+    "List display icons": "List display icons",
+    "Filename recognition and service metadata disagree on a known value. Excluding this finds files without that disagreement.": "Filename recognition and service metadata disagree on a known value. Excluding this finds files without that disagreement.",
+    "Multiple matching recognition rules assign incompatible values to the same attribute. Excluding this finds files without a rule conflict.": "Multiple matching recognition rules assign incompatible values to the same attribute. Excluding this finds files without a rule conflict.",
+    "At least one required media attribute is unknown: resolution, codec, source, audio or language. Excluding this selects complete metadata; HDR may be SDR or unknown.": "At least one required media attribute is unknown: resolution, codec, source, audio or language. Excluding this selects complete metadata; HDR may be SDR or unknown.",
+    "At least one enabled media server uniquely matches this file by name and size. Excluding this selects files without a successful match.": "At least one enabled media server uniquely matches this file by name and size. Excluding this selects files without a successful match.",
+    "No matching file was found, or a required file size is missing. Excluding this removes those cases.": "No matching file was found, or a required file size is missing. Excluding this removes those cases.",
+    "Multiple files or audio tracks prevent a unique match. Excluding this removes ambiguous matches.": "Multiple files or audio tracks prevent a unique match. Excluding this removes ambiguous matches.",
+    "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.": "Enabled media servers report different audio-track inventories for the same file. Excluding this removes these disagreements.",
+    "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.": "A matched media-server item has no usable audio-track metadata. Excluding this removes these items.",
+    "The file is awaiting a media-server match after a cache or file update. Excluding this removes pending items.": "The file is awaiting a media-server match after a cache or file update. Excluding this removes pending items.",
+    "The file has no media-server enrichment configured. Excluding this removes those items.": "The file has no media-server enrichment configured. Excluding this removes those items."
   }
 }
