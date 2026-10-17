@@ -2,11 +2,50 @@
 
 Explore and filter your Radarr and Sonarr libraries using existing filenames and API metadata. A lightweight, self-hosted web app with a local SQLite cache — no media scans, media mounts or external database server.
 
-![Scopearr dashboard](docs/screenshots/dashboard-0.4.0-en.png)
+> [!TIP]
+> **Scopearr highlights**
+> - **Your libraries, together:** Radarr movies and Sonarr series, grouped seasons, specials and multi-episode files.
+> - **Find exactly what matters:** filename/title search, technical and language filters, include/exclude logic, saved presets and CSV export.
+> - **Understand your metadata:** filename-first recognition, editable rules, source evidence, conflicts and season outliers.
+> - **Go deeper with Emby & Jellyfin:** optional video enrichment, aligned audio/language/channel tracks and direct media-server links.
+> - **See the big picture:** clickable dashboard distributions, metadata-quality summaries and configurable storage widgets.
+> - **Keep tags in sync:** custom tags, external tag import and optional outbound synchronization with removal previews and confirmation.
+> - **Make it yours:** configurable columns, icons and tag colors; 18 palettes, dark/light modes, mobile layouts and four interface languages.
+> - **Stay up to date:** manual or scheduled sync, authenticated webhooks, durable retries and release notices.
+> - **Keep it local:** one Go process, embedded UI, SQLite/FTS5 cache, local backups, encrypted API keys, protected sessions and AMD64/ARM64 Docker images. No media scans or mounts.
 
-![Scopearr movie library](docs/screenshots/library-0.4.0-en.png)
+![Scopearr 0.9.5 movie library](docs/screenshots/library-0.9.5-en.jpg)
 
-Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. Real metadata detection remains unchanged.
+<details>
+<summary>Current screenshots: dashboard, filters, TV series, audio details, light theme and mobile</summary>
+
+### Dashboard
+
+![Scopearr 0.9.5 dashboard](docs/screenshots/dashboard-0.9.5-en.jpg)
+
+### Filters and metadata quality
+
+![Scopearr 0.9.5 filters](docs/screenshots/filters-0.9.5-en.jpg)
+
+### TV series and season outliers
+
+![Scopearr 0.9.5 TV library](docs/screenshots/series-0.9.5-en.jpg)
+
+### Audio tracks and metadata evidence
+
+![Scopearr 0.9.5 audio details](docs/screenshots/audio-details-0.9.5-en.jpg)
+
+### Light theme
+
+![Scopearr 0.9.5 light theme](docs/screenshots/light-0.9.5-en.jpg)
+
+### Mobile
+
+<img src="docs/screenshots/mobile-0.9.5-en.jpg" alt="Scopearr 0.9.5 mobile TV library" width="390">
+
+</details>
+
+Screenshots show the unmodified Scopearr 0.9.5 interface in English, using a separate instance with synthetic demo data. They contain no private library data or service credentials.
 
 ## Features
 
@@ -19,7 +58,7 @@ Screenshots use isolated synthetic data with BluRay, DVD and UHD source labels. 
 - Grouped TV seasons, specials and multi-episode files. Show only matching files or complete matching seasons with highlighted matches.
 - Dashboard counts and distributions by resolution, codec, source, audio codecs and language. Click a tag to select its value in the existing library filters. Selections remain unsaved unless you explicitly save a preset.
 - Optional [Emby and Jellyfin enrichment](docs/MEDIA-SERVERS.md) reads existing video and audio stream metadata, with independently enabled connections and explicit conflicts. Verified video resolution, codec and bit depth fill gaps after filename/Arr values. Local SVG language flags have translated tooltips and remain associated with each track’s codec. Multiple audio codecs and HDR profiles use separate tags.
-- Persistent configurable columns and an Info action column with new-tab Radarr/Sonarr links, file details and warning icons. Saved icon visibility/order, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers and Info icon-count sorting in both libraries.
+- Persistent configurable columns and an Info action column with new-tab Radarr/Sonarr and matched Emby/Jellyfin links, file details and warning icons. Saved icon visibility/order, column order, tag backgrounds and black/white/automatic text colors. Temporary “All columns” view; clickable movie headers and Info icon-count sorting in both libraries.
 - Indexed SQLite queries and FTS5 search, atomic sync snapshots, cached dashboard aggregates and a global sync queue.
 - Optional clock-anchored synchronization and [authenticated realtime webhooks](docs/WEBHOOKS.md) for affected media, with durable retries and atomic scoped updates.
 - [Selected/shared storage widgets](docs/WIDGETS.md) with individual-area Used/Free charts and no summed overlapping shares; automatic release notices in System.
@@ -111,7 +150,7 @@ Custom filters support OR, exclusion, contains-all and does-not-contain-all. Fil
 
 Keep the existing appdata mount and `secret.key`. Database upgrades create a consistent backup and preserve accounts, encrypted API keys, presets, recognition rules and cached media. Use `ghcr.io/buffer379x/scopearr:stable` and `deploy/scopearr.xml`; see [operations](docs/OPERATIONS.md).
 
-Documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=true` and `SCOPEARR_DEMO_DISCS=true`; the latter fixture presents BluRay, DVD and UHD sources consistent with displayed resolutions. It does not change production recognition defaults.
+Current documentation screenshots use isolated synthetic demo data with `SCOPEARR_DEMO=true`. The optional `SCOPEARR_DEMO_DISCS=true` fixture used for older screenshots presents BluRay, DVD and UHD sources consistent with displayed resolutions. Neither fixture changes production recognition defaults.
 
 ## Settings and dashboard
 
