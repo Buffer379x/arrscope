@@ -532,3 +532,42 @@ func TestAuthenticatedStatusRemainsResponsiveDuringSnapshotWrite100(t *testing.T
 		t.Fatal(result, response.Code, err)
 	}
 }
+
+func TestLegacyQuestionMarkPathDoesNotInitializeEmptyAccount100(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "data?legacy")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "secret.key"), make([]byte, 32), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Reproduce the pre-1.0 DSN with its actual SQLite driver, rather than
+	// fabricating a differently named database inside the intended directory.
+	legacy, err := sql.Open("sqlite", filepath.Join(dir, "scopearr.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = legacy.Exec("CREATE TABLE kv(key TEXT PRIMARY KEY,value TEXT); INSERT INTO kv VALUES('admin','existing-account')"); err != nil {
+		legacy.Close()
+		t.Fatal(err)
+	}
+	legacy.Close()
+	store, err := OpenStore(dir)
+	if err == nil {
+		store.DB.Close()
+		t.Fatal("legacy account was hidden by a fresh database")
+	}
+	if _, err = os.Stat(filepath.Join(dir, "scopearr.db")); !os.IsNotExist(err) {
+		t.Fatal("a new database was created", err)
+	}
+	legacy, err = sql.Open("sqlite", filepath.Join(parent, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer legacy.Close()
+	var account string
+	if err = legacy.QueryRow("SELECT value FROM kv WHERE key='admin'").Scan(&account); err != nil || account != "existing-account" {
+		t.Fatal(account, err)
+	}
+}

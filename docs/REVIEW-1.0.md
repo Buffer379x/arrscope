@@ -13,7 +13,7 @@ The review of 0.9.5 was repeated before implementation. Its five primary finding
 | Incomplete Sonarr episode validation | Share identity/file/series validation and file mapping between full and delta synchronization; reject conflicting snapshots and retain the previous cache. |
 | Concurrent recognition-engine access during outbound reconciliation | Pass a protected immutable rules snapshot into transaction work. |
 | Corrupt recognition JSON replaced during migration | Fail the migration instead of writing default rules over the existing entry. |
-| Special characters changing the SQLite database location | Escape the database path as a file URI and establish private file permissions before SQLite opens it. |
+| Special characters changing the SQLite database location | Escape the database path as a file URI and establish private file permissions before SQLite opens it. Refuse a new empty database when a legacy question-mark directory already contains its local key but lacks the expected database. |
 | Legacy `mediaMatch` suppressing Emby filter validation | Remove the orphaned bypass; continue validating and applying the supported `embyMatch` filter. |
 
 Snapshot writes now carry cancellation contexts through SQLite. Status readers and cancellation do not wait for the entire rewrite or memory reclamation. The final commit still checks the configuration generation under the status lock. Immutable recognition engines are published through an atomic pointer, so the authenticated status endpoint can read their committed revision without waiting for recognition work. Display-only settings changes do not wait for the global file/tag gate.

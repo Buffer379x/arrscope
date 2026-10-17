@@ -28,6 +28,15 @@ func OpenStore(dir string) (*Store, error) {
 	// Never silently initialize an empty account over an existing differently
 	// named database. Current deployments use scopearr.db.
 	if _, e := os.Stat(filepath.Join(dir, "scopearr.db")); os.IsNotExist(e) {
+		// Older unescaped DSNs could place this database outside a directory
+		// containing '?'. Its local key must not accompany a new empty account.
+		if strings.Contains(dir, "?") {
+			if _, keyErr := os.Stat(filepath.Join(dir, "secret.key")); keyErr == nil {
+				return nil, fmt.Errorf("Existing database found. Restore the active database as scopearr.db before starting")
+			} else if !os.IsNotExist(keyErr) {
+				return nil, keyErr
+			}
+		}
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return nil, err
