@@ -157,7 +157,7 @@ func readTagSnapshot(ctx context.Context, q tagQueryer, service string, g TagGro
 	}
 	return out, rows.Err()
 }
-func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint string, g TagGroups, owned bool, target ...int) error {
+func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint string, g TagGroups, owned bool, rules []RecognitionRule, target ...int) error {
 	snap, err := readTagSnapshot(ctx, tx, service, g, target...)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (s *Store) seedTagValues(ctx context.Context, tx *sql.Tx, service, endpoint
 			snap.groups[field][unknownTagLabel(field)] = true
 		}
 	}
-	for _, rule := range s.recognition.config.Rules {
+	for _, rule := range rules {
 		field := rule.Field
 		if field == "processing" {
 			field = "source"
@@ -252,7 +252,7 @@ func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings
 
 		endpoint := tagEndpoint(after)
 		if tagEndpoint(before) == endpoint && before.TagSync.Active() {
-			if err = s.seedTagValues(ctx, tx, service, endpoint, before.TagSync, false); err != nil {
+			if err = s.seedTagValues(ctx, tx, service, endpoint, before.TagSync, false, s.recognition.config.Rules); err != nil {
 				return err
 			}
 		}
@@ -366,10 +366,6 @@ func (s *Store) tagPolicies(ctx context.Context, service, endpoint string, g Tag
 		}
 	}
 	return p, rows.Err()
-}
-func (s *Store) stageTagCleanup(ctx context.Context, service, endpoint, label string) error {
-	_, e := s.DB.ExecContext(ctx, "INSERT OR IGNORE INTO tag_sync_cleanup VALUES(?,?,?)", service, endpoint, label)
-	return e
 }
 
 // The services enforce their own in-use check at DELETE time. Inspect fresh

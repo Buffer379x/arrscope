@@ -20,7 +20,7 @@ func TestDashboardSettingsLegacyAndPersistence(t *testing.T) {
 	cfg.PageSize = 0
 	cfg.Widgets.Order = nil
 	cfg.Widgets.Visible = nil
-	if e := normalize070(&cfg); e != nil {
+	if e := normalizeSettings(&cfg); e != nil {
 		t.Fatal(e)
 	}
 	if cfg.PageSize != 100 || !reflect.DeepEqual(cfg.Widgets.Order, defaultDashboardOrder()) || len(cfg.Widgets.Visible) != 6 {
@@ -47,14 +47,14 @@ func TestDashboardSettingsLegacyAndPersistence(t *testing.T) {
 	for _, size := range []int{-1, 1001} {
 		c := DefaultSettings()
 		c.PageSize = size
-		if normalize070(&c) == nil {
+		if normalizeSettings(&c) == nil {
 			t.Fatal("invalid page size", size)
 		}
 	}
 	for _, order := range [][]string{{"source", "source"}, {"unknown"}} {
 		c := DefaultSettings()
 		c.Widgets.Order = order
-		if normalize070(&c) == nil {
+		if normalizeSettings(&c) == nil {
 			t.Fatal("invalid widgets", order)
 		}
 	}

@@ -24,12 +24,6 @@
 .filter-heading svg {
   color: var(--accent);
 }
-.filter-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1.1fr;
-  gap: 16px;
-  padding: 20px;
-}
 .input-wrap {
   position: relative;
 }
@@ -145,57 +139,12 @@
   gap: 20px;
   white-space: nowrap;
 }
-.advanced-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  padding: 0 20px 20px;
-}
 .check-field {
   display: flex;
   flex-direction: row;
   gap: 9px;
   align-items: center;
   font-size: 12px;
-}
-.advanced-grid > .check-field {
-  align-self: end;
-  height: 42px;
-}
-.preset-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: -10px 0 26px;
-  flex-wrap: wrap;
-}
-.preset-row > span {
-  font-size: 8px;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin-right: 2px;
-}
-.preset-pill {
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-}
-.preset-pill button {
-  border: 0;
-  background: none;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  padding: 7px 9px;
-}
-.preset-pill button:hover {
-  color: var(--accent);
-}
-.preset-pill button + button {
-  border-left: 1px solid var(--line);
 }
 .results-heading {
   display: flex;

@@ -1,21 +1,6 @@
-import { AutoTagMark, autoTagHint } from "./AutoTagMark";
-import { ChannelsCell } from "./ChannelsCell";
-import { RowInfo } from "./RowInfo";
-import { applyInterfaceTheme } from "../themes";
-import { TagInformation, TagVisibility, HiddenTags } from "../ui";
-import { confirmDeletion } from "../confirmation";
-import { notify } from "../notifications";
-import { CustomBulk } from "./CustomBulk";
-import type { CustomTag } from "../types";
-import { t, useI18n } from "../i18n";
 import {
-  Tag as TagIcon,
-  RotateCcw,
-  ArrowDown,
-  ArrowDownUp,
   ArrowLeft,
   ArrowRight,
-  ArrowUp,
   ArrowUpRight,
   BarChart3,
   Bookmark,
@@ -24,18 +9,25 @@ import {
   Download,
   Film,
   Info,
-  Layers,
   LoaderCircle,
   LogOut,
   Moon,
+  RotateCcw,
   Search,
   Settings as SettingsIcon,
   Sun,
+  Tag as TagIcon,
   Tv,
 } from "lucide-preact";
-import type { JSX } from "preact";
+import { lazy, Suspense } from "preact/compat";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { readPreference, writePreference } from "../browser-storage";
+import { confirmDeletion } from "../confirmation";
+import { t, useI18n } from "../i18n";
+import { notify } from "../notifications";
+import { applyInterfaceTheme } from "../themes";
 import type {
+  CustomTag,
   FilmSort,
   MediaFile,
   Preset,
@@ -44,34 +36,35 @@ import type {
   Settings,
   Status,
 } from "../types";
+import { HiddenTags, TagVisibility, TagInformation } from "../ui";
+import { CustomBulk } from "./CustomBulk";
+import { LibraryTable } from "./LibraryTable";
 
-import { canonicalPresetQuery } from "../preset-query";
 import { api, ApiError } from "../api";
 import { dashboardService, makeDashboardFilter } from "../dashboard-filter";
-import { LanguageFlag, LanguageFlags } from "./LanguageFlag";
-import { getLocale } from "../i18n";
 import { useFacets, useLibraryQuery } from "../hooks/useLibraryQuery";
+import { getLocale } from "../i18n";
+import { canonicalPresetQuery } from "../preset-query";
 import {
-  bytes,
-  columnLabels,
   count,
+  CustomTagNames,
   defaultColumnOrder,
   defaultColumns,
+  defaultWarningColors,
   emptyResults,
   FilterUpdate,
-  Tag,
-  CustomTagNames,
   TagColors,
   TagTextColors,
 } from "../ui";
-import { RecognitionPage } from "./RecognitionPage";
-import { AudioCell } from "./AudioCell";
-import { defaultWarningColors } from "../ui";
 import { FileDialog } from "./FileDialog";
 import { FilterPanel } from "./FilterPanel";
 import { Modal } from "./Modal";
-import { SettingsDialog } from "./SettingsDialog";
 import { StatisticsPage } from "./StatisticsPage";
+const SettingsDialog = lazy(() =>
+  import("./SettingsDialog").then((module) => ({
+    default: module.SettingsDialog,
+  })),
+);
 const movieSortFields = [
   "info",
   "title",
@@ -88,9 +81,7 @@ const movieSortFields = [
 ];
 function initialMovieSort(): FilmSort {
   try {
-    const saved = JSON.parse(
-      localStorage.getItem("scopearr-film-sort") || "null",
-    );
+    const saved = JSON.parse(readPreference("scopearr-film-sort") || "null");
     if (saved?.field === "language") saved.field = "audio";
     if (
       saved &&
@@ -104,10 +95,8 @@ function initialMovieSort(): FilmSort {
 export function Library({
   status,
   refresh,
-  connectionError,
 }: {
   status: Status;
-  connectionError?: string;
   refresh: () => Promise<void>;
 }) {
   useI18n();
@@ -127,9 +116,22 @@ export function Library({
     string[]
   > | null>(null);
   useEffect(() => {
-    api<Record<string, string[]>>("display-tags")
-      .then(setTagVisibility)
+    const controller = new AbortController();
+    let current = true;
+    api<Record<string, string[]>>(
+      "display-tags",
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then((tags) => {
+        if (current) setTagVisibility(tags);
+      })
       .catch(() => {});
+    return () => {
+      current = false;
+      controller.abort();
+    };
   }, [
     status.recognitionRevision,
     status.sync?.radarr?.lastSuccess,
@@ -138,8 +140,17 @@ export function Library({
   ]);
   const [customOpen, setCustomOpen] = useState(false);
   const [singleCustom, setSingleCustom] = useState<number | null>(null);
+  const customRequest = useRef(0);
+  useEffect(
+    () => () => {
+      ++customRequest.current;
+    },
+    [],
+  );
   const loadCustom = async () => {
+    const request = ++customRequest.current;
     const tags = await api<CustomTag[]>("custom-tags");
+    if (request !== customRequest.current) return;
     setCustomTags(tags);
     setCustomRevision((value) => value + 1);
     const ids = new Set(tags.map((tag) => String(tag.id)));
@@ -158,14 +169,13 @@ export function Library({
           }),
         ) as Record<Service, string>,
     );
+    return tags;
   };
   useEffect(() => {
-    if (status.cacheRevision) loadCustom().catch(() => {});
+    loadCustom().catch(() => {});
   }, [status.cacheRevision]);
   const [service, setService] = useState<Service>("radarr"),
-    [view, setView] = useState<"library" | "statistics" | "recognition">(
-      "statistics",
-    ),
+    [view, setView] = useState<"library" | "statistics">("statistics"),
     [movieSort, setMovieSort] = useState<FilmSort>(initialMovieSort),
     [filters, setFilters] = useState<Record<Service, string>>({
       radarr: "",
@@ -184,18 +194,14 @@ export function Library({
       radarr: false,
       sonarr: false,
     }),
-    [rulesDirty, setRulesDirty] = useState(false),
     [settingsDirty, setSettingsDirty] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [settingsSection, setSettingsSection] = useState("connections"),
     [collapsed, setCollapsed] = useState(true),
     [filename, setFilename] = useState<MediaFile | null>(null),
-    [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
-    [theme, setTheme] = useState(
-      localStorage.getItem("scopearr-theme") || "dark",
-    ),
+    [theme, setTheme] = useState(readPreference("scopearr-theme") || "dark"),
     [savePreset, setSavePreset] = useState(false),
     [presetName, setPresetName] = useState(""),
     [presetError, setPresetError] = useState("");
@@ -216,7 +222,7 @@ export function Library({
   );
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem("scopearr-theme", theme);
+    writePreference("scopearr-theme", theme);
   }, [theme]);
   useEffect(() => {
     applyInterfaceTheme(
@@ -226,13 +232,12 @@ export function Library({
     );
   }, [settings?.interfaceTheme, theme]);
   useEffect(() => {
-    localStorage.setItem("scopearr-film-sort", JSON.stringify(movieSort));
+    writePreference("scopearr-film-sort", JSON.stringify(movieSort));
   }, [movieSort]);
   const loadSettings = async () => setSettings(await api<Settings>("settings"));
   const loadPresets = async () => setPresets(await api<Preset[]>("presets"));
   useEffect(() => {
-    loadCustom().catch((e) => setError(e.message));
-    loadSettings().catch((e) => setError(e.message));
+    loadSettings().catch(() => {});
     loadPresets().catch(() => {});
   }, []);
   useFacets(
@@ -240,7 +245,6 @@ export function Library({
     service,
     `${sync?.lastSuccess}:${status.cacheRevision}:${status.recognitionRevision}:${customRevision}:${settings?.listInfoVisible.join(",")}`,
     setFacets,
-    setError,
   );
   useLibraryQuery({
     view: settingsOpen ? "settings" : view,
@@ -253,7 +257,6 @@ export function Library({
     pageSize: settings?.pageSize,
     setResults,
     setBusy,
-    setError,
   });
   useEffect(() => {
     setPage(1);
@@ -268,12 +271,6 @@ export function Library({
       settingsOpen &&
       settingsDirty &&
       !confirm(t("Discard unsaved settings changes?"))
-    )
-      return false;
-    if (
-      view === "recognition" &&
-      rulesDirty &&
-      !confirm(t("Discard unsaved rule changes?"))
     )
       return false;
     setSettingsOpen(false);
@@ -393,9 +390,7 @@ export function Library({
       await api("presets?id=" + selectedPreset.id, "DELETE");
       await loadPresets();
       setNotice(t("Preset deleted."));
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    } catch {}
   };
   const sortColumn = (field: string) => {
     setMovieSort({
@@ -406,52 +401,6 @@ export function Library({
           : "asc",
     });
     setPage(1);
-  };
-  const columnHeader = (field: string, label: string, titleCell = false) => {
-    const current = movieSort.field === field;
-    return (
-      <th
-        key={field}
-        scope="col"
-        class={titleCell ? "title-cell" : undefined}
-        aria-sort={
-          service === "radarr" || field === "info"
-            ? current
-              ? movieSort.direction === "asc"
-                ? "ascending"
-                : "descending"
-              : "none"
-            : undefined
-        }
-      >
-        {service === "radarr" || field === "info" ? (
-          <button
-            class={"column-sort" + (current ? " current" : "")}
-            onClick={() => sortColumn(field)}
-            aria-label={t("Sort by {field}", { field: label })}
-            title={t(
-              current && movieSort.direction === "asc"
-                ? "Sort {field} descending"
-                : "Sort {field} ascending",
-              { field: label },
-            )}
-          >
-            {label}
-            {current ? (
-              movieSort.direction === "asc" ? (
-                <ArrowUp size={13} />
-              ) : (
-                <ArrowDown size={13} />
-              )
-            ) : (
-              <ArrowDownUp size={13} />
-            )}
-          </button>
-        ) : (
-          label
-        )}
-      </th>
-    );
   };
   const pages = Math.max(1, Math.ceil(results.displayTotal / results.pageSize));
   useEffect(() => {
@@ -577,493 +526,254 @@ export function Library({
                   </div>
                 )}
                 <main class="main">
-                  {settingsOpen && settings ? (
-                    <SettingsDialog
-                      customTags={customTags}
-                      customChanged={async () => {
-                        await loadCustom();
-                        await loadSettings();
-                        await loadPresets();
-                        await refresh();
-                      }}
-                      settings={settings}
-                      initialSection={settingsSection}
-                      onDirty={setSettingsDirty}
-                      refresh={refresh}
-                      status={status}
-                      connectionError={connectionError}
-                      demo={status.demo}
-                      saved={async () => {
-                        await loadSettings();
-                        await refresh();
-                      }}
-                    />
-                  ) : view === "recognition" ? (
-                    <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
-                  ) : view === "statistics" ? (
-                    <StatisticsPage
-                      status={status}
-                      settings={settings}
-                      onFilter={openDashboardFilter}
-                    />
-                  ) : (
-                    <>
-                      <section class="library-intro">
-                        <h1>
-                          {service === "radarr"
-                            ? t("Movie library")
-                            : t("TV library")}
-                        </h1>
-                        <span>
-                          {count(sync?.count || 0)} {t("files in cache")}
-                        </span>
-                      </section>
-                      {!status.demo && settings && !configured && (
-                        <div class="connect-card">
-                          <Database size={24} />
-                          <div>
-                            <b>
-                              {t(
-                                service === "radarr"
-                                  ? "Connect your movie library."
-                                  : "Connect your TV library.",
-                              )}
-                            </b>
-                            <p>
-                              {t(
-                                "An address and API key are enough. Scopearr only reads existing data.",
-                              )}
-                            </p>
-                          </div>
-                          <button
-                            class="primary"
-                            onClick={() => {
-                              if (canLeaveRules()) openSettings();
-                            }}
-                          >
-                            {t("Set up service")}
-                            <ArrowUpRight size={16} />
-                          </button>
-                        </div>
-                      )}
-                      <FilterPanel
-                        q={q}
-                        collapsed={collapsed}
-                        setCollapsed={setCollapsed}
-                        active={active}
-                        service={service}
-                        facets={facets}
-                        presets={presets}
-                        selectedPreset={selectedPreset}
-                        applyPreset={applyPreset}
-                        reset={reset}
-                        setSavePreset={(value) => {
-                          setPresetError("");
-                          setSavePreset(value);
+                  <Suspense fallback={null}>
+                    {settingsOpen && settings ? (
+                      <SettingsDialog
+                        customTags={customTags}
+                        customChanged={async () => {
+                          const tags = await loadCustom();
+                          await loadSettings();
+                          await loadPresets();
+                          await refresh();
+                          return tags;
                         }}
-                        deletePreset={deletePreset}
-                        change={change}
+                        settings={settings}
+                        initialSection={settingsSection}
+                        onDirty={setSettingsDirty}
+                        refresh={refresh}
+                        status={status}
+                        demo={status.demo}
+                        saved={async (settings) => {
+                          setSettings(settings);
+                          await refresh();
+                        }}
                       />
-                      <section class="library-section">
-                        <div class="results-heading">
-                          <div>
-                            <h2>
-                              {t(
-                                service === "radarr"
-                                  ? "Your movies"
-                                  : "Your TV series",
-                              )}{" "}
-                              <span>{count(results.total)}</span>
-                              {busy && <LoaderCircle size={16} class="spin" />}
-                            </h2>
-                          </div>
-                          <div class="results-tools">
-                            <button
-                              class="button"
-                              aria-pressed={showAllColumns[service]}
-                              disabled={
-                                visibleColumns.length === columnOrder.length &&
-                                !showAllColumns[service]
-                              }
-                              title={
-                                showAllColumns[service]
-                                  ? t("Return to saved columns")
-                                  : t("Show hidden columns in the saved order")
-                              }
-                              onClick={() =>
-                                setShowAllColumns({
-                                  ...showAllColumns,
-                                  [service]: !showAllColumns[service],
-                                })
-                              }
-                            >
-                              <Columns3 size={15} />{" "}
-                              {showAllColumns[service]
-                                ? t("Default view")
-                                : t("All columns")}
-                            </button>
-                            <button
-                              type="button"
-                              class="button"
-                              disabled={!results.total}
-                              onClick={() => setCustomOpen(true)}
-                            >
-                              <TagIcon size={15} />
-                              {t("Set tag")}
-                            </button>
-                            <a
-                              class="button"
-                              href={"/api/export?" + exportQuery}
-                            >
-                              <Download size={15} />
-                              {t("Export CSV")}
-                            </a>
-                          </div>
-                        </div>
-                        <div
-                          class={"table-wrap" + (busy ? " busy" : "")}
-                          aria-busy={busy}
-                        >
-                          <table
-                            class={
-                              displayColumns.includes("custom")
-                                ? "with-custom"
-                                : ""
-                            }
-                          >
-                            <thead>
-                              <tr>
-                                {displayColumns.map((field) =>
-                                  columnHeader(
-                                    field,
-                                    field === "title"
-                                      ? service === "radarr"
-                                        ? t("Title")
-                                        : t("Episode")
-                                      : columnLabels[field],
-                                    field === "title",
-                                  ),
+                    ) : view === "statistics" ? (
+                      <StatisticsPage
+                        status={status}
+                        settings={settings}
+                        onFilter={openDashboardFilter}
+                      />
+                    ) : (
+                      <>
+                        <section class="library-intro">
+                          <h1>
+                            {service === "radarr"
+                              ? t("Movie library")
+                              : t("TV library")}
+                          </h1>
+                          <span>
+                            {count(sync?.count || 0)} {t("files in cache")}
+                          </span>
+                        </section>
+                        {!status.demo && settings && !configured && (
+                          <div class="connect-card">
+                            <Database size={24} />
+                            <div>
+                              <b>
+                                {t(
+                                  service === "radarr"
+                                    ? "Connect your movie library."
+                                    : "Connect your TV library.",
                                 )}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {results.files.map((f, i) => {
-                                const prev = results.files[i - 1];
-                                const group =
-                                  service === "sonarr" &&
-                                  (!prev ||
-                                    prev.mediaId !== f.mediaId ||
-                                    prev.season !== f.season);
-                                const cells: Record<string, JSX.Element> = {
-                                  title: (
-                                    <td key="title" class="title-cell">
-                                      <div class="title-line">
-                                        <b>{f.title}</b>
-                                      </div>
-                                      {service === "sonarr" && (
-                                        <small class="episode-filename">
-                                          {f.filename}
-                                        </small>
-                                      )}
-                                      {!f.matched && (
-                                        <small class="context-label">
-                                          {t(
-                                            "Season context · not a filter match",
-                                          )}
-                                        </small>
-                                      )}
-                                    </td>
-                                  ),
-                                  info: (
-                                    <td key="info" class="info-cell">
-                                      <RowInfo
-                                        file={f}
-                                        settings={settings}
-                                        details={() => setFilename(f)}
-                                      />
-                                    </td>
-                                  ),
-                                  year: (
-                                    <td key="year" class="year-cell">
-                                      {f.years.length
-                                        ? f.years.join(" / ")
-                                        : "—"}
-                                    </td>
-                                  ),
-                                  resolution: (
-                                    <td key="resolution">
-                                      <Tag
-                                        respectHidden
-                                        value={f.resolution}
-                                        kind={"resolution r" + f.resolution}
-                                      />
-                                    </td>
-                                  ),
-                                  codec: (
-                                    <td key="codec">
-                                      <Tag
-                                        respectHidden
-                                        value={f.codec}
-                                        kind="codec"
-                                        title={f.family}
-                                      />
-                                    </td>
-                                  ),
-                                  source: (
-                                    <td key="source">
-                                      <Tag respectHidden value={f.source} />
-                                    </td>
-                                  ),
-                                  processing: (
-                                    <td key="processing">
-                                      <Tag
-                                        respectHidden
-                                        value={f.processing}
-                                        kind="processing"
-                                      />
-                                    </td>
-                                  ),
-                                  size: (
-                                    <td key="size" class="nowrap">
-                                      {bytes(f.size)}
-                                    </td>
-                                  ),
-                                  hdr: (
-                                    <td key="hdr">
-                                      <div class="source-tags">
-                                        {(f.hdr
-                                          ? f.hdr.split(" + ")
-                                          : [""]
-                                        ).map((value) => (
-                                          <Tag
-                                            respectHidden
-                                            value={value}
-                                            kind="hdr"
-                                          />
-                                        ))}
-                                      </div>
-                                    </td>
-                                  ),
-                                  bitDepth: (
-                                    <td key="bitDepth">
-                                      <Tag
-                                        respectHidden
-                                        kind="bitDepth"
-                                        value={f.bitDepth}
-                                      />
-                                    </td>
-                                  ),
-                                  audio: (
-                                    <td key="audio" class="audio-tracks-cell">
-                                      <AudioCell file={f} />
-                                    </td>
-                                  ),
-                                  custom: (
-                                    <td key="custom" class="custom-cell">
-                                      <div class="source-tags">
-                                        <button
-                                          class="icon-button single-tag-button"
-                                          aria-label={t(
-                                            "Edit custom tags: {title}",
-                                            { title: f.title },
-                                          )}
-                                          title={t(
-                                            "Edit custom tags: {title}",
-                                            {
-                                              title: f.title,
-                                            },
-                                          )}
-                                          onClick={() => setSingleCustom(f.id)}
-                                        >
-                                          <TagIcon size={15} />
-                                        </button>
-                                        {(f.custom || []).map((tag) => (
-                                          <Tag
-                                            respectHidden
-                                            kind="custom"
-                                            value={String(tag.id)}
-                                            forceTag={
-                                              tag.manual || tag.protected
-                                            }
-                                            label={tag.displayName || tag.name}
-                                            title={
-                                              tag.protected
-                                                ? autoTagHint(tag)
-                                                : tag.displayName || tag.name
-                                            }
-                                          >
-                                            <AutoTagMark tag={tag} />
-                                            {tag.displayName || tag.name}
-                                          </Tag>
-                                        ))}
-                                      </div>
-                                    </td>
-                                  ),
-                                  channels: (
-                                    <td
-                                      key="channels"
-                                      class="audio-tracks-cell"
-                                    >
-                                      <ChannelsCell file={f} />
-                                    </td>
-                                  ),
-                                };
-                                return (
-                                  <>
-                                    {group && (
-                                      <tr
-                                        class={
-                                          "season-row" +
-                                          (results.files.some(
-                                            (entry) =>
-                                              entry.mediaId === f.mediaId &&
-                                              entry.season === f.season &&
-                                              (entry.seasonOutlier ||
-                                                entry.languageOutlier),
-                                          )
-                                            ? " has-outlier"
-                                            : "")
-                                        }
-                                      >
-                                        <td colSpan={displayColumns.length}>
-                                          <Layers size={15} />
-                                          <strong>
-                                            {f.series} <span>—</span>{" "}
-                                            {f.season === 0
-                                              ? t("Specials")
-                                              : t("Season {number}", {
-                                                  number: String(
-                                                    f.season,
-                                                  ).padStart(2, "0"),
-                                                })}
-                                          </strong>
-                                          <span class="season-note">
-                                            {settings?.seasonMode === "season"
-                                              ? t("Season context enabled")
-                                              : t("Matching files")}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    )}
-                                    <TagInformation.Provider
-                                      value={f.informationOnly || {}}
-                                    >
-                                      <tr
-                                        key={f.service + f.id}
-                                        title={[
-                                          f.seasonOutlier
-                                            ? t("Technical outliers")
-                                            : "",
-                                          f.languageOutlier
-                                            ? t("Language outliers")
-                                            : "",
-                                        ]
-                                          .filter(Boolean)
-                                          .join(" · ")}
-                                        class={[
-                                          !f.matched ? "context-row" : "",
-                                          f.seasonOutlier
-                                            ? "technical-outlier"
-                                            : "",
-                                          f.languageOutlier
-                                            ? "language-outlier"
-                                            : "",
-                                        ]
-                                          .filter(Boolean)
-                                          .join(" ")}
-                                      >
-                                        {displayColumns.map(
-                                          (field) => cells[field],
-                                        )}
-                                      </tr>
-                                    </TagInformation.Provider>
-                                  </>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                          {!results.files.length && !busy && (
-                            <div class="empty-state">
-                              <Search size={32} />
-                              <h3>
-                                {active.length
-                                  ? t("No matching files.")
-                                  : t("Your overview starts here.")}
-                              </h3>
+                              </b>
                               <p>
-                                {active.length
-                                  ? t("Adjust or reset your filters.")
-                                  : t(
-                                      "Connect a service and start the first sync.",
-                                    )}
+                                {t(
+                                  "An address and API key are enough. Scopearr only reads existing data.",
+                                )}
                               </p>
+                            </div>
+                            <button
+                              class="primary"
+                              onClick={() => {
+                                if (canLeaveRules()) openSettings();
+                              }}
+                            >
+                              {t("Set up service")}
+                              <ArrowUpRight size={16} />
+                            </button>
+                          </div>
+                        )}
+                        <FilterPanel
+                          q={q}
+                          collapsed={collapsed}
+                          setCollapsed={setCollapsed}
+                          active={active}
+                          service={service}
+                          facets={facets}
+                          presets={presets}
+                          selectedPreset={selectedPreset}
+                          applyPreset={applyPreset}
+                          reset={reset}
+                          setSavePreset={(value) => {
+                            setPresetError("");
+                            setSavePreset(value);
+                          }}
+                          deletePreset={deletePreset}
+                          change={change}
+                        />
+                        <section class="library-section">
+                          <div class="results-heading">
+                            <div>
+                              <h2>
+                                {t(
+                                  service === "radarr"
+                                    ? "Your movies"
+                                    : "Your TV series",
+                                )}{" "}
+                                <span>{count(results.total)}</span>
+                                {busy && (
+                                  <LoaderCircle size={16} class="spin" />
+                                )}
+                              </h2>
+                            </div>
+                            <div class="results-tools">
                               <button
-                                class={active.length ? "icon-button" : "button"}
+                                class="button"
+                                aria-pressed={showAllColumns[service]}
+                                disabled={
+                                  visibleColumns.length ===
+                                    columnOrder.length &&
+                                  !showAllColumns[service]
+                                }
                                 title={
-                                  active.length ? t("Reset filters") : undefined
+                                  showAllColumns[service]
+                                    ? t("Return to saved columns")
+                                    : t(
+                                        "Show hidden columns in the saved order",
+                                      )
                                 }
-                                aria-label={
-                                  active.length
-                                    ? t("Reset filters")
-                                    : t("Open settings")
-                                }
-                                onClick={
-                                  active.length ? reset : () => openSettings()
+                                onClick={() =>
+                                  setShowAllColumns({
+                                    ...showAllColumns,
+                                    [service]: !showAllColumns[service],
+                                  })
                                 }
                               >
-                                {active.length ? (
-                                  <RotateCcw size={16} />
-                                ) : (
-                                  t("Open settings")
-                                )}
+                                <Columns3 size={15} />{" "}
+                                {showAllColumns[service]
+                                  ? t("Default view")
+                                  : t("All columns")}
+                              </button>
+                              <button
+                                type="button"
+                                class="button"
+                                disabled={!results.total}
+                                onClick={() => setCustomOpen(true)}
+                              >
+                                <TagIcon size={15} />
+                                {t("Set tag")}
+                              </button>
+                              <a
+                                class="button"
+                                href={"/api/export?" + exportQuery}
+                              >
+                                <Download size={15} />
+                                {t("Export CSV")}
+                              </a>
+                            </div>
+                          </div>
+                          <div
+                            class={"table-wrap" + (busy ? " busy" : "")}
+                            aria-busy={busy}
+                          >
+                            <LibraryTable
+                              files={results.files}
+                              service={service}
+                              settings={settings}
+                              displayColumns={displayColumns}
+                              movieSort={movieSort}
+                              sortColumn={sortColumn}
+                              setFilename={setFilename}
+                              setSingleCustom={setSingleCustom}
+                            />
+                            {!results.files.length && !busy && (
+                              <div class="empty-state">
+                                <Search size={32} />
+                                <h3>
+                                  {active.length
+                                    ? t("No matching files.")
+                                    : t("Your overview starts here.")}
+                                </h3>
+                                <p>
+                                  {active.length
+                                    ? t("Adjust or reset your filters.")
+                                    : t(
+                                        "Connect a service and start the first sync.",
+                                      )}
+                                </p>
+                                <button
+                                  class={
+                                    active.length ? "icon-button" : "button"
+                                  }
+                                  title={
+                                    active.length
+                                      ? t("Reset filters")
+                                      : undefined
+                                  }
+                                  aria-label={
+                                    active.length
+                                      ? t("Reset filters")
+                                      : t("Open settings")
+                                  }
+                                  onClick={
+                                    active.length ? reset : () => openSettings()
+                                  }
+                                >
+                                  {active.length ? (
+                                    <RotateCcw size={16} />
+                                  ) : (
+                                    t("Open settings")
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div class="pagination">
+                            <span>
+                              {results.displayTotal
+                                ? t("{from}–{to} of {total} files", {
+                                    from: count(
+                                      (page - 1) * results.pageSize + 1,
+                                    ),
+                                    to: count(
+                                      Math.min(
+                                        page * results.pageSize,
+                                        results.displayTotal,
+                                      ),
+                                    ),
+                                    total: count(results.displayTotal),
+                                  })
+                                : t("0 files")}
+                              {service === "sonarr" &&
+                                t(" · by series and season")}
+                            </span>
+                            <div>
+                              <button
+                                class="icon-button"
+                                aria-label={t("Previous page")}
+                                disabled={page <= 1}
+                                onClick={() => setPage(page - 1)}
+                              >
+                                <ArrowLeft size={16} />
+                              </button>
+                              <span>
+                                {t("Page {page} / {pages}", { page, pages })}
+                              </span>
+                              <button
+                                class="icon-button"
+                                aria-label={t("Next page")}
+                                disabled={page >= pages}
+                                onClick={() => setPage(page + 1)}
+                              >
+                                <ArrowRight size={16} />
                               </button>
                             </div>
-                          )}
-                        </div>
-                        <div class="pagination">
-                          <span>
-                            {results.displayTotal
-                              ? t("{from}–{to} of {total} files", {
-                                  from: count(
-                                    (page - 1) * results.pageSize + 1,
-                                  ),
-                                  to: count(
-                                    Math.min(
-                                      page * results.pageSize,
-                                      results.displayTotal,
-                                    ),
-                                  ),
-                                  total: count(results.displayTotal),
-                                })
-                              : t("0 files")}
-                            {service === "sonarr" &&
-                              t(" · by series and season")}
-                          </span>
-                          <div>
-                            <button
-                              class="icon-button"
-                              aria-label={t("Previous page")}
-                              disabled={page <= 1}
-                              onClick={() => setPage(page - 1)}
-                            >
-                              <ArrowLeft size={16} />
-                            </button>
-                            <span>
-                              {t("Page {page} / {pages}", { page, pages })}
-                            </span>
-                            <button
-                              class="icon-button"
-                              aria-label={t("Next page")}
-                              disabled={page >= pages}
-                              onClick={() => setPage(page + 1)}
-                            >
-                              <ArrowRight size={16} />
-                            </button>
                           </div>
-                        </div>
-                      </section>
-                    </>
-                  )}
+                        </section>
+                      </>
+                    )}
+                  </Suspense>
                 </main>
                 {(customOpen || singleCustom !== null) && (
                   <CustomBulk

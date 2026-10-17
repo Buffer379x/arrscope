@@ -215,18 +215,6 @@
 .settings-page [hidden] {
   display: none !important;
 }
-.settings-page .settings-save-bar {
-  margin-top: 24px;
-  padding: 16px 0;
-  border: 0;
-  justify-content: flex-end;
-  background: transparent;
-}
-.settings-save-bar > span {
-  margin-right: auto;
-  font-size: 12px;
-  color: var(--muted);
-}
 .service-sync {
   display: flex;
   align-items: start;
@@ -279,12 +267,6 @@
   }
   .settings-page .connection {
     padding: 14px;
-  }
-  .settings-page .settings-save-bar {
-    flex-wrap: wrap;
-  }
-  .settings-save-bar > span {
-    flex-basis: 100%;
   }
 }
 @media (pointer: coarse) {
@@ -562,11 +544,6 @@ select {
 }
 .settings-content .settings-card .table-wrap {
   margin-top: 16px;
-}
-.settings-content .settings-save-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
 }
 .system-sync-button {
   display: flex;

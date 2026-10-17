@@ -18,6 +18,23 @@ func (s *Store) Recognition() RecognitionConfig {
 	defer s.recognitionMu.Unlock()
 	return s.recognition.Config()
 }
+
+// Pin the database snapshot while its matching immutable rules are protected.
+// Release the recognition lock before doing the expensive catalog queries.
+func (s *Store) beginRecognitionRead(ctx context.Context) (*sql.Tx, []RecognitionRule, error) {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, err
+	}
+	var entries int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM kv").Scan(&entries); err != nil {
+		tx.Rollback()
+		return nil, nil, err
+	}
+	return tx, s.recognition.Config().Rules, nil
+}
 func reparseFile(f *File, engine *RecognitionEngine) {
 	f.comparisonEngine = engine
 	if f.RecognitionRevision == engine.config.Revision {
@@ -103,6 +120,9 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 		return RecognitionConfig{}, err
 	}
 	if err = reparseCached(ctx, tx, engine); err != nil {
+		return RecognitionConfig{}, err
+	}
+	if err = rememberDisplayTags(ctx, tx, engine.config.Rules); err != nil {
 		return RecognitionConfig{}, err
 	}
 	data, _ := json.Marshal(engine.Config())

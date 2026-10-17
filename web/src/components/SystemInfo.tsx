@@ -1,14 +1,13 @@
-import { ExternalTagStatus } from "./ExternalTagStatus";
 import { Database, RefreshCw } from "lucide-preact";
-import type { ConnectionService } from "../ui";
 import { t, useI18n } from "../i18n";
 import type { Settings, Status } from "../types";
+import type { ConnectionService } from "../ui";
 import { count, date } from "../ui";
+import { ExternalTagStatus } from "./ExternalTagStatus";
 
 export function SystemInfo({
   status,
   settings,
-  connectionError,
   demo,
   syncing,
   manualSync,
@@ -17,7 +16,6 @@ export function SystemInfo({
 }: {
   status: Status;
   settings: Settings;
-  connectionError?: string;
   demo: boolean;
   syncing: Record<string, boolean>;
   manualSync: (service: ConnectionService) => Promise<void>;

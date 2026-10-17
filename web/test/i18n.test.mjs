@@ -4,11 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { translate, resolveLocale } from "../src/i18n-core.ts";
-import {
-  audioLanguage,
-  audioLanguageKey,
-  sameAudioLanguage,
-} from "../src/languages.ts";
+import { audioLanguage, sameAudioLanguage } from "../src/languages.ts";
 import {
   makeDashboardFilter,
   dashboardService,
@@ -101,10 +97,10 @@ test("language icons preserve canonical filter values and use a neutral fallback
   assert.equal(audioLanguage("Deutsch").flag, "de");
   assert.equal(audioLanguage("eng").flag, "gb");
   assert.equal(audioLanguage("spa").flag, "es");
-  assert.equal(audioLanguageKey("ita"), "Italian");
+  assert.equal(audioLanguage("ita")?.name, "Italian");
   assert.equal(audioLanguage("und"), undefined);
-  assert.equal(audioLanguageKey(""), "Unknown");
-  assert.equal(audioLanguageKey("Unidentified"), "Unidentified");
+  assert.equal(audioLanguage(""), undefined);
+  assert.equal(audioLanguage("Unidentified"), undefined);
 });
 test("dashboard drilldown encodes values, handles unknowns and picks the service scope", () => {
   assert.equal(

@@ -20,7 +20,6 @@ export const interfaceThemes = [
   "charcoal",
 ] as const;
 export type InterfaceTheme = (typeof interfaceThemes)[number];
-export type ThemeMode = "dark" | "light";
 export const themeLabels = {
   default: "Default",
   nord: "Nordic",

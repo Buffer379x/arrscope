@@ -153,10 +153,10 @@ func (b *Background) CheckRelease(ctx context.Context) {
 		status.Error = "Release check is unavailable"
 	} else {
 		defer res.Body.Close()
-		if res.StatusCode == 304 && old.SuccessAt != nil {
+		if res.StatusCode == http.StatusNotModified && old.SuccessAt != nil {
 			status.SuccessAt = &now
 			status.Error = ""
-		} else if res.StatusCode != 200 {
+		} else if res.StatusCode != http.StatusOK {
 			status.Error = "Release check is unavailable"
 		} else {
 			var release struct {

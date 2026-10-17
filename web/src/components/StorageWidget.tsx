@@ -1,8 +1,9 @@
 import { ChevronLeft, ChevronRight } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
-import type { Settings, StorageData } from "../types";
-import { t, useI18n, getLocale } from "../i18n";
 import { api } from "../api";
+import { readPreference, writePreference } from "../browser-storage";
+import { getLocale, t, useI18n } from "../i18n";
+import type { Settings, StorageData } from "../types";
 export function storageBytes(n: number) {
   const divisor = n >= 1e12 ? 1e12 : 1e9;
   return (
@@ -22,14 +23,13 @@ export function StorageWidget({
   const [data, setData] = useState<StorageData | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>(() => {
     try {
-      return JSON.parse(localStorage.getItem("scopearr-storage-areas") || "{}");
+      return JSON.parse(readPreference("scopearr-storage-areas") || "{}");
     } catch {
       return {};
     }
   });
   useEffect(
-    () =>
-      localStorage.setItem("scopearr-storage-areas", JSON.stringify(selected)),
+    () => writePreference("scopearr-storage-areas", JSON.stringify(selected)),
     [selected],
   );
   const [error, setError] = useState(false);

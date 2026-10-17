@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"runtime/debug"
 	"sync"
@@ -79,7 +81,6 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 	gen := m.generation[service]
 	ctx, cancel := context.WithCancel(parent)
 	m.cancels[service] = cancel
-	m.store.Put("sync:"+service, st)
 	m.wg.Add(1)
 	m.mu.Unlock()
 	go func() {
@@ -95,6 +96,7 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 			err = ctx.Err()
 		}
 		if err == nil {
+			_ = m.persistStatus(ctx, service, st, gen)
 			m.mu.Lock()
 			if gen != m.generation[service] {
 				m.mu.Unlock()
@@ -140,40 +142,84 @@ func (m *Syncer) Start(parent context.Context, service string, c ServiceConfig, 
 			err = ctx.Err()
 		}
 		m.mu.Lock()
-		defer m.mu.Unlock()
 		if gen != m.generation[service] {
+			m.mu.Unlock()
 			return
 		}
 		st := m.status[service]
+		m.mu.Unlock()
 		st.Running = false
 		st.Queued = false
-		if err != nil {
-			st.Error = err.Error()
-			m.store.Put("sync:"+service, st)
-		} else {
+		if err == nil {
 			now := time.Now().UTC()
 			st.LastSuccess = &now
 			st.Source = tagEndpoint(c)
 			st.Count = len(files)
 			st.Error = ""
-			if err = m.store.replaceSyncSnapshot(service, files, st); err != nil {
-				st = m.status[service]
-				st.Running = false
+			// Only the final commit needs to exclude invalidation. Database work
+			// remains cancellable, and status readers stay responsive.
+			err = m.store.replaceContext(ctx, service, files, st, true, nil, func(tx *sql.Tx) error {
+				m.mu.Lock()
+				defer m.mu.Unlock()
+				if gen != m.generation[service] {
+					return context.Canceled
+				}
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				return tx.Commit()
+			})
+			if err != nil {
 				st.Error = "Cache konnte nicht gespeichert werden"
-				m.store.Put("sync:"+service, st)
 			}
+		} else {
+			st.Error = err.Error()
 		}
-		// replaceSyncSnapshot consumes file contents; drop its backing slice too.
-		// The next service must not overlap with the outgoing snapshot's RSS.
 		files = nil
 		debug.FreeOSMemory()
+		m.mu.Lock()
+		if gen != m.generation[service] {
+			m.mu.Unlock()
+			return
+		}
+		if err != nil {
+			previous := m.status[service]
+			st.LastSuccess, st.Source, st.Count = previous.LastSuccess, previous.Source, previous.Count
+		}
 		m.status[service] = st
 		delete(m.cancels, service)
+		m.mu.Unlock()
+		if err != nil {
+			statusCtx, cancelStatus := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			_ = m.persistStatus(statusCtx, service, st, gen)
+			cancelStatus()
+		}
 		if err == nil && m.AfterSync != nil && !(c.TagImport && c.TagImportInterval == 0 && !c.TagSync.Active()) {
 			m.AfterSync(service)
 		}
 	}()
 	return nil
+}
+
+func (m *Syncer) persistStatus(ctx context.Context, service string, status SyncStatus, generation int) error {
+	raw, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	tx, err := m.store.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", "sync:"+service, string(raw)); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if generation != m.generation[service] {
+		return context.Canceled
+	}
+	return tx.Commit()
 }
 func (m *Syncer) Shutdown() {
 	m.mu.Lock()

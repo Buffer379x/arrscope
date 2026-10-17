@@ -17,17 +17,8 @@
   .main {
     padding: 30px 24px 0;
   }
-  .filter-grid {
-    grid-template-columns: 2fr 1fr 1fr;
-  }
-  .filter-grid > .year-field {
-    grid-column: auto;
-  }
   .intro h1 {
     font-size: 31px;
-  }
-  .filter-grid > .search-field {
-    grid-column: span 1;
   }
   .footer {
     flex-direction: column;
@@ -42,9 +33,6 @@
   }
   .login-art > img {
     width: 200px;
-  }
-  .advanced-grid {
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 @media (max-width: 740px) {
@@ -106,17 +94,6 @@
   .filter-heading > span {
     font-size: 8px;
   }
-  .filter-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-    padding: 16px 14px;
-  }
-  .filter-grid > .search-field {
-    grid-column: 1/-1;
-  }
-  .filter-grid > .year-field {
-    grid-column: auto;
-  }
   .filter-footer {
     padding: 12px 14px;
     flex-direction: column;
@@ -126,10 +103,6 @@
   .filter-tools {
     width: 100%;
     justify-content: flex-end;
-  }
-  .advanced-grid {
-    padding: 0 14px 16px;
-    grid-template-columns: 1fr 1fr;
   }
   .results-heading {
     align-items: flex-start;

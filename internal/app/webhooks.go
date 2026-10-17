@@ -91,26 +91,26 @@ func (m *WebhookManager) key(service string, create bool) (string, error) {
 func (s *Server) webhookCredentialsHTTP(w http.ResponseWriter, r *http.Request) {
 	service := r.URL.Query().Get("service")
 	if !serviceOK(service) || s.Demo {
-		failure(w, r, 400, errors.New("Invalid service"))
+		failure(w, r, http.StatusBadRequest, errors.New("Invalid service"))
 		return
 	}
 	key, e := s.Webhooks.key(service, true)
 	if e != nil {
-		failure(w, r, 500, errors.New("Could not create webhook credentials"))
+		failure(w, r, http.StatusInternalServerError, errors.New("Could not create webhook credentials"))
 		return
 	}
-	jsonOut(w, 200, map[string]string{"username": service, "password": key, "endpoint": "/api/webhooks/arr?service=" + service})
+	jsonOut(w, http.StatusOK, map[string]string{"username": service, "password": key, "endpoint": "/api/webhooks/arr?service=" + service})
 }
 func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != "POST" {
 		w.Header().Set("Allow", "POST")
-		http.Error(w, "Method not allowed", 405)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	service := r.URL.Query().Get("service")
 	if !serviceOK(service) || s.Demo {
-		http.Error(w, "Webhook unavailable", 404)
+		http.Error(w, "Webhook unavailable", http.StatusNotFound)
 		return
 	}
 	cfg := s.Config()
@@ -119,7 +119,7 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 		c = cfg.Sonarr
 	}
 	if !c.Enabled || !c.WebhookEnabled {
-		http.Error(w, "Webhook unavailable", 404)
+		http.Error(w, "Webhook unavailable", http.StatusNotFound)
 		return
 	}
 	key, e := s.Webhooks.key(service, false)
@@ -129,7 +129,7 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 		pass = r.Header.Get("X-Scopearr-Webhook-Key")
 	}
 	if e != nil || user != service || len(pass) > 128 || subtle.ConstantTimeCompare([]byte(pass), []byte(key)) != 1 {
-		http.Error(w, "Unauthorized", 401)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
@@ -153,16 +153,16 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if e = decoder.Decode(&payload); e != nil {
-		http.Error(w, "Invalid webhook payload", 400)
+		http.Error(w, "Invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		http.Error(w, "Invalid webhook payload", 400)
+		http.Error(w, "Invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 	if payload.Event == "Test" {
-		jsonOut(w, 200, map[string]bool{"ok": true})
+		jsonOut(w, http.StatusOK, map[string]bool{"ok": true})
 		return
 	}
 	id := payload.Movie.ID
@@ -186,11 +186,11 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 		all = true
 	}
 	if !recognized {
-		jsonOut(w, 200, map[string]bool{"ignored": true})
+		jsonOut(w, http.StatusOK, map[string]bool{"ignored": true})
 		return
 	}
 	if id <= 0 || (service == "radarr" && payload.Series.ID != 0) || (service == "sonarr" && payload.Movie.ID != 0) {
-		http.Error(w, "Invalid media identity", 400)
+		http.Error(w, "Invalid media identity", http.StatusBadRequest)
 		return
 	}
 	ids := map[int]bool{}
@@ -211,11 +211,11 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 		all = true
 	}
 	if service == "sonarr" && !all && len(ids) == 0 {
-		http.Error(w, "Episode file identities are required", 400)
+		http.Error(w, "Episode file identities are required", http.StatusBadRequest)
 		return
 	}
 	if len(ids) > 512 {
-		http.Error(w, "Too many file identities", 400)
+		http.Error(w, "Too many file identities", http.StatusBadRequest)
 		return
 	}
 	job := WebhookJob{Service: service, MediaID: id, All: all, Source: tagEndpoint(c), Next: time.Now().UTC().Add(2 * time.Second)}
@@ -223,10 +223,10 @@ func (s *Server) webhookHTTP(w http.ResponseWriter, r *http.Request) {
 		job.FileIDs = append(job.FileIDs, fileID)
 	}
 	if e = s.Webhooks.Enqueue(job); e != nil {
-		http.Error(w, "Webhook queue is full or unavailable; retry later", 503)
+		http.Error(w, "Webhook queue is full or unavailable; retry later", http.StatusServiceUnavailable)
 		return
 	}
-	jsonOut(w, 202, map[string]bool{"queued": true})
+	jsonOut(w, http.StatusAccepted, map[string]bool{"queued": true})
 }
 func jobKey(job WebhookJob) string {
 	return "webhook-job:" + job.Service + ":" + strconv.Itoa(job.MediaID)
@@ -340,21 +340,22 @@ func (m *WebhookManager) processOne(ctx context.Context) {
 		e = m.s.Store.preserveDeltaEmby(readCtx, job.Service, files, cfg.Emby.Enabled || cfg.Jellyfin.Enabled)
 	}
 	// Settings updates and the commit share the same lock; obsolete endpoints never replace the cache.
-	m.s.mu.Lock()
-	current := m.s.settings.Radarr
+	m.s.settingsMu.Lock()
+	settings := m.s.Config()
+	current := settings.Radarr
 	if job.Service == "sonarr" {
-		current = m.s.settings.Sonarr
+		current = settings.Sonarr
 	}
 	if (tagEndpoint(current) != job.Source || current.APIKey != c.APIKey) || !current.Enabled || !current.WebhookEnabled {
-		m.s.mu.Unlock()
+		m.s.settingsMu.Unlock()
 		return
 	}
 	if e == nil && readCtx.Err() == nil {
-		e = m.s.Store.replace(job.Service, files, SyncStatus{}, true, scope)
+		e = m.s.Store.replaceContext(readCtx, job.Service, files, SyncStatus{}, true, scope, nil)
 	} else if e == nil {
 		e = readCtx.Err()
 	}
-	m.s.mu.Unlock()
+	m.s.settingsMu.Unlock()
 	var tagPolicyPending bool
 	m.s.Store.Get("tagSyncDirty:"+job.Service, &tagPolicyPending)
 	// A pending service-wide policy transition must finish before a targeted tag reconciliation.

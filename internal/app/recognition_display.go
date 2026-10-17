@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 )
 
@@ -21,53 +22,27 @@ func unknownTagLabel(f string) string {
 	}
 	return f + "-unknown"
 }
-func uhdBluRayDefaultRule() RecognitionRule {
-	return RecognitionRule{ID: "default-source-uhd-bluray", Name: "Source / UHD", Field: "source", Match: "regex", Pattern: `(?:^|[ ._\[\]()-])UHD(?:$|[ ._\[\]()-])`, Value: "UHD", Mode: "override", Priority: 94, Enabled: true, Unless: `(?:^|[ ._\[\]()-])(?:WEB[ ._-]?(?:DL|Rip)|HDTV|DVD)(?:$|[ ._\[\]()-])`}
-}
-func upgradeRules053(rules []RecognitionRule) ([]RecognitionRule, bool) {
-	next := append([]RecognitionRule{}, rules...)
-	changed := false
-	found := false
-	names := map[string]string{}
-	for _, r := range DefaultRecognitionRules() {
-		names[r.ID] = r.Field + " · " + strings.TrimPrefix(r.Name, ruleFieldName(r.Field)+" / ")
-	}
-	for i, r := range next {
-		if old, ok := names[r.ID]; ok && r.Name == old {
-			next[i].Name = ruleFieldName(r.Field) + " / " + strings.TrimPrefix(r.Name, r.Field+" · ")
-			changed = true
-		}
-
-		if r.ID == "default-source-uhd-bluray" {
-			found = true
-		}
-		if r.Field == "source" && strings.EqualFold(r.Value, "UHD") {
-			probe := r
-			probe.Enabled = true
-			if e, err := CompileRecognition([]RecognitionRule{probe}); err == nil && e.Recognize("Example.UHD.BluRay.mkv").Values["source"] == "UHD" {
-				found = true
-			}
-		}
-	}
-	if !found && len(next) < 256 {
-		next = append(next, uhdBluRayDefaultRule())
-		changed = true
-	}
-	return next, changed
-}
 
 // Presentation registry is separate from recognized data and outbound categories.
 func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
-	engine := s.Recognition()
+	tx, rules, err := s.beginRecognitionRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	return displayTags(ctx, tx, rules)
+}
+
+func displayTags(ctx context.Context, tx *sql.Tx, rules []RecognitionRule) (map[string][]string, error) {
 	out := map[string][]string{}
 	sets := map[string]map[string]bool{}
 	informationFields := map[string]bool{}
-	for _, r := range engine.Rules {
+	for _, r := range rules {
 		if r.Enabled && !ruleIsTag(r) {
 			informationFields[r.Field] = true
 		}
 	}
-	for _, r := range engine.Rules {
+	for _, r := range rules {
 		if !r.Enabled || !ruleIsTag(r) {
 			continue
 		}
@@ -91,7 +66,7 @@ func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
 		}
 	}
 	// Dynamic captures use only filename evidence from enabled, tag-marked rules.
-	for _, r := range engine.Rules {
+	for _, r := range rules {
 		if !r.Enabled || !ruleIsTag(r) || !strings.Contains(r.Value, "$") {
 			continue
 		}
@@ -99,7 +74,7 @@ func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
 		if field == "custom" {
 			continue
 		}
-		rows, e := s.DB.QueryContext(ctx, "SELECT DISTINCT "+field+" FROM files f WHERE EXISTS(SELECT 1 FROM json_each(f.data,'$.evidence.'||?||'.rules') x WHERE x.value=?)", field, r.ID)
+		rows, e := tx.QueryContext(ctx, "SELECT DISTINCT "+field+" FROM files f WHERE EXISTS(SELECT 1 FROM json_each(f.data,'$.evidence.'||?||'.rules') x WHERE x.value=?)", field, r.ID)
 		if e != nil {
 			return nil, e
 		}
@@ -120,7 +95,7 @@ func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
 		}
 	}
 	// Manually assigned custom tags remain tags independently of recognition rules.
-	rows, e := s.DB.QueryContext(ctx, "SELECT DISTINCT c.tag_id FROM file_custom c WHERE NOT EXISTS(SELECT 1 FROM file_custom_auto a WHERE a.file_rowid=c.file_rowid AND a.tag_id=c.tag_id) OR EXISTS(SELECT 1 FROM custom_overrides o JOIN files f ON f.rowid=c.file_rowid WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=c.tag_id AND o.state=1)")
+	rows, e := tx.QueryContext(ctx, "SELECT DISTINCT c.tag_id FROM file_custom c WHERE NOT EXISTS(SELECT 1 FROM file_custom_auto a WHERE a.file_rowid=c.file_rowid AND a.tag_id=c.tag_id) OR EXISTS(SELECT 1 FROM custom_overrides o JOIN files f ON f.rowid=c.file_rowid WHERE o.service=f.service AND o.file_id=f.id AND o.tag_id=c.tag_id AND o.state=1)")
 	if e != nil {
 		return nil, e
 	}
@@ -146,7 +121,7 @@ func (s *Store) DisplayTags(ctx context.Context) (map[string][]string, error) {
 					sep = ", "
 				}
 				var exists bool
-				if e = s.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM files f WHERE (f."+f+"=? OR instr(?||f."+f+"||?,?||?||?)>0) AND NOT EXISTS(SELECT 1 FROM json_each(f.data,'$.informationOnly.'||?) i WHERE i.value=?))", v, sep, sep, sep, v, sep, f, v).Scan(&exists); e != nil {
+				if e = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM files f WHERE (f."+f+"=? OR instr(?||f."+f+"||?,?||?||?)>0) AND NOT EXISTS(SELECT 1 FROM json_each(f.data,'$.informationOnly.'||?) i WHERE i.value=?))", v, sep, sep, sep, v, sep, f, v).Scan(&exists); e != nil {
 					return nil, e
 				}
 				if !exists {

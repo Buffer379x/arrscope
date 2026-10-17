@@ -14,38 +14,38 @@ Explore and filter your Radarr and Sonarr libraries using existing filenames and
 > - **Stay up to date:** manual or scheduled sync, authenticated webhooks, durable retries and release notices.
 > - **Keep it local:** one Go process, embedded UI, SQLite/FTS5 cache, local backups, encrypted API keys, protected sessions and AMD64/ARM64 Docker images. No media scans or mounts.
 
-![Scopearr 0.9.5 movie library](docs/screenshots/library-0.9.5-en.jpg)
+![Scopearr 1.0.0 movie library](docs/screenshots/library-1.0.0-en.jpg)
 
 <details>
 <summary>Current screenshots: dashboard, filters, TV series, audio details, light theme and mobile</summary>
 
 ### Dashboard
 
-![Scopearr 0.9.5 dashboard](docs/screenshots/dashboard-0.9.5-en.jpg)
+![Scopearr 1.0.0 dashboard](docs/screenshots/dashboard-1.0.0-en.jpg)
 
 ### Filters and metadata quality
 
-![Scopearr 0.9.5 filters](docs/screenshots/filters-0.9.5-en.jpg)
+![Scopearr 1.0.0 filters](docs/screenshots/filters-1.0.0-en.jpg)
 
 ### TV series and season outliers
 
-![Scopearr 0.9.5 TV library](docs/screenshots/series-0.9.5-en.jpg)
+![Scopearr 1.0.0 TV library](docs/screenshots/series-1.0.0-en.jpg)
 
 ### Audio tracks and metadata evidence
 
-![Scopearr 0.9.5 audio details](docs/screenshots/audio-details-0.9.5-en.jpg)
+![Scopearr 1.0.0 audio details](docs/screenshots/audio-details-1.0.0-en.jpg)
 
 ### Light theme
 
-![Scopearr 0.9.5 light theme](docs/screenshots/light-0.9.5-en.jpg)
+![Scopearr 1.0.0 light theme](docs/screenshots/light-1.0.0-en.jpg)
 
 ### Mobile
 
-<img src="docs/screenshots/mobile-0.9.5-en.jpg" alt="Scopearr 0.9.5 mobile TV library" width="390">
+<img src="docs/screenshots/mobile-1.0.0-en.jpg" alt="Scopearr 1.0.0 mobile TV library" width="390">
 
 </details>
 
-Screenshots show the unmodified Scopearr 0.9.5 interface in English, using a separate instance with synthetic demo data. They contain no private library data or service credentials.
+Screenshots show the Scopearr 1.0.0 interface in English, using a separate instance with synthetic demo data. They contain no private library data or service credentials.
 
 ## Features
 

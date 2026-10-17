@@ -7,6 +7,7 @@ args = parser.parse_args()
 if not 1 <= args.files_per_service <= 100000:
     parser.error('Use 1 to 100000 files per service.')
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from concurrent.futures import ThreadPoolExecutor
 N = args.files_per_service
 PER_SERIES = 50
 overlap = None
@@ -152,6 +153,12 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
             catalog = req('/api/tag-catalog')
             result['tag_catalog_ms'] = round((time.perf_counter() - t) * 1000, 3)
             assert next(row['count'] for row in catalog if row['field'] == 'resolution' and row['value'] == '1080p') == 2 * N
+            cached = []
+            for _ in range(20):
+                t = time.perf_counter()
+                assert req('/api/tag-catalog') == catalog
+                cached.append((time.perf_counter() - t) * 1000)
+            result['tag_catalog_cached_p95_ms'] = round(sorted(cached)[18], 3)
             # Reprocess the entire cache under the same 256 MiB/no-swap limit.
             # Verified Emby pairs must survive and no synthetic upstream GET may occur.
             current = req('/api/recognition')
@@ -191,6 +198,26 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
                 assert out['files'][0]['mediaServers']['emby']['video']['width'] == 1920
             result['recognition_preserved_emby'] = True
             result['recognition_upstream_requests'] = Fixture.calls - before_calls
+            # Rule changes invalidate all three caches. Fill them concurrently
+            # under the same memory limit and verify the new complete snapshot.
+            t = time.perf_counter()
+            reserve_peak = 0.0
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = {key: pool.submit(req, '/api/' + path) for key, path in {
+                    'statistics': 'statistics', 'facets': 'facets?service=radarr', 'catalog': 'tag-catalog'
+                }.items()}
+                while any(not future.done() for future in futures.values()):
+                    value = re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status', check=False))
+                    if value: reserve_peak = max(reserve_peak, int(value[1]) / 1024)
+                    time.sleep(0.1)
+                replies = {key: future.result() for key, future in futures.items()}
+            assert replies['statistics']['files'] == 2 * N
+            assert 'UHD' in replies['facets']['source']
+            assert next(row['count'] for row in replies['catalog'] if row['field'] == 'source' and row['value'] == 'UHD') == 2 * N
+            result['parallel_cold_reads_ms'] = round((time.perf_counter() - t) * 1000, 3)
+            result['parallel_sampled_app_rss_peak_mib'] = round(reserve_peak, 2)
+            result['sampled_app_rss_peak_mib'] = round(max(result['sampled_app_rss_peak_mib'], reserve_peak), 2)
+            result['parallel_read_reserve_passed'] = True
             raw = docker('exec', name, 'cat', '/sys/fs/cgroup/memory.peak', check=False)
             if raw.isdigit(): result['cgroup_peak_mib'] = round(int(raw)/1024**2,2)
             result['app_rss_after_queries_mib'] = round(int(re.search('VmRSS:\\s+(\\d+) kB', docker('exec', name, 'cat', '/proc/1/status'))[1]) / 1024, 2)

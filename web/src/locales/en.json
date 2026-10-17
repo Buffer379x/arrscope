@@ -838,6 +838,8 @@
     "Show link to media server entry": "Show link to media server entry",
     "Open media server entry in a new tab": "Open media server entry in a new tab",
     "Choose media server": "Choose media server",
-    "Media server link unavailable. Synchronize the library and check the file mapping.": "Media server link unavailable. Synchronize the library and check the file mapping."
+    "Media server link unavailable. Synchronize the library and check the file mapping.": "Media server link unavailable. Synchronize the library and check the file mapping.",
+    "Could not revoke session": "Could not revoke session",
+    "Could not load settings": "Could not load settings"
   }
 }

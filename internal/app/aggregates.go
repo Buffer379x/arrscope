@@ -3,23 +3,35 @@ package app
 import "context"
 
 // Cached aggregates are immutable snapshots and are invalidated after a successful commit.
-func (s *Store) Facets(service string) (map[string][]string, error) {
-	return s.FacetsContext(context.Background(), service)
-}
 func (s *Store) FacetsContext(ctx context.Context, service string) (map[string][]string, error) {
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
+	if !serviceOK(service) {
+		return s.facets(ctx, service)
+	}
+	index := 0
+	if service == "sonarr" {
+		index = 1
+	}
+	s.facetLoad[index].Lock()
+	defer s.facetLoad[index].Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if result, ok := s.facetCache[service]; ok {
+	s.cacheMu.Lock()
+	result, ok := s.facetCache[service]
+	generation := s.cacheGeneration
+	s.cacheMu.Unlock()
+	if ok {
 		return cloneFacets(result), nil
 	}
 	result, err := s.facets(ctx, service)
 	if err != nil {
 		return nil, err
 	}
-	s.facetCache[service] = result
+	s.cacheMu.Lock()
+	if generation == s.cacheGeneration {
+		s.facetCache[service] = result
+	}
+	s.cacheMu.Unlock()
 	return cloneFacets(result), nil
 }
 func cloneFacets(in map[string][]string) map[string][]string {
@@ -29,21 +41,28 @@ func cloneFacets(in map[string][]string) map[string][]string {
 	}
 	return out
 }
-func (s *Store) Statistics() (Statistics, error) { return s.StatisticsContext(context.Background()) }
 func (s *Store) StatisticsContext(ctx context.Context) (Statistics, error) {
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
+	s.statisticsLoad.Lock()
+	defer s.statisticsLoad.Unlock()
 	if err := ctx.Err(); err != nil {
 		return Statistics{}, err
 	}
-	if s.statisticsCache != nil {
-		return cloneStatistics(*s.statisticsCache), nil
+	s.cacheMu.Lock()
+	cached := s.statisticsCache
+	generation := s.cacheGeneration
+	s.cacheMu.Unlock()
+	if cached != nil {
+		return cloneStatistics(*cached), nil
 	}
 	result, err := s.statistics(ctx)
 	if err != nil {
 		return result, err
 	}
-	s.statisticsCache = &result
+	s.cacheMu.Lock()
+	if generation == s.cacheGeneration {
+		s.statisticsCache = &result
+	}
+	s.cacheMu.Unlock()
 	return cloneStatistics(result), nil
 }
 func cloneStatistics(in Statistics) Statistics {
@@ -75,4 +94,6 @@ func (s *Store) invalidateCustomFacets() {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 	s.facetCache = map[string]map[string][]string{}
+	s.catalogCache = nil
+	s.cacheGeneration++
 }

@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type credentials struct {
@@ -30,11 +31,12 @@ type attempt struct {
 	Until time.Time
 }
 type Security struct {
-	store      *Store
-	aead       cipher.AEAD
-	setupToken string
-	mu         sync.Mutex
-	attempts   map[string]attempt
+	store          *Store
+	aead           cipher.AEAD
+	setupToken     string
+	mu             sync.Mutex
+	attempts       map[string]attempt
+	passwordChecks chan struct{}
 }
 
 func NewSecurity(s *Store) (*Security, error) {
@@ -58,7 +60,7 @@ func NewSecurity(s *Store) (*Security, error) {
 	if e != nil {
 		return nil, e
 	}
-	sec := &Security{store: s, aead: a, attempts: map[string]attempt{}}
+	sec := &Security{store: s, aead: a, attempts: map[string]attempt{}, passwordChecks: make(chan struct{}, 2)}
 	if !sec.Initialized() {
 		p := filepath.Join(s.Dir, "setup-token")
 		t, e := os.ReadFile(p)
@@ -137,44 +139,50 @@ func (s *Security) Setup(user, password, token string) error {
 	s.setupToken = ""
 	return nil
 }
-func (s *Security) Login(user, password, ip string) bool {
-	return s.loginHash(user, password, ip) != ""
-}
 
 // The verified hash guards session creation against a concurrent password reset,
 // including reset-password in another process sharing the database.
 func (s *Security) loginHash(user, password, ip string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	a := s.attempts[ip]
-	if now.Before(a.Until) && a.Count >= 5 {
+	select {
+	case s.passwordChecks <- struct{}{}:
+		defer func() { <-s.passwordChecks }()
+	default:
 		return ""
 	}
-	if now.After(a.Until) {
+	now := time.Now()
+	s.mu.Lock()
+	a := s.attempts[ip]
+	if now.Before(a.Until) && a.Count >= 5 {
+		s.mu.Unlock()
+		return ""
+	}
+	if !now.Before(a.Until) {
 		a = attempt{Until: now.Add(15 * time.Minute)}
 	}
-	var c credentials
-	s.store.Get("admin", &c)
-	passwordValid := bcrypt.CompareHashAndPassword([]byte(c.Hash), []byte(password)) == nil
-	valid := c.Username == user && passwordValid
-	if !valid {
-		a.Count++
-		s.attempts[ip] = a
-	} else {
-		delete(s.attempts, ip)
-	}
-	if len(s.attempts) > 10000 {
+	if len(s.attempts) >= 10000 {
 		for k, v := range s.attempts {
-			if now.After(v.Until) {
+			if !now.Before(v.Until) {
 				delete(s.attempts, k)
 			}
 		}
+		if _, exists := s.attempts[ip]; !exists && len(s.attempts) >= 10000 {
+			s.mu.Unlock()
+			return ""
+		}
 	}
-	if valid {
-		return c.Hash
+	// Reserve this attempt before releasing the lock so parallel failures
+	// cannot exceed the per-address limit while bcrypt is running.
+	a.Count++
+	s.attempts[ip] = a
+	s.mu.Unlock()
+	var c credentials
+	if s.store.Get("admin", &c) != nil || bcrypt.CompareHashAndPassword([]byte(c.Hash), []byte(password)) != nil || c.Username != user {
+		return ""
 	}
-	return ""
+	s.mu.Lock()
+	delete(s.attempts, ip)
+	s.mu.Unlock()
+	return c.Hash
 }
 func remoteIP(r *http.Request) string {
 	h, _, e := net.SplitHostPort(r.RemoteAddr)

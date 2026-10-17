@@ -1,5 +1,6 @@
 import { createContext, type ComponentChildren } from "preact";
 import { useContext, useEffect, useState } from "preact/hooks";
+import { readPreference, writePreference } from "./browser-storage";
 import {
   resolveLocale,
   translate,
@@ -20,11 +21,7 @@ export const t = (key: string, parameters?: Parameters) =>
   translate(active, fallback, key, parameters);
 export const getLocale = () => active.locale;
 function initialLocale() {
-  let saved: string | null = null;
-  try {
-    saved =
-      localStorage.getItem("scopearr-language");
-  } catch {}
+  const saved = readPreference("scopearr-language");
   return resolveLocale(
     saved ? [saved] : navigator.languages,
     catalogs.map((catalog) => catalog.locale),
@@ -46,9 +43,7 @@ export function I18nProvider({ children }: { children: ComponentChildren }) {
         "content",
         t("Your movie and TV library. Clearly filtered."),
       );
-    try {
-      localStorage.setItem("scopearr-language", locale);
-    } catch {}
+    writePreference("scopearr-language", locale);
   }, [locale]);
   return (
     <Context.Provider value={{ locale, setLocale }}>
