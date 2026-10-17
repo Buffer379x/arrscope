@@ -108,7 +108,10 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
         peak = 0
         rss_peak = 0
         status = {}
-        for _ in range(600):
+        # Poll count is not a time budget: responsive status endpoints otherwise
+        # shorten this test on slower runners. Keep a bounded wall-clock limit.
+        sync_deadline = time.monotonic() + 300
+        while time.monotonic() < sync_deadline:
             state = json.loads(docker('inspect', name))[0]['State']
             if not state['Running']:
                 result.update(completed=False, oom_killed=state['OOMKilled'], exit_code=state['ExitCode'])
@@ -127,7 +130,9 @@ with tempfile.TemporaryDirectory(prefix='scopearr-review-data-') as data:
             if not any((v['running'] for v in status.values())):
                 result.update(completed=all((v['count'] == N and (not v['error']) for v in status.values())), statuses=status, oom_killed=False)
                 break
-            time.sleep(0.1)
+            time.sleep(0.25)
+        else:
+            result.update(completed=False, statuses=status, test_error='Library synchronization exceeded its 300-second deadline')
         result.update(seconds=round(time.perf_counter() - start, 3), cgroup_peak_mib=round(peak / 1024 ** 2, 2), sampled_app_rss_peak_mib=round(rss_peak, 2))
         if result.get('completed'):
             timings = []
