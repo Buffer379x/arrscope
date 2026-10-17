@@ -11,7 +11,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "lucide-preact": "0.468.0",
+    "lucide-preact": "1.53.0",
     "preact": "10.27.3"
   },
   "devDependencies": {
