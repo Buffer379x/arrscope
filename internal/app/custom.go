@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -91,13 +90,8 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 		return fmt.Errorf("This tag is controlled by an external auto-tag rule")
 	}
 
-	rules := []RecognitionRule{}
-	for _, r := range s.recognition.config.Rules {
-		if r.Field != "custom" || r.Value != strconv.FormatInt(id, 10) {
-			rules = append(rules, r)
-		}
-	}
-	engine, err := CompileRecognition(rules)
+	deleted := map[int64]bool{id: true}
+	engine, err := s.recognitionWithoutCustomTags(deleted)
 	if err != nil {
 		return err
 	}
@@ -114,75 +108,8 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 	if _, err = tx.ExecContext(ctx, "DELETE FROM custom_tags WHERE id=?", id); err != nil {
 		return err
 	}
-	raw, _ := json.Marshal(engine.Config())
-	if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(raw)); err != nil {
+	if err = cleanupDeletedCustomTags(ctx, tx, deleted, engine); err != nil {
 		return err
-	}
-	var rawSettings string
-	if err = tx.QueryRowContext(ctx, "SELECT value FROM kv WHERE key='settings'").Scan(&rawSettings); err != nil && err != sql.ErrNoRows {
-		return err
-	}
-	if err == nil {
-		var cfg Settings
-		if err = json.Unmarshal([]byte(rawSettings), &cfg); err != nil {
-			return err
-		}
-		key := "custom:" + strconv.FormatInt(id, 10)
-		delete(cfg.TagColors, key)
-		delete(cfg.TagTextColors, key)
-		delete(cfg.HiddenTags, key)
-		raw, _ := json.Marshal(cfg)
-		if _, err = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(raw)); err != nil {
-			return err
-		}
-	}
-	rows, err := tx.QueryContext(ctx, "SELECT id,query FROM presets")
-	if err != nil {
-		return err
-	}
-	type presetQuery struct {
-		id    int64
-		query string
-	}
-	updates := []presetQuery{}
-	for rows.Next() {
-		var item presetQuery
-		if err = rows.Scan(&item.id, &item.query); err != nil {
-			rows.Close()
-			return err
-		}
-		q, e := url.ParseQuery(item.query)
-		if e != nil {
-			continue
-		}
-		values := q["custom"]
-		kept := []string{}
-		for _, v := range values {
-			if v != strconv.FormatInt(id, 10) {
-				kept = append(kept, v)
-			}
-		}
-		if len(kept) != len(values) {
-			q.Del("custom")
-			for _, v := range kept {
-				q.Add("custom", v)
-			}
-			if len(kept) == 0 {
-				q.Del("customOp")
-			}
-			item.query = q.Encode()
-			updates = append(updates, item)
-		}
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	for _, item := range updates {
-		if _, err = tx.ExecContext(ctx, "UPDATE presets SET query=? WHERE id=?", item.query, item.id); err != nil {
-			return err
-		}
 	}
 	if err = revisionCustom(ctx, tx); err != nil {
 		return err
@@ -190,7 +117,7 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 	if err = tx.Commit(); err != nil {
 		return err
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.invalidateCustomFacets()
 	return nil
 }
@@ -463,14 +390,7 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 		}
 	}
 
-	rules := []RecognitionRule{}
-	for _, rule := range s.recognition.config.Rules {
-		id, _ := strconv.ParseInt(rule.Value, 10, 64)
-		if rule.Field != "custom" || !deleted[id] {
-			rules = append(rules, rule)
-		}
-	}
-	engine, err := CompileRecognition(rules)
+	engine, err := s.recognitionWithoutCustomTags(deleted)
 	if err != nil {
 		return nil, err
 	}
@@ -537,87 +457,8 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 		}
 	}
 	if len(deleted) > 0 {
-		raw, e := json.Marshal(engine.Config())
-		if e != nil {
-			return nil, e
-		}
-		if _, err = tx.ExecContext(ctx, "INSERT INTO kv(key,value) VALUES('recognition',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", string(raw)); err != nil {
+		if err = cleanupDeletedCustomTags(ctx, tx, deleted, engine); err != nil {
 			return nil, err
-		}
-		var rawSettings string
-		err = tx.QueryRowContext(ctx, "SELECT value FROM kv WHERE key='settings'").Scan(&rawSettings)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, err
-		}
-		if err == nil {
-			var cfg Settings
-			if err = json.Unmarshal([]byte(rawSettings), &cfg); err != nil {
-				return nil, err
-			}
-			for id := range deleted {
-				key := "custom:" + strconv.FormatInt(id, 10)
-				delete(cfg.TagColors, key)
-				delete(cfg.TagTextColors, key)
-				delete(cfg.HiddenTags, key)
-			}
-			raw, err = json.Marshal(cfg)
-			if err != nil {
-				return nil, err
-			}
-			if _, err = tx.ExecContext(ctx, "UPDATE kv SET value=? WHERE key='settings'", string(raw)); err != nil {
-				return nil, err
-			}
-		}
-		for id := range deleted {
-			rows, err := tx.QueryContext(ctx, "SELECT id,query FROM presets")
-			if err != nil {
-				return nil, err
-			}
-			type presetQuery struct {
-				id    int64
-				query string
-			}
-			updates := []presetQuery{}
-			for rows.Next() {
-				var item presetQuery
-				if err = rows.Scan(&item.id, &item.query); err != nil {
-					rows.Close()
-					return nil, err
-				}
-				q, e := url.ParseQuery(item.query)
-				if e != nil {
-					continue
-				}
-				values := q["custom"]
-				kept := []string{}
-				for _, v := range values {
-					if v != strconv.FormatInt(id, 10) {
-						kept = append(kept, v)
-					}
-				}
-				if len(kept) != len(values) {
-					q.Del("custom")
-					for _, v := range kept {
-						q.Add("custom", v)
-					}
-					if len(kept) == 0 {
-						q.Del("customOp")
-					}
-					item.query = q.Encode()
-					updates = append(updates, item)
-				}
-			}
-			err = rows.Err()
-			rows.Close()
-			if err != nil {
-				return nil, err
-			}
-			for _, item := range updates {
-				if _, err = tx.ExecContext(ctx, "UPDATE presets SET query=? WHERE id=?", item.query, item.id); err != nil {
-					return nil, err
-				}
-			}
-
 		}
 	}
 	if err = revisionCustom(ctx, tx); err != nil {
@@ -626,7 +467,7 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.invalidateCustomFacets()
 	return s.CustomTags(ctx)
 }

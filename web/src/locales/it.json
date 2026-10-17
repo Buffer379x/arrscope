@@ -838,6 +838,8 @@
     "Show link to media server entry": "Mostra link alla voce del server multimediale",
     "Open media server entry in a new tab": "Apri la voce del server multimediale in una nuova scheda",
     "Choose media server": "Scegli server multimediale",
-    "Media server link unavailable. Synchronize the library and check the file mapping.": "Link al server multimediale non disponibile. Sincronizza la libreria e controlla la corrispondenza del file."
+    "Media server link unavailable. Synchronize the library and check the file mapping.": "Link al server multimediale non disponibile. Sincronizza la libreria e controlla la corrispondenza del file.",
+    "Could not revoke session": "Impossibile revocare la sessione",
+    "Could not load settings": "Impossibile caricare le impostazioni"
   }
 }

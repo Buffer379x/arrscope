@@ -1,55 +1,47 @@
 import { Trash2 } from "lucide-preact";
-import { WidgetsSettings } from "./WidgetsSettings";
-import { WebhookSettings } from "./WebhookSettings";
-import { ListLayoutSettings } from "./ListLayoutSettings";
-import { interfaceThemes, themeLabels } from "../themes";
-import { audioLanguageLabel } from "../languages";
-import { LanguageFlag } from "./LanguageFlag";
-import { TagReview, type TagPreview, type TagReviewRequest } from "./TagReview";
+import { lazy, Suspense } from "preact/compat";
 import { confirmDeletion } from "../confirmation";
-import { TagPolicyDialog } from "./TagPolicyDialog";
+import { getLocale, t, useI18n } from "../i18n";
+import { audioLanguageLabel } from "../languages";
+import { notify } from "../notifications";
 import {
   tagTransition,
-  type TagTransition,
   type TagDecision,
+  type TagTransition,
 } from "../tag-policy";
-import { notify } from "../notifications";
-import { CustomTagsSettings } from "./CustomTagsSettings";
 import type { CustomTag } from "../types";
-import { LanguageSelect, t, useI18n, getLocale } from "../i18n";
+import { AppearanceSettings } from "./AppearanceSettings";
+import { ConnectionSettings } from "./ConnectionSettings";
+import { CustomTagsSettings } from "./CustomTagsSettings";
+import { LanguageFlag } from "./LanguageFlag";
 import { SystemInfo } from "./SystemInfo";
-import { RecognitionPage } from "./RecognitionPage";
+import { TagPolicyDialog } from "./TagPolicyDialog";
+import { TagReview, type TagPreview, type TagReviewRequest } from "./TagReview";
+import { WidgetsSettings } from "./WidgetsSettings";
+const RecognitionPage = lazy(() =>
+  import("./RecognitionPage").then((module) => ({
+    default: module.RecognitionPage,
+  })),
+);
 
 import {
-  RotateCcw,
   AlertTriangle,
-  OctagonAlert,
-  SlidersHorizontal,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpRight,
   Check,
-  Database,
-  Film,
-  Layers,
   LoaderCircle,
   LockKeyhole,
-  Tv,
+  OctagonAlert,
+  RotateCcw,
 } from "lucide-preact";
 import { useEffect, useId, useRef, useState } from "preact/hooks";
-import type { Connection, Service, Settings, Status } from "../types";
+import type { Service, Settings, Status } from "../types";
 
 import { api } from "../api";
 import {
-  defaultWarningColors,
   colorFields,
-  columnLabels,
   ConnectionService,
   defaultColor,
-  defaultColumnOrder,
-  defaultColumns,
+  defaultWarningColors,
   labels,
-  tableColumns,
   Tag,
 } from "../ui";
 export function SettingsDialog({
@@ -57,7 +49,6 @@ export function SettingsDialog({
   customChanged,
   settings,
   status,
-  connectionError,
   demo,
   saved,
   onDirty,
@@ -65,20 +56,16 @@ export function SettingsDialog({
   initialSection = "connections",
 }: {
   customTags: CustomTag[];
-  customChanged: () => Promise<void>;
+  customChanged: () => Promise<CustomTag[] | undefined>;
   settings: Settings;
   status: Status;
-  connectionError?: string;
   demo: boolean;
-  saved: () => Promise<void>;
+  saved: (settings: Settings) => Promise<void>;
   onDirty: (dirty: boolean) => void;
   refresh: () => Promise<void>;
   initialSection?: string;
 }) {
   const { locale, setLocale } = useI18n();
-  const [mediaProvider, setMediaProvider] = useState<"emby" | "jellyfin">(
-    settings.emby.enabled || !settings.jellyfin.enabled ? "emby" : "jellyfin",
-  );
   const [draftLocale, setDraftLocale] = useState(locale);
   const [tagChanges, setTagChanges] = useState<TagTransition[] | null>(null);
   const settingsFormId = useId();
@@ -96,15 +83,17 @@ export function SettingsDialog({
   const contentRef = useRef<HTMLDivElement>(null);
   const [cfg, setCfg] = useState<Settings>(structuredClone(settings)),
     [busy, setBusy] = useState(false),
-    [testing, setTesting] = useState<Record<string, boolean>>({}),
     [current, setCurrent] = useState(""),
     [password, setPassword] = useState(""),
     [section, setSection] = useState(initialSection),
     [colorField, setColorField] = useState("resolution"),
     [recognized, setRecognized] = useState<Record<string, string[]>>({});
   useEffect(() => {
-    api<CatalogTag[]>("tag-catalog")
+    const controller = new AbortController();
+    let current = true;
+    api<CatalogTag[]>("tag-catalog", "GET", undefined, controller.signal)
       .then((rows) => {
+        if (!current) return;
         setCatalog(rows);
         const values: Record<string, string[]> = {};
         for (const field of colorFields) {
@@ -118,6 +107,10 @@ export function SettingsDialog({
         setRecognized(values);
       })
       .catch(() => {});
+    return () => {
+      current = false;
+      controller.abort();
+    };
   }, [
     customTags,
     status.recognitionRevision,
@@ -202,11 +195,6 @@ export function SettingsDialog({
       return { ...current, tagTextColors: colors };
     });
   };
-  const update = (service: ConnectionService, patch: Partial<Connection>) =>
-    setCfg((current) => ({
-      ...current,
-      [service]: { ...current[service], ...patch },
-    }));
   const saveSettings = async (
     next: Settings,
     tagApprovals: Record<string, string> = {},
@@ -217,8 +205,9 @@ export function SettingsDialog({
       await api("settings", "PUT", { ...next, tagApprovals });
       setTagChanges(null);
       setTagSaveReview(null);
-      setCfg(await api<Settings>("settings"));
-      await saved();
+      const settings = await api<Settings>("settings");
+      setCfg(settings);
+      await saved(settings);
       setLocale(draftLocale);
       notify(t("Settings saved."));
     } catch (e) {
@@ -336,7 +325,9 @@ export function SettingsDialog({
         </nav>
         <div class="settings-content" ref={contentRef}>
           {section === "recognition" && (
-            <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
+            <Suspense fallback={null}>
+              <RecognitionPage onDirty={setRulesDirty} saved={refresh} />
+            </Suspense>
           )}
           {section === "custom" && (
             <CustomTagsSettings
@@ -347,8 +338,8 @@ export function SettingsDialog({
               colorsDirty={dirty}
               savingColors={busy}
               changed={async () => {
-                await customChanged();
-                const tags = await api<CustomTag[]>("custom-tags");
+                const tags = await customChanged();
+                if (!tags) return;
                 const ids = new Set(tags.map((tag) => String(tag.id)));
                 setCfg((current) => ({
                   ...current,
@@ -430,634 +421,20 @@ export function SettingsDialog({
                 <WidgetsSettings settings={cfg} changed={setCfg} demo={demo} />
               )}
             </div>
-            <div class="settings-section" hidden={section !== "connections"}>
-              <section class="connection">
-                <label>
-                  {t("Sync timezone")}
-                  <input
-                    value={cfg.syncTimezone || ""}
-                    placeholder={
-                      Intl.DateTimeFormat().resolvedOptions().timeZone
-                    }
-                    onInput={(e) =>
-                      setCfg({ ...cfg, syncTimezone: e.currentTarget.value })
-                    }
-                  />
-                </label>
-                <small>
-                  {t(
-                    "Clock schedules use this IANA timezone. Empty uses UTC; no start time keeps the existing interval schedule.",
-                  )}
-                </small>
-              </section>
-              {(["radarr", "sonarr", mediaProvider] as ConnectionService[]).map(
-                (service) => (
-                  <section class="connection" key={service}>
-                    <header class="connection-heading">
-                      <h3 class="card-title">
-                        {service === "radarr" ? (
-                          <Film size={16} />
-                        ) : (
-                          <Tv size={16} />
-                        )}{" "}
-                        {service === "radarr"
-                          ? "Radarr"
-                          : service === "sonarr"
-                            ? "Sonarr"
-                            : t("Media server")}
-                      </h3>
-                      <div class="connection-heading-test">
-                        <button
-                          type="button"
-                          class="button"
-                          disabled={demo || testing[service]}
-                          onClick={async () => {
-                            setTesting((current) => ({
-                              ...current,
-                              [service]: true,
-                            }));
-                            try {
-                              const r = await api<{ version: string }>(
-                                "test",
-                                "POST",
-                                {
-                                  service,
-                                  url: cfg[service].url,
-                                  apiKey: cfg[service].apiKey || "",
-                                },
-                              );
-                              notify(
-                                t("Connected · version {version}", {
-                                  version: r.version,
-                                }),
-                              );
-                            } catch {
-                            } finally {
-                              setTesting((current) => ({
-                                ...current,
-                                [service]: false,
-                              }));
-                            }
-                          }}
-                        >
-                          {t("Test connection")}
-                          <ArrowUpRight size={14} />
-                        </button>
-                      </div>
-                    </header>
-                    {(service === "emby" || service === "jellyfin") && (
-                      <p class="quiet">
-                        {t(
-                          "Adds existing video and audio stream metadata. No scans or media access. Matching requires a unique filename and identical file size.",
-                        )}
-                      </p>
-                    )}
-                    {(service === "emby" || service === "jellyfin") && (
-                      <label class="media-provider-select">
-                        {t("Media server")}
-                        <select
-                          aria-label={t("Media server")}
-                          value={mediaProvider}
-                          onChange={(e) =>
-                            setMediaProvider(
-                              e.currentTarget.value as "emby" | "jellyfin",
-                            )
-                          }
-                        >
-                          <option value="emby">Emby</option>
-                          <option value="jellyfin">Jellyfin</option>
-                        </select>
-                      </label>
-                    )}
-                    <label class="check-field">
-                      <input
-                        type="checkbox"
-                        disabled={demo}
-                        checked={cfg[service].enabled}
-                        onChange={(e) =>
-                          update(service, { enabled: e.currentTarget.checked })
-                        }
-                      />{" "}
-                      {t("Enable service")}
-                    </label>
-                    <div class="connection-grid">
-                      <label>
-                        {t("Server address")}
-                        <input
-                          type="url"
-                          disabled={demo}
-                          placeholder={
-                            service === "radarr"
-                              ? "http://192.168.1.10:7878"
-                              : service === "sonarr"
-                                ? "http://192.168.1.10:8989"
-                                : "http://192.168.1.10:8096"
-                          }
-                          value={cfg[service].url}
-                          onInput={(e) =>
-                            update(service, { url: e.currentTarget.value })
-                          }
-                        />
-                        <small>
-                          {t(
-                            "URL subpaths are supported, for example /{service}.",
-                            { service },
-                          )}
-                        </small>
-                      </label>
-                      <label>
-                        {t("API key")}
-                        <input
-                          type="password"
-                          disabled={demo}
-                          autoComplete="off"
-                          placeholder={
-                            cfg[service].hasKey
-                              ? t("Saved · leave empty to keep")
-                              : t("Enter API key")
-                          }
-                          value={cfg[service].apiKey || ""}
-                          onInput={(e) =>
-                            update(service, { apiKey: e.currentTarget.value })
-                          }
-                        />
-                        <small>
-                          {service === "emby" || service === "jellyfin"
-                            ? t(
-                                "Create a dedicated API key in the selected media server dashboard.",
-                              )
-                            : t("In each service under Settings → General.")}
-                        </small>
-                      </label>
-                      <label class="check-field">
-                        <input
-                          type="checkbox"
-                          disabled={demo}
-                          checked={!!cfg[service].clearKey}
-                          onChange={async (e) => {
-                            const input = e.currentTarget,
-                              checked = input.checked;
-                            if (
-                              checked &&
-                              !(await confirmDeletion(
-                                t("Delete the saved API key when saving?"),
-                              ))
-                            ) {
-                              input.checked = false;
-                              return;
-                            }
-                            update(service, {
-                              clearKey: checked,
-                              ...(checked
-                                ? { enabled: false, apiKey: "" }
-                                : {}),
-                            });
-                          }}
-                        />
-                        {t("Delete saved API key on save")}
-                      </label>
-                      {(service === "emby" || service === "jellyfin") && (
-                        <label class="path-mapping-field">
-                          {t("Optional path mappings")}
-                          <textarea
-                            aria-label={t("Media server path mappings")}
-                            disabled={demo}
-                            rows={3}
-                            value={cfg[service].pathMappings || ""}
-                            placeholder="/movies => /media/movies"
-                            onInput={(e) =>
-                              update(service, {
-                                pathMappings: e.currentTarget.value,
-                              })
-                            }
-                          />
-                          <small>
-                            {t(
-                              "One line per media path: Arr path => media server path. If configured, the full mapped path must also match. Different folder names inside the library prevent enrichment.",
-                            )}
-                          </small>
-                        </label>
-                      )}
-                      {service === "radarr" || service === "sonarr" ? (
-                        <div class="sync-clock-grid">
-                          <label>
-                            {t("Synchronize")}
-                            <select
-                              disabled={demo}
-                              value={cfg[service].interval}
-                              onChange={(e) =>
-                                update(service, {
-                                  interval: Number(e.currentTarget.value),
-                                })
-                              }
-                            >
-                              {[
-                                [0, t("Manual only")],
-                                [15, t("Every 15 minutes")],
-                                [30, t("Every 30 minutes")],
-                                [60, t("Hourly")],
-                                [360, t("Every 6 hours")],
-                                [1440, t("Daily")],
-                              ].map(([value, label]) => (
-                                <option value={value}>{label}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            {t("Starting at")}
-                            <input
-                              type="text"
-                              inputMode="text"
-                              placeholder="HH:MM"
-                              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
-                              maxLength={5}
-                              autoComplete="off"
-                              disabled={demo || cfg[service].interval === 0}
-                              value={cfg[service].syncStart || ""}
-                              onInput={(e) => {
-                                update(service, {
-                                  syncStart: e.currentTarget.value,
-                                });
-                                if (!cfg.syncTimezone)
-                                  setCfg((current) => ({
-                                    ...current,
-                                    syncTimezone:
-                                      Intl.DateTimeFormat().resolvedOptions()
-                                        .timeZone,
-                                  }));
-                              }}
-                            />
-                          </label>
-                        </div>
-                      ) : (
-                        <p class="quiet">
-                          {t(
-                            "Synced with Radarr and Sonarr. An error preserves the last complete cache.",
-                          )}
-                        </p>
-                      )}
-                      {(service === "radarr" || service === "sonarr") && (
-                        <div class="tag-integration-settings">
-                          <section class="external-tag-settings">
-                            <h4>{t("External tags")}</h4>
-                            <label class="check-field">
-                              <input
-                                type="checkbox"
-                                checked={!!cfg[service].tagImport}
-                                onChange={(e) =>
-                                  update(service, {
-                                    tagImport: e.currentTarget.checked,
-                                    ...(e.currentTarget.checked &&
-                                    !cfg[service].tagImport
-                                      ? { tagImportInterval: 5 }
-                                      : {}),
-                                  })
-                                }
-                              />
-                              {t("Import external tags as custom tags")}
-                            </label>
-                            <label>
-                              {t("Tag check interval")}
-                              <select
-                                value={cfg[service].tagImportInterval ?? 5}
-                                disabled={!cfg[service].tagImport}
-                                onChange={(e) =>
-                                  update(service, {
-                                    tagImportInterval: Number(
-                                      e.currentTarget.value,
-                                    ),
-                                  })
-                                }
-                              >
-                                {[0, 5, 15, 30, -1].map((v) => (
-                                  <option value={v}>
-                                    {t(
-                                      v === 0
-                                        ? "Manual only"
-                                        : v === -1
-                                          ? "With library sync"
-                                          : v === 5
-                                            ? "Every 5 minutes"
-                                            : v === 15
-                                              ? "Every 15 minutes"
-                                              : "Every 30 minutes",
-                                    )}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <p class="quiet">
-                              {t(
-                                "Local edits are checked immediately. Enable outbound Custom tags below to send them back. Auto-tag rule references protect edits; no file or media server requests are needed for tag checks.",
-                              )}
-                            </p>
-                          </section>
-                          <section class="outbound-tag-settings">
-                            <h4>
-                              {t("Tag synchronization to {service}", {
-                                service:
-                                  service === "radarr" ? "Radarr" : "Sonarr",
-                              })}
-                            </h4>
-                            <p class="quiet">
-                              {t(
-                                "Disabled by default. When saving changes, choose whether existing tags should be kept or overwritten, and whether disabled groups should be kept or deleted.",
-                              )}
-                            </p>
-                            <div class="tag-group-options">
-                              {[
-                                "resolution",
-                                "codec",
-                                "source",
-                                "hdr",
-                                "bitDepth",
-                                "audio",
-                                "channels",
-                                "language",
-                                "custom",
-                              ].map((field) => (
-                                <label class="check-field">
-                                  <input
-                                    type="checkbox"
-                                    disabled={demo}
-                                    checked={
-                                      !!cfg[service].tagSync?.[
-                                        field as keyof import("../types").TagGroups
-                                      ]
-                                    }
-                                    onChange={(e) =>
-                                      update(service, {
-                                        tagSync: {
-                                          ...cfg[service].tagSync,
-                                          [field]: e.currentTarget.checked,
-                                        } as import("../types").TagGroups,
-                                      })
-                                    }
-                                  />
-                                  {labels[field]}
-                                </label>
-                              ))}
-                            </div>
-                            <small>
-                              {t(
-                                "Source includes processing tags such as Remux. Series collect the values of all episode files. Labels use lowercase letters, digits and hyphens.",
-                              )}
-                            </small>
-                          </section>
-                        </div>
-                      )}
-                      {(service === "radarr" || service === "sonarr") && (
-                        <WebhookSettings
-                          service={service}
-                          config={cfg[service]}
-                          changed={(patch) => update(service, patch)}
-                          savedEnabled={!!settings[service].webhookEnabled}
-                          demo={demo}
-                        />
-                      )}
-                    </div>
-                  </section>
-                ),
-              )}
-            </div>
-            <div class="settings-section" hidden={section !== "appearance"}>
-              <div class="appearance-preferences">
-                <section class="connection">
-                  <h3 class="card-title">{t("Interface language")}</h3>
-                  <LanguageSelect
-                    value={draftLocale}
-                    onChange={setDraftLocale}
-                  />
-                  <small>
-                    {t(
-                      "Applied after saving in this browser. Media names and filter values stay unchanged.",
-                    )}
-                  </small>
-                </section>
-                <section class="connection">
-                  <h3 class="card-title">{t("Interface theme")}</h3>
-                  <select
-                    aria-label={t("Interface theme")}
-                    value={cfg.interfaceTheme || "default"}
-                    onChange={(e) =>
-                      setCfg({ ...cfg, interfaceTheme: e.currentTarget.value })
-                    }
-                  >
-                    {interfaceThemes.map((theme) => (
-                      <option value={theme}>{t(themeLabels[theme])}</option>
-                    ))}
-                  </select>
-                  <small>
-                    {t(
-                      "Applied after saving. Every theme supports dark and light mode; layout and tag colors stay unchanged.",
-                    )}
-                  </small>
-                </section>
-              </div>
-              <section class="connection">
-                <h3 class="card-title">
-                  <Layers size={16} />
-                  {t("TV view")}
-                </h3>
-                <label>
-                  {t("Results with active filters")}
-                  <select
-                    value={cfg.seasonMode}
-                    onChange={(e) =>
-                      setCfg({
-                        ...cfg,
-                        seasonMode: e.currentTarget
-                          .value as Settings["seasonMode"],
-                      })
-                    }
-                  >
-                    <option value="matches">
-                      {t("Show matching files only")}
-                    </option>
-                    <option value="season">
-                      {t("Full matching season · highlight matches")}
-                    </option>
-                  </select>
-                </label>
-                <small>
-                  {t(
-                    "One matching file is enough to show its season in context.",
-                  )}
-                </small>
-              </section>
-              <section class="connection">
-                <h3 class="card-title">{t("Pagination")}</h3>
-                <label>
-                  {t("Entries per page")}
-                  <input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    step="1"
-                    required
-                    value={cfg.pageSize ?? 100}
-                    onInput={(e) =>
-                      setCfg({
-                        ...cfg,
-                        pageSize: Number(e.currentTarget.value),
-                      })
-                    }
-                  />
-                </label>
-                <small>
-                  {t(
-                    "Shared by movies and TV series. Default: 100. Allowed: 1–1000.",
-                  )}
-                </small>
-              </section>
-              <ListLayoutSettings
-                settings={cfg}
-                changed={(next) => setCfg(next)}
-              />
-              <section class="connection">
-                <h3 class="card-title">{t("Default columns")}</h3>
-                <p class="quiet">
-                  {t(
-                    "Choose visible columns and move them with the arrows. The order runs left to right, including hidden columns. Both are saved permanently. Filters and CSV still include all fields.",
-                  )}
-                </p>
-                <div class="column-settings">
-                  {(["radarr", "sonarr"] as Service[]).map((service) => (
-                    <section class="columns-group">
-                      <h3 class="card-title">
-                        {service === "radarr"
-                          ? t("Movies · Radarr")
-                          : t("TV series · Sonarr")}
-                      </h3>
-                      <div class="column-options">
-                        {cfg.columnOrder[service].map((field, index) => (
-                          <div class="column-option" key={field}>
-                            <label class="check-field">
-                              <input
-                                type="checkbox"
-                                aria-label={
-                                  (service === "radarr"
-                                    ? t("Movies")
-                                    : t("TV series")) +
-                                  ": " +
-                                  columnLabels[field]
-                                }
-                                checked={cfg.visibleColumns[service].includes(
-                                  field,
-                                )}
-                                disabled={field === "title"}
-                                onChange={(e) => {
-                                  const checked = e.currentTarget.checked;
-                                  setCfg((current) => {
-                                    const selected = new Set(
-                                      current.visibleColumns[service],
-                                    );
-                                    if (checked) selected.add(field);
-                                    else selected.delete(field);
-                                    return {
-                                      ...current,
-                                      visibleColumns: {
-                                        ...current.visibleColumns,
-                                        [service]: tableColumns
-                                          .map(([key]) => key)
-                                          .filter((key) => selected.has(key)),
-                                      },
-                                    };
-                                  });
-                                }}
-                              />
-                              {field === "title"
-                                ? service === "radarr"
-                                  ? t("Title (always visible)")
-                                  : t("Episode (always visible)")
-                                : columnLabels[field]}
-                            </label>
-                            <div class="column-move-tools">
-                              {([-1, 1] as const).map((direction) => (
-                                <button
-                                  type="button"
-                                  class="icon-button"
-                                  aria-label={
-                                    (service === "radarr"
-                                      ? t("Movies") + ": "
-                                      : t("TV series") + ": ") +
-                                    columnLabels[field] +
-                                    " · " +
-                                    (direction === -1
-                                      ? t("Move up")
-                                      : t("Move down"))
-                                  }
-                                  title={
-                                    direction === -1
-                                      ? t("Move column left")
-                                      : t("Move column right")
-                                  }
-                                  disabled={
-                                    direction === -1
-                                      ? index === 0
-                                      : index ===
-                                        cfg.columnOrder[service].length - 1
-                                  }
-                                  onClick={() => {
-                                    setCfg((current) => {
-                                      const order = [
-                                        ...current.columnOrder[service],
-                                      ];
-                                      const position = order.indexOf(field);
-                                      const next = position + direction;
-                                      if (next < 0 || next >= order.length)
-                                        return current;
-                                      [order[position], order[next]] = [
-                                        order[next],
-                                        order[position],
-                                      ];
-                                      return {
-                                        ...current,
-                                        columnOrder: {
-                                          ...current.columnOrder,
-                                          [service]: order,
-                                        },
-                                      };
-                                    });
-                                  }}
-                                >
-                                  {direction === -1 ? (
-                                    <ArrowUp size={14} />
-                                  ) : (
-                                    <ArrowDown size={14} />
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        class="icon-button"
-                        aria-label={t("Restore defaults")}
-                        title={t("Restore defaults")}
-                        onClick={() =>
-                          setCfg((current) => ({
-                            ...current,
-                            visibleColumns: {
-                              ...current.visibleColumns,
-                              [service]: [...defaultColumns],
-                            },
-                            columnOrder: {
-                              ...current.columnOrder,
-                              [service]: [...defaultColumnOrder],
-                            },
-                          }))
-                        }
-                      >
-                        <RotateCcw size={16} />
-                      </button>
-                    </section>
-                  ))}
-                </div>
-              </section>
-            </div>
+            <ConnectionSettings
+              cfg={cfg}
+              setCfg={setCfg}
+              settings={settings}
+              demo={demo}
+              hidden={section !== "connections"}
+            />
+            <AppearanceSettings
+              cfg={cfg}
+              setCfg={setCfg}
+              draftLocale={draftLocale}
+              setDraftLocale={setDraftLocale}
+              hidden={section !== "appearance"}
+            />
             <div class="settings-section" hidden={section !== "appearance"}>
               <section class="connection warning-color-settings">
                 <h3 class="card-title">{t("Warning colors")}</h3>
@@ -1362,7 +739,9 @@ export function SettingsDialog({
                                           field: colorField,
                                           value,
                                         });
-                                        await saved();
+                                        await saved(
+                                          await api<Settings>("settings"),
+                                        );
                                       }
                                       setCatalog((old) =>
                                         old.filter(
@@ -1414,7 +793,6 @@ export function SettingsDialog({
               <SystemInfo
                 status={status}
                 settings={settings}
-                connectionError={connectionError}
                 demo={demo}
                 syncing={syncing}
                 manualSync={manualSync}

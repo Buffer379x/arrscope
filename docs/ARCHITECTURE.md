@@ -18,6 +18,12 @@ Data is gathered in memory, validated and committed only after a complete succes
 
 Facet and dashboard caches are defensively copied immutable snapshots, invalidated after successful commits. Queries carry cancellation contexts to SQLite. Frontend request generations and abort controllers reject stale results. Polling pauses in hidden tabs; intervals are 3 seconds during sync, 30 seconds when idle/authenticated and 60 seconds on login.
 
+The catalog is also a defensively copied cache. Its GET path uses a read-only snapshot; data/rule writes retain historical display values inside their own transaction. Aggregate fills have separate locks and publish only if their invalidation generation still matches. Library counts/rows and dashboard widgets use explicit read-only transactions, allowing WAL readers alongside a writer.
+
+`Server.mu` protects only the in-memory configuration. `settingsMu` serializes settings and presentation changes; operations needing the sync gate acquire it first. Store writes never hold `Server.mu`. Recognition changes acquire `recognitionMu` before opening a write transaction; reconciliation takes a protected immutable rules snapshot before opening its transaction. Sync status locks cover only short state updates and the generation-checked commit, so cancellation and status reads remain available during snapshot construction.
+
+Routing/authentication remain in `server.go`, with named endpoint handlers in `server_*.go` and CSV handling in `export.go`. Store opening and historical migrations live in `store_open.go`; query filters, ordering, results, facets and statistics have focused files. Existing 0.5.x rule migrations remain explicitly separated from current display logic. Frontend settings sections, table rendering and the rule editor retain their existing markup in separate components. The authenticated application, settings and recognition page load on demand; the full language registry remains available after login.
+
 ## Endpoints
 
 Cold Dashboard queries use a compact expression index for episode associations and metadata completeness, avoiding full evidence/audio JSON scans. SQLite maintains the expressions automatically on file writes; the index is additive and contains no new canonical state.

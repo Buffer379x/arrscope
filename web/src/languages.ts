@@ -50,11 +50,7 @@ export function audioLanguage(value: string) {
   const matched = match ? byAlias.get(match[1]) : undefined;
   return matched?.id === "und" ? undefined : matched;
 }
-export function audioLanguageKey(value: string) {
-  return isUnknownAudioLanguage(value)
-    ? "Unknown"
-    : audioLanguage(value)?.name || value || "Unknown";
-}
+
 const displayNames = new Map<string, Intl.DisplayNames>();
 export function audioLanguageLabel(value: string, locale: string) {
   if (isUnknownAudioLanguage(value)) return "Unknown";

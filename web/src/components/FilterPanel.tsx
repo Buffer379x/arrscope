@@ -1,18 +1,23 @@
-import { useState, useId } from "preact/hooks";
-import { t, useI18n, getLocale } from "../i18n";
-import { audioLanguageLabel } from "../languages";
 import {
-  CircleHelp,
-  RotateCcw,
   Bookmark,
   ChevronDown,
+  CircleHelp,
+  RotateCcw,
   Search,
-  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-preact";
+import { useId, useState } from "preact/hooks";
+import { getLocale, t, useI18n } from "../i18n";
+import { audioLanguageLabel } from "../languages";
 import type { Preset, Service } from "../types";
 
+import {
+  mediaStateFilters,
+  mediaStateHelp,
+  seasonLanguageHelp,
+  seasonTechnicalHelp,
+} from "../media-filters";
 import {
   embyMatchLabels,
   FilterOperator,
@@ -20,14 +25,8 @@ import {
   labels,
   operatorLabels,
 } from "../ui";
-import {
-  mediaStateFilters,
-  mediaStateHelp,
-  seasonTechnicalHelp,
-  seasonLanguageHelp,
-} from "../media-filters";
-import { StateFilter } from "./StateFilter";
 import { MultiFilter } from "./MultiFilter";
+import { StateFilter } from "./StateFilter";
 type Props = {
   q: URLSearchParams;
   collapsed: boolean;

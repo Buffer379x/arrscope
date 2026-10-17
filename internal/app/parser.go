@@ -3,18 +3,15 @@ package app
 import (
 	"regexp"
 	"scopearr/internal/langdata"
-	"sort"
 	"strconv"
 	"strings"
 )
 
 var resolutionRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(480[pi]|576[pi]|720p|1080[pi]|1440p|2160p|4320p|4k|8k)(?:$|[ ._\[\]()-])`)
-var codecRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(x[ ._-]?264|x[ ._-]?265|h[ ._-]?264|h[ ._-]?265|avc|hevc|av1|xvid|divx|mpeg[ ._-]?2|vc[ ._-]?1)(?:$|[ ._\[\]()-])`)
-var depthRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(8|10|12)[ ._-]?bit(?:$|[ ._\[\]()-])`)
-var channelRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])([257]\.1|2\.0)(?:$|[ ._\[\]()-])`)
 var dolbyRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:dv|dovi|dolby[ ._-]?vision)(?:$|[ ._\[\]()-])`)
 var hdrRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])hdr(?:$|[ ._\[\]()-])`)
 var eacRE = regexp.MustCompile(`(?i)(?:^|[ ._\[\]()-])(?:ddp|dd\+|eac3|e-ac-3)(?:[ ._\[\]()-]|\d|$)`)
+
 var languageMatchers = []struct {
 	re    *regexp.Regexp
 	label string
@@ -158,16 +155,6 @@ func audioToken(s string) string {
 		}
 	}
 	return strings.Join(out, " + ")
-}
-func languageToken(s string) string {
-	var out []string
-	for _, x := range languageMatchers {
-		if x.re.MatchString(s) {
-			out = append(out, x.label)
-		}
-	}
-	sort.Strings(out)
-	return strings.Join(out, ", ")
 }
 func normAudio(s string) string {
 	switch strings.ToLower(strings.TrimSpace(s)) {

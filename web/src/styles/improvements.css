@@ -38,13 +38,6 @@
   color: var(--accent);
   background: var(--accent-bg);
 }
-.settings-save-bar {
-  flex-shrink: 0;
-  background: var(--panel);
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-  z-index: 2;
-}
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -126,24 +119,9 @@ textarea {
   .quality-widgets {
     grid-template-columns: 1fr;
   }
-  .settings-save-bar {
-    flex-wrap: wrap;
-  }
 }
 
 /* Only settings keep a stable frame; the active section scrolls inside it. */
-.modal.settings-modal {
-  height: min(820px, calc(100dvh - 30px));
-  max-height: calc(100dvh - 30px);
-  overflow: hidden;
-}
-.modal.settings-modal[open] {
-  display: flex;
-  flex-direction: column;
-}
-.settings-modal .modal-heading {
-  flex-shrink: 0;
-}
 .settings-content {
   flex: 1;
   min-height: 0;
@@ -152,13 +130,4 @@ textarea {
   scrollbar-gutter: stable;
   padding-right: 5px;
   overscroll-behavior: contain;
-}
-@media (max-width: 740px) {
-  .settings-modal .settings-tabs {
-    gap: 5px;
-  }
-  .settings-modal .settings-tabs button {
-    padding: 10px 5px;
-    font-size: 12px;
-  }
 }

@@ -75,23 +75,23 @@ func (c *ArrClient) entrySlug(ctx context.Context, service string, id int) (stri
 // Only a cached media ID and the configured service address can be opened.
 func (s *Server) openEntry(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		failure(w, r, 405, errors.New("Method not allowed"))
+		failure(w, r, http.StatusMethodNotAllowed, errors.New("Method not allowed"))
 		return
 	}
 	service := r.URL.Query().Get("service")
 	id, err := strconv.Atoi(r.URL.Query().Get("mediaId"))
 	if err != nil || id <= 0 || (service != "radarr" && service != "sonarr") {
-		failure(w, r, 400, errors.New("Invalid entry link"))
+		failure(w, r, http.StatusBadRequest, errors.New("Invalid entry link"))
 		return
 	}
 	var raw string
 	if err = s.Store.DB.QueryRowContext(r.Context(), "SELECT data FROM files WHERE service=? AND media_id=? LIMIT 1", service, id).Scan(&raw); err != nil {
-		failure(w, r, 404, errors.New("Cached entry not found"))
+		failure(w, r, http.StatusNotFound, errors.New("Cached entry not found"))
 		return
 	}
 	var file File
 	if err = json.Unmarshal([]byte(raw), &file); err != nil {
-		failure(w, r, 500, errors.New("Could not read cached entry"))
+		failure(w, r, http.StatusInternalServerError, errors.New("Could not read cached entry"))
 		return
 	}
 	settings := s.Config()
@@ -102,18 +102,18 @@ func (s *Server) openEntry(w http.ResponseWriter, r *http.Request) {
 	slug := safeTitleSlug(file.TitleSlug)
 	if slug == "" {
 		if !cfg.Enabled || cfg.APIKey == "" {
-			failure(w, r, 409, errors.New("Enable the service to resolve this entry link"))
+			failure(w, r, http.StatusConflict, errors.New("Enable the service to resolve this entry link"))
 			return
 		}
 		slug, err = NewArr(cfg).entrySlug(r.Context(), service, id)
 		if err != nil {
-			failure(w, r, 502, err)
+			failure(w, r, http.StatusBadGateway, err)
 			return
 		}
 	}
 	target, err := entryURL(cfg.URL, service, slug)
 	if err != nil {
-		failure(w, r, 400, err)
+		failure(w, r, http.StatusBadRequest, err)
 		return
 	}
 	w.Header().Set("Referrer-Policy", "no-referrer")

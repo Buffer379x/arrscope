@@ -10,7 +10,7 @@ import (
 
 func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", 405)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var in struct {
@@ -21,15 +21,15 @@ func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 		Page    int           `json:"page"`
 	}
 	if e := decode(w, r, &in); e != nil {
-		failure(w, r, 400, e)
+		failure(w, r, http.StatusBadRequest, e)
 		return
 	}
 	if !serviceOK(in.Service) {
-		failure(w, r, 400, errors.New("Invalid service"))
+		failure(w, r, http.StatusBadRequest, errors.New("Invalid service"))
 		return
 	}
 	if s.Demo {
-		failure(w, r, 403, errors.New("Demo connections cannot be changed"))
+		failure(w, r, http.StatusForbidden, errors.New("Demo connections cannot be changed"))
 		return
 	}
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(130 * time.Second))
@@ -39,7 +39,7 @@ func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 	case s.Sync.gate <- struct{}{}:
 		defer func() { <-s.Sync.gate }()
 	case <-ctx.Done():
-		failure(w, r, 503, errors.New("Sync is busy. Try again after it completes"))
+		failure(w, r, http.StatusServiceUnavailable, errors.New("Sync is busy. Try again after it completes"))
 		return
 	}
 	cfg := s.Config()
@@ -52,11 +52,11 @@ func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 		next = before
 	} else {
 		if e := mergeConnection(&next, before); e != nil {
-			failure(w, r, 400, e)
+			failure(w, r, http.StatusBadRequest, e)
 			return
 		}
 		if e := validateTagPolicy(before, next); e != nil {
-			failure(w, r, 400, e)
+			failure(w, r, http.StatusBadRequest, e)
 			return
 		}
 	}
@@ -66,32 +66,32 @@ func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	p, e := s.Store.BuildTagPlan(ctx, in.Service, next, old)
 	if e != nil {
-		failure(w, r, 400, e)
+		failure(w, r, http.StatusBadRequest, e)
 		return
 	}
 	if p.Waiting {
-		failure(w, r, 409, errors.New("Synchronize file data before reviewing outbound tags"))
+		failure(w, r, http.StatusConflict, errors.New("Synchronize file data before reviewing outbound tags"))
 		return
 	}
 	if in.Token != "" && in.Token != p.Preview.Token {
-		failure(w, r, 409, ErrTagPreviewChanged)
+		failure(w, r, http.StatusConflict, ErrTagPreviewChanged)
 		return
 	}
 	if r.URL.Path == "/api/tag-approval" {
 		if in.Token == "" {
-			failure(w, r, 400, errors.New("Review the tag preview before confirming"))
+			failure(w, r, http.StatusBadRequest, errors.New("Review the tag preview before confirming"))
 			return
 		}
 		if !reflect.DeepEqual(s.Config(), cfg) {
-			failure(w, r, 409, ErrTagPreviewChanged)
+			failure(w, r, http.StatusConflict, ErrTagPreviewChanged)
 			return
 		}
 		if e = s.Store.ApproveTagPlan(ctx, p); e != nil {
-			failure(w, r, 500, errors.New("Could not save tag approval"))
+			failure(w, r, http.StatusInternalServerError, errors.New("Could not save tag approval"))
 			return
 		}
 		s.Tags.Queue(in.Service)
-		jsonOut(w, 200, map[string]bool{"ok": true})
+		jsonOut(w, http.StatusOK, map[string]bool{"ok": true})
 		return
 	}
 	if in.TagID > 0 {
@@ -127,5 +127,5 @@ func (s *Server) tagPreviewHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		p.Preview.Targets = targets[start:end]
 	}
-	jsonOut(w, 200, p.Preview)
+	jsonOut(w, http.StatusOK, p.Preview)
 }

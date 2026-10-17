@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -20,15 +18,15 @@ type DeltaScope struct {
 	All     bool
 }
 
-func deleteScopedFiles(tx *sql.Tx, service string, scope *DeltaScope) (sql.Result, error) {
+func deleteScopedFiles(ctx context.Context, tx *sql.Tx, service string, scope *DeltaScope) (sql.Result, error) {
 	if scope == nil {
-		return tx.Exec("DELETE FROM files WHERE service=?", service)
+		return tx.ExecContext(ctx, "DELETE FROM files WHERE service=?", service)
 	}
 	if scope.MediaID <= 0 {
 		return nil, errors.New("Invalid delta scope")
 	}
 	if scope.All {
-		return tx.Exec("DELETE FROM files WHERE service=? AND media_id=?", service, scope.MediaID)
+		return tx.ExecContext(ctx, "DELETE FROM files WHERE service=? AND media_id=?", service, scope.MediaID)
 	}
 	args := []any{service, scope.MediaID}
 	marks := []string{}
@@ -42,7 +40,7 @@ func deleteScopedFiles(tx *sql.Tx, service string, scope *DeltaScope) (sql.Resul
 	if len(marks) == 0 {
 		return nil, errors.New("Empty delta scope")
 	}
-	return tx.Exec("DELETE FROM files WHERE service=? AND media_id=? AND id IN ("+strings.Join(marks, ",")+")", args...)
+	return tx.ExecContext(ctx, "DELETE FROM files WHERE service=? AND media_id=? AND id IN ("+strings.Join(marks, ",")+")", args...)
 }
 func (c *ArrClient) FetchDelta(ctx context.Context, service string, scope *DeltaScope) ([]File, error) {
 	if service == "radarr" {
@@ -118,7 +116,7 @@ func (c *ArrClient) FetchDelta(ctx context.Context, service string, scope *Delta
 	for _, id := range scope.FileIDs {
 		allowed[id] = true
 	}
-	seen := map[int]bool{}
+	seen, seenEpisodes := map[int]bool{}, map[int]bool{}
 	out := []File{}
 	// Two requests at most are in flight. Episode mappings are limited to one file.
 	for _, a := range files {
@@ -126,50 +124,15 @@ func (c *ArrClient) FetchDelta(ctx context.Context, service string, scope *Delta
 			return nil, errors.New("Invalid episode file response")
 		}
 		seen[a.ID] = true
-		var episodes []struct {
-			ID       int    `json:"id"`
-			SeriesID int    `json:"seriesId"`
-			FileID   int    `json:"episodeFileId"`
-			Number   int    `json:"episodeNumber"`
-			Title    string `json:"title"`
-			AirDate  string `json:"airDate"`
-		}
+		var episodes []arrEpisode
 		if e = c.get(ctx, "episode", url.Values{"episodeFileId": {strconv.Itoa(a.ID)}}, &episodes); e != nil {
 			return nil, e
 		}
-		eps := []Episode{}
-		years := map[int]bool{}
-		titles := []string{}
-		for _, ep := range episodes {
-			if ep.ID <= 0 || ep.FileID != a.ID || (ep.SeriesID != 0 && ep.SeriesID != scope.MediaID) {
-				return nil, errors.New("Invalid episode mapping")
-			}
-			year := 0
-			if len(ep.AirDate) >= 4 {
-				year, _ = strconv.Atoi(ep.AirDate[:4])
-			}
-			if year > 0 {
-				years[year] = true
-			}
-			eps = append(eps, Episode{ep.ID, ep.Number, ep.Title, year})
+		byFile, err := episodeMappings(episodes, scope.MediaID, map[int]bool{a.ID: true}, seenEpisodes, true)
+		if err != nil {
+			return nil, err
 		}
-		sort.Slice(eps, func(i, j int) bool { return eps[i].Number < eps[j].Number })
-		for _, ep := range eps {
-			titles = append(titles, fmt.Sprintf("E%02d · %s", ep.Number, ep.Title))
-		}
-		ys := []int{}
-		for y := range years {
-			ys = append(ys, y)
-		}
-		sort.Ints(ys)
-		title := strings.Join(titles, " / ")
-		if title == "" {
-			title = basename(a)
-		}
-		f := File{ID: a.ID, Service: service, MediaID: series.ID, Title: title, TitleSlug: safeTitleSlug(series.TitleSlug), Series: series.Title, Season: a.Season, Episodes: eps, Years: ys, Filename: basename(a), SourcePath: a.Path, Size: a.Size}
-		a.MediaInfo.Quality = a.Quality.Quality.Name
-		Enrich(&f, a.MediaInfo)
-		out = append(out, f)
+		out = append(out, seriesFile(a, series.ID, series.Title, series.TitleSlug, byFile[a.ID]))
 	}
 	return out, nil
 }

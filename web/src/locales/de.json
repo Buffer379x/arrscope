@@ -838,6 +838,8 @@
     "Show link to media server entry": "Zeige Link zum Medienserver-Eintrag",
     "Open media server entry in a new tab": "Medienserver-Eintrag in neuem Tab öffnen",
     "Choose media server": "Medienserver auswählen",
-    "Media server link unavailable. Synchronize the library and check the file mapping.": "Medienserver-Link nicht verfügbar. Bibliothek synchronisieren und Dateizuordnung prüfen."
+    "Media server link unavailable. Synchronize the library and check the file mapping.": "Medienserver-Link nicht verfügbar. Bibliothek synchronisieren und Dateizuordnung prüfen.",
+    "Could not revoke session": "Sitzung konnte nicht widerrufen werden",
+    "Could not load settings": "Einstellungen konnten nicht geladen werden"
   }
 }

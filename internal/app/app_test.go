@@ -146,9 +146,10 @@ func TestSearchUnknownYearsAndInjection(t *testing.T) {
 	}
 }
 func TestArrReadOnlyAndMultiEpisodes(t *testing.T) {
-	var methods []string
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		methods = append(methods, r.Method)
+		if r.Method != http.MethodGet {
+			t.Errorf("upstream mutation: %s", r.Method)
+		}
 		if r.Header.Get("X-Api-Key") != "test-secret" {
 			t.Error("missing auth header")
 		}
@@ -198,11 +199,6 @@ func TestArrReadOnlyAndMultiEpisodes(t *testing.T) {
 	}
 	if e = client.get(context.Background(), "command", nil, &files); e == nil {
 		t.Fatal("command endpoint accepted")
-	}
-	for _, m := range methods {
-		if m != "GET" {
-			t.Fatal("upstream mutation")
-		}
 	}
 }
 func TestFailedAndCancelledSyncPreservesCache(t *testing.T) {

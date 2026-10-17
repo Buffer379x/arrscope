@@ -43,7 +43,7 @@ func TestClockScheduleAndDST(t *testing.T) {
 	}
 	cfg := DefaultSettings()
 	cfg.SyncTimezone = "wrong/zone"
-	if normalize070(&cfg) == nil {
+	if normalizeSettings(&cfg) == nil {
 		t.Fatal("bad timezone accepted")
 	}
 }

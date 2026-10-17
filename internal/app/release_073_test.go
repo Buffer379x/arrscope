@@ -218,7 +218,7 @@ func TestStorageAliasesDoNotAlterSharing(t *testing.T) {
 	cfg.Radarr = ServiceConfig{Enabled: true, URL: "http://r"}
 	cfg.Sonarr = ServiceConfig{Enabled: true, URL: "http://s"}
 	cfg.Widgets.Storage = map[string][]StorageSelection{"radarr": {{Path: "/movies", Name: "Films"}, {Path: "/downloads", Name: "SSD cache", SharedGroup: "cache"}}, "sonarr": {{Path: "/downloads", Name: "Downloads", SharedGroup: "cache"}}}
-	if e := normalize070(&cfg); e != nil {
+	if e := normalizeSettings(&cfg); e != nil {
 		t.Fatal(e)
 	}
 	now := time.Now()
@@ -233,7 +233,7 @@ func TestStorageAliasesDoNotAlterSharing(t *testing.T) {
 		}
 	}
 	cfg.Widgets.Storage["radarr"][0].Name = ""
-	normalize070(&cfg)
+	normalizeSettings(&cfg)
 	if cfg.Widgets.Storage["radarr"][0].Name != "/movies" {
 		t.Fatal(cfg.Widgets)
 	}

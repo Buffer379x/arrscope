@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,15 +97,15 @@ func (c *ArrClient) readJSON(ctx context.Context, u *url.URL, keyHeader string, 
 			}
 			return errors.New("Service unreachable, timed out or TLS validation failed")
 		}
-		if res.StatusCode != 200 {
+		if res.StatusCode != http.StatusOK {
 			res.Body.Close()
-			if res.StatusCode >= 500 && attempt < 2 {
+			if res.StatusCode >= http.StatusInternalServerError && attempt < 2 {
 				continue
 			}
-			if res.StatusCode == 401 || res.StatusCode == 403 {
+			if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
 				return errors.New("API key was rejected")
 			}
-			if res.StatusCode == 404 {
+			if res.StatusCode == http.StatusNotFound {
 				return ErrArrNotFound
 			}
 			return fmt.Errorf("Service returned HTTP %d", res.StatusCode)
@@ -300,7 +299,7 @@ func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 		return nil, e
 	}
 	out := []File{}
-	seenSeries, seenFiles := map[int]bool{}, map[int]bool{}
+	seenSeries, seenFiles, seenEpisodes := map[int]bool{}, map[int]bool{}, map[int]bool{}
 	for _, s := range series {
 		if s.ID <= 0 || s.Title == "" || seenSeries[s.ID] {
 			return nil, errors.New("Invalid series catalog")
@@ -308,55 +307,24 @@ func (c *ArrClient) series(ctx context.Context) ([]File, error) {
 		seenSeries[s.ID] = true
 		q := url.Values{"seriesId": {strconv.Itoa(s.ID)}}
 		var files []arrFile
-		var episodes []struct {
-			ID      int    `json:"id"`
-			FileID  int    `json:"episodeFileId"`
-			Number  int    `json:"episodeNumber"`
-			Title   string `json:"title"`
-			AirDate string `json:"airDate"`
-		}
+		var episodes []arrEpisode
 		if e := readPair(ctx, func(ctx context.Context) error { return c.get(ctx, "episodefile", q, &files) }, func(ctx context.Context) error { return c.get(ctx, "episode", q, &episodes) }); e != nil {
 			return nil, e
 		}
-		byFile := map[int][]Episode{}
-		for _, ep := range episodes {
-			year := 0
-			if len(ep.AirDate) >= 4 {
-				year, _ = strconv.Atoi(ep.AirDate[:4])
-			}
-			byFile[ep.FileID] = append(byFile[ep.FileID], Episode{ep.ID, ep.Number, ep.Title, year})
-		}
+		fileIDs := map[int]bool{}
 		for _, a := range files {
-			if a.ID <= 0 || seenFiles[a.ID] || (a.SeriesID != 0 && a.SeriesID != s.ID) || basename(a) == "" || a.Size < 0 {
+			if a.ID <= 0 || seenFiles[a.ID] || fileIDs[a.ID] || (a.SeriesID != 0 && a.SeriesID != s.ID) || basename(a) == "" || a.Size < 0 {
 				return nil, errors.New("Invalid or duplicate episode file")
 			}
+			fileIDs[a.ID] = true
+		}
+		byFile, err := episodeMappings(episodes, s.ID, fileIDs, seenEpisodes, false)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range files {
 			seenFiles[a.ID] = true
-			eps := byFile[a.ID]
-			sort.Slice(eps, func(i, j int) bool { return eps[i].Number < eps[j].Number })
-			ys := map[int]bool{}
-			var titles []string
-			for _, ep := range eps {
-				if ep.Year > 0 {
-					ys[ep.Year] = true
-				}
-				titles = append(titles, fmt.Sprintf("E%02d · %s", ep.Number, ep.Title))
-			}
-			years := []int{}
-			for y := range ys {
-				years = append(years, y)
-			}
-			sort.Ints(years)
-			title := strings.Join(titles, " / ")
-			if title == "" {
-				title = basename(a)
-			}
-			if eps == nil {
-				eps = []Episode{}
-			}
-			f := File{ID: a.ID, Service: "sonarr", MediaID: s.ID, TitleSlug: safeTitleSlug(s.TitleSlug), Title: title, Series: s.Title, Season: a.Season, Episodes: eps, Years: years, Filename: basename(a), SourcePath: a.Path, Size: a.Size}
-			a.MediaInfo.Quality = a.Quality.Quality.Name
-			Enrich(&f, a.MediaInfo)
-			out = append(out, f)
+			out = append(out, seriesFile(a, s.ID, s.Title, s.TitleSlug, byFile[a.ID]))
 		}
 	}
 	return out, nil

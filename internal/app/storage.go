@@ -94,7 +94,7 @@ func normalizeDashboard(cfg *Settings) error {
 	}
 	return nil
 }
-func normalize070(cfg *Settings) error {
+func normalizeSettings(cfg *Settings) error {
 	if err := normalizeDashboard(cfg); err != nil {
 		return err
 	}
@@ -222,22 +222,22 @@ func (s *Server) storageHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, scope := range []string{"all", "radarr", "sonarr"} {
 		areas[scope] = storageAreas(cfg, snap, scope)
 	}
-	jsonOut(w, 200, map[string]any{"services": snap, "areas": areas})
+	jsonOut(w, http.StatusOK, map[string]any{"services": snap, "areas": areas})
 }
 func (s *Server) storageRefreshHTTP(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Service string `json:"service"`
 	}
 	if e := decode(w, r, &in); e != nil || !serviceOK(in.Service) {
-		failure(w, r, 400, errors.New("Invalid service"))
+		failure(w, r, http.StatusBadRequest, errors.New("Invalid service"))
 		return
 	}
 	if s.Demo {
-		failure(w, r, 400, errors.New("Demo connections are locked"))
+		failure(w, r, http.StatusBadRequest, errors.New("Demo connections are locked"))
 		return
 	}
 	if e := s.Background.RefreshStorage(r.Context(), in.Service); e != nil {
-		failure(w, r, 502, e)
+		failure(w, r, http.StatusBadGateway, e)
 		return
 	}
 	s.storageHTTP(w, r)

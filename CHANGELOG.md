@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 — 2026-10-17
+
+- Harden configuration, tag reconciliation, session revocation, startup validation, database paths and Sonarr snapshot integrity.
+- Keep reads and sync status responsive during writes; support cancellable, generation-checked snapshot commits and bounded password verification.
+- Cache the read-only tag catalog, load authenticated pages on demand, remove duplicate requests and guard browser preference storage and stale responses.
+- Split large modules and share custom-tag cleanup; remove unreachable UI code, unused helpers/styles and a duplicate embedded asset without changing the interface or feature set.
+- Refresh GitHub highlights/screenshots and add targeted regression coverage. See [release notes](docs/releases/1.0.0.md) for validation and upgrade details.
+
 ## 0.9.5
 
 - Require a tag-color recognition rule for codec frames again, including API-only codecs.

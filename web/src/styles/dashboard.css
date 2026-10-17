@@ -93,12 +93,6 @@
   color: var(--accent);
   background: var(--panel2);
 }
-.distribution-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
-}
 .distribution-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -189,9 +183,6 @@
 @media (max-width: 1000px) {
   .stat-widgets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .distribution-grid {
-    grid-template-columns: 1fr;
   }
   .distribution-card {
     padding: 20px;
@@ -321,4 +312,7 @@
   overflow-wrap: anywhere;
 }
 
-.dashboard-settings-table th:first-child { padding: 10px; white-space: nowrap; }
+.dashboard-settings-table th:first-child {
+  padding: 10px;
+  white-space: nowrap;
+}

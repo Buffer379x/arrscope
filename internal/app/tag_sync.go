@@ -281,10 +281,10 @@ func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, ou
 		return errors.New("Tag write request failed")
 	}
 	defer res.Body.Close()
-	if method == "DELETE" && res.StatusCode == 404 {
+	if method == "DELETE" && res.StatusCode == http.StatusNotFound {
 		return nil
 	}
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("Tag API returned HTTP %d", res.StatusCode)
 	}
 	if out != nil {
@@ -292,10 +292,6 @@ func (c *ArrClient) writeTags(ctx context.Context, path, method string, body, ou
 	}
 	_, err = io.Copy(io.Discard, io.LimitReader(res.Body, 8<<20))
 	return err
-}
-func (s *Store) desiredTags(ctx context.Context, service string, g TagGroups) (map[int]map[string]bool, error) {
-	snap, e := readTagSnapshot(ctx, s.DB, service, g)
-	return snap.desired, e
 }
 func sameTagIDs(a, b []int) bool {
 	if len(a) != len(b) {
@@ -346,13 +342,14 @@ func (s *Store) ReconcileTags(ctx context.Context, service string, c ServiceConf
 	}
 	endpoint := p.Endpoint
 	client := NewArr(c)
+	rules := s.Recognition().Rules
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return 0, false, e
 	}
 	defer tx.Rollback()
 	if c.TagSync.Active() {
-		if e = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true, target...); e != nil {
+		if e = s.seedTagValues(ctx, tx, service, endpoint, c.TagSync, true, rules, target...); e != nil {
 			return 0, false, e
 		}
 		for f, on := range c.TagSync.fields() {

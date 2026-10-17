@@ -1,6 +1,6 @@
-import { LanguageSelect, t, useI18n } from "../i18n";
 import { ArrowUpRight, LoaderCircle, ShieldCheck } from "lucide-preact";
 import { useState } from "preact/hooks";
+import { LanguageSelect, t, useI18n } from "../i18n";
 import type { Status } from "../types";
 
 import { api } from "../api";
@@ -15,12 +15,10 @@ export function Login({
   const [user, setUser] = useState(status.demo ? "demo" : ""),
     [password, setPassword] = useState(status.demo ? "Scopearr-demo-2026" : ""),
     [token, setToken] = useState(""),
-    [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const submit = async (e: Event) => {
     e.preventDefault();
     setBusy(true);
-    setError("");
     try {
       await api(status.initialized ? "login" : "setup", "POST", {
         username: user,
@@ -28,8 +26,7 @@ export function Login({
         token,
       });
       await done();
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
     } finally {
       setBusy(false);
     }

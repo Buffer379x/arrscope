@@ -12,7 +12,6 @@ type QueryArgs = {
   pageSize: number | undefined;
   setResults: (r: Results) => void;
   setBusy: (b: boolean) => void;
-  setError: (s: string) => void;
 };
 export function useLibraryQuery({
   view,
@@ -25,7 +24,6 @@ export function useLibraryQuery({
   pageSize,
   setResults,
   setBusy,
-  setError,
 }: QueryArgs) {
   const lastRequest = useRef(0);
   useEffect(() => {
@@ -33,7 +31,6 @@ export function useLibraryQuery({
     const id = ++lastRequest.current;
     const controller = new AbortController();
     setBusy(true);
-    setError("");
     const timer = setTimeout(() => {
       const params = new URLSearchParams(filters[service]);
       params.set("service", service);
@@ -51,10 +48,7 @@ export function useLibraryQuery({
         .then((r) => {
           if (id === lastRequest.current) setResults(r);
         })
-        .catch((e) => {
-          if (e.name !== "AbortError" && id === lastRequest.current)
-            setError(e.message);
-        })
+        .catch(() => {})
         .finally(() => {
           if (id === lastRequest.current) setBusy(false);
         });
@@ -81,7 +75,6 @@ export function useFacets(
   service: Service,
   lastSuccess: string | null | undefined,
   setFacets: (f: Record<string, string[]>) => void,
-  setError: (s: string) => void,
 ) {
   useEffect(() => {
     if (!enabled) return;
@@ -97,9 +90,7 @@ export function useFacets(
       .then((f) => {
         if (current) setFacets(f);
       })
-      .catch((e) => {
-        if (current && e.name !== "AbortError") setError(e.message);
-      });
+      .catch(() => {});
     return () => {
       current = false;
       controller.abort();

@@ -513,9 +513,7 @@ func (s *Store) BuildTagPlan(ctx context.Context, service string, c ServiceConfi
 			projected[k] = v
 		}
 		projected[key], _ = json.Marshal(remaining)
-		if _, exists := projected["inUse"]; exists {
-			delete(projected, "inUse")
-		}
+		delete(projected, "inUse")
 		unused, err := tagUnused(projected, service, id, l)
 		if err != nil {
 			return nil, err

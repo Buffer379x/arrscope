@@ -97,55 +97,67 @@ func rememberTagRules(ctx context.Context, tx *sql.Tx, rules []RecognitionRule) 
 	return nil
 }
 func (s *Store) TagCatalog(ctx context.Context) ([]CatalogTag, error) {
-	active, e := s.DisplayTags(ctx)
-	if e != nil {
-		return nil, e
+	s.catalogLoad.Lock()
+	defer s.catalogLoad.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	counts, e := allTraitCounts(ctx, s.DB)
-	if e != nil {
-		return nil, e
+	s.cacheMu.Lock()
+	cached, generation := s.catalogCache, s.cacheGeneration
+	s.cacheMu.Unlock()
+	if cached != nil {
+		return append([]CatalogTag{}, cached...), nil
 	}
-	tx, e := s.DB.BeginTx(ctx, nil)
-	if e != nil {
-		return nil, e
+	tx, rules, err := s.beginRecognitionRead(ctx)
+	if err != nil {
+		return nil, err
 	}
 	defer tx.Rollback()
-	for f, values := range active {
-		if !catalogField(f) {
+	active, err := displayTags(ctx, tx, rules)
+	if err != nil {
+		return nil, err
+	}
+	counts, err := allTraitCounts(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	values := map[string]CatalogTag{}
+	for field, tags := range active {
+		if !catalogField(field) {
 			continue
 		}
-		for _, v := range values {
-			if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO display_tag_catalog(field,value) VALUES(?,?)", f, v); e != nil {
-				return nil, e
-			}
-			if counts[f][v] > 0 {
-				if _, e = tx.ExecContext(ctx, "UPDATE display_tag_catalog SET deleted=0 WHERE field=? AND value=?", f, v); e != nil {
-					return nil, e
-				}
-			}
+		for _, value := range tags {
+			values[field+":"+value] = CatalogTag{field, value, counts[field][value]}
 		}
 	}
-	rows, e := tx.QueryContext(ctx, "SELECT field,value FROM display_tag_catalog WHERE deleted=0")
-	if e != nil {
-		return nil, e
+	rows, err := tx.QueryContext(ctx, "SELECT field,value,deleted FROM display_tag_catalog")
+	if err != nil {
+		return nil, err
 	}
-	out := []CatalogTag{}
 	for rows.Next() {
 		var tag CatalogTag
-		if e = rows.Scan(&tag.Field, &tag.Value); e != nil {
+		var deleted bool
+		if err = rows.Scan(&tag.Field, &tag.Value, &deleted); err != nil {
 			rows.Close()
-			return nil, e
+			return nil, err
 		}
 		tag.Count = counts[tag.Field][tag.Value]
-		out = append(out, tag)
+		key := tag.Field + ":" + tag.Value
+		_, isActive := values[key]
+		if deleted && (!isActive || tag.Count == 0) {
+			delete(values, key)
+		} else {
+			values[key] = tag
+		}
 	}
-	e = rows.Err()
+	err = rows.Err()
 	rows.Close()
-	if e != nil {
-		return nil, e
+	if err != nil {
+		return nil, err
 	}
-	if e = tx.Commit(); e != nil {
-		return nil, e
+	out := make([]CatalogTag, 0, len(values))
+	for _, tag := range values {
+		out = append(out, tag)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Field != out[j].Field {
@@ -153,7 +165,12 @@ func (s *Store) TagCatalog(ctx context.Context) ([]CatalogTag, error) {
 		}
 		return out[i].Value < out[j].Value
 	})
-	return out, nil
+	s.cacheMu.Lock()
+	if generation == s.cacheGeneration {
+		s.catalogCache = out
+	}
+	s.cacheMu.Unlock()
+	return append([]CatalogTag{}, out...), nil
 }
 func (s *Store) DeleteCatalogTag(ctx context.Context, field, value string) error {
 	if !catalogField(field) || value == "" {
@@ -199,17 +216,23 @@ func (s *Store) DeleteCatalogTag(ctx context.Context, field, value string) error
 			return e
 		}
 	}
-	return tx.Commit()
+	if e = tx.Commit(); e != nil {
+		return e
+	}
+	s.invalidateCustomFacets()
+	return nil
 }
 func (s *Store) seedTagCatalog(ctx context.Context) error {
 	var cfg Settings
-	_ = s.Get("settings", &cfg)
+	if err := s.Get("settings", &cfg); err != nil && err != sql.ErrNoRows {
+		return err
+	}
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback()
-	if e = rememberTagRules(ctx, tx, s.recognition.config.Rules); e != nil {
+	if e = rememberDisplayTags(ctx, tx, s.recognition.Load().config.Rules); e != nil {
 		return e
 	}
 	if cfg.TagColors != nil || cfg.TagTextColors != nil {

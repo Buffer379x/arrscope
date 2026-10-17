@@ -13,10 +13,33 @@ import (
 
 var ErrRecognitionRevision = errors.New("Recognition rules changed in another session. Reload before saving.")
 
+// Status polling only needs the committed immutable revision, without waiting
+// for a running cache rewrite to release recognitionMu.
+func (s *Store) RecognitionRevision() string {
+	return s.recognition.Load().config.Revision
+}
+
 func (s *Store) Recognition() RecognitionConfig {
 	s.recognitionMu.Lock()
 	defer s.recognitionMu.Unlock()
-	return s.recognition.Config()
+	return s.recognition.Load().Config()
+}
+
+// Pin the database snapshot while its matching immutable rules are protected.
+// Release the recognition lock before doing the expensive catalog queries.
+func (s *Store) beginRecognitionRead(ctx context.Context) (*sql.Tx, []RecognitionRule, error) {
+	s.recognitionMu.Lock()
+	defer s.recognitionMu.Unlock()
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, err
+	}
+	var entries int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM kv").Scan(&entries); err != nil {
+		tx.Rollback()
+		return nil, nil, err
+	}
+	return tx, s.recognition.Load().Config().Rules, nil
 }
 func reparseFile(f *File, engine *RecognitionEngine) {
 	f.comparisonEngine = engine
@@ -76,7 +99,7 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	if err = s.validateCustomRules(ctx, rules); err != nil {
 		return RecognitionConfig{}, err
 	}
-	if revision != s.recognition.config.Revision {
+	if revision != s.recognition.Load().config.Revision {
 		return RecognitionConfig{}, ErrRecognitionRevision
 	}
 	if engine.config.Revision == revision {
@@ -96,13 +119,16 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 		return RecognitionConfig{}, err
 	}
 	defer tx.Rollback()
-	if err = rememberTagRules(ctx, tx, s.recognition.config.Rules); err != nil {
+	if err = rememberTagRules(ctx, tx, s.recognition.Load().config.Rules); err != nil {
 		return RecognitionConfig{}, err
 	}
 	if err = rememberTagRules(ctx, tx, rules); err != nil {
 		return RecognitionConfig{}, err
 	}
 	if err = reparseCached(ctx, tx, engine); err != nil {
+		return RecognitionConfig{}, err
+	}
+	if err = rememberDisplayTags(ctx, tx, engine.config.Rules); err != nil {
 		return RecognitionConfig{}, err
 	}
 	data, _ := json.Marshal(engine.Config())
@@ -112,7 +138,7 @@ func (s *Store) SaveRecognition(ctx context.Context, rules []RecognitionRule, re
 	if err = tx.Commit(); err != nil {
 		return RecognitionConfig{}, err
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.invalidateAggregates()
 	return engine.Config(), nil
 }
