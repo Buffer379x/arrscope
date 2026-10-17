@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -18,7 +19,7 @@ import (
 type Store struct {
 	presetMu        sync.Mutex
 	recognitionMu   sync.Mutex
-	recognition     *RecognitionEngine
+	recognition     atomic.Pointer[RecognitionEngine]
 	DB              *sql.DB
 	Dir             string
 	cacheMu         sync.Mutex
@@ -82,7 +83,7 @@ func (s *Store) replaceContext(ctx context.Context, service string, files []File
 	}
 	defer tx.Rollback()
 	customActive := false
-	for _, rule := range s.recognition.config.Rules {
+	for _, rule := range s.recognition.Load().config.Rules {
 		if rule.Enabled && rule.Field == "custom" {
 			customActive = true
 			break
@@ -105,8 +106,8 @@ func (s *Store) replaceContext(ctx context.Context, service string, files []File
 		if consume {
 			files[index] = File{}
 		}
-		if f.APIInfo != nil || len(f.Evidence) > 0 || s.recognition.config.Revision != defaultRecognitionEngine.config.Revision {
-			reparseFile(&f, s.recognition)
+		if f.APIInfo != nil || len(f.Evidence) > 0 || s.recognition.Load().config.Revision != defaultRecognitionEngine.config.Revision {
+			reparseFile(&f, s.recognition.Load())
 		}
 		updateCompleteness(&f)
 		f.Service = service
@@ -153,7 +154,7 @@ func (s *Store) replaceContext(ctx context.Context, service string, files []File
 			return e
 		}
 	}
-	if e = rememberDisplayTags(ctx, tx, s.recognition.config.Rules); e != nil {
+	if e = rememberDisplayTags(ctx, tx, s.recognition.Load().config.Rules); e != nil {
 		return e
 	}
 	if scope == nil {

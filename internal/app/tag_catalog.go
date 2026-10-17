@@ -232,7 +232,7 @@ func (s *Store) seedTagCatalog(ctx context.Context) error {
 		return e
 	}
 	defer tx.Rollback()
-	if e = rememberDisplayTags(ctx, tx, s.recognition.config.Rules); e != nil {
+	if e = rememberDisplayTags(ctx, tx, s.recognition.Load().config.Rules); e != nil {
 		return e
 	}
 	if cfg.TagColors != nil || cfg.TagTextColors != nil {

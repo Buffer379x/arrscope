@@ -21,11 +21,11 @@ func TestISOLanguageCodesAndUnknowns(t *testing.T) {
 func TestSchemaElevenNormalizesExistingAPIAndEmbyLanguages(t *testing.T) {
 	s := testStore(t)
 	f := sample(1, "Movie.BluRay.mkv")
-	EnrichWithRules(&f, APIInfo{AudioLanguages: "cze"}, s.recognition)
+	EnrichWithRules(&f, APIInfo{AudioLanguages: "cze"}, s.recognition.Load())
 	f.Language = "cze"
 	f.RecognitionRevision = "old-language-registry"
 	second := sample(2, "Movie2.BluRay.mkv")
-	EnrichWithRules(&second, APIInfo{}, s.recognition)
+	EnrichWithRules(&second, APIInfo{}, s.recognition.Load())
 	second.Language = "tur"
 	second.EmbyMatch = "matched"
 	second.AudioTracks = []AudioTrack{{Language: "tur", Codec: "DTS", Channels: 2}}

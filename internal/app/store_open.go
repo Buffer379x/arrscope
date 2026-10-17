@@ -57,7 +57,8 @@ func OpenStore(dir string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(4)
-	s := &Store{DB: db, Dir: dir, facetCache: map[string]map[string][]string{}, recognition: defaultRecognitionEngine}
+	s := &Store{DB: db, Dir: dir, facetCache: map[string]map[string][]string{}}
+	s.recognition.Store(defaultRecognitionEngine)
 	fail := func(e error) (*Store, error) { db.Close(); return nil, e }
 	if _, err = db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		return fail(err)
@@ -263,7 +264,7 @@ PRAGMA user_version=1;COMMIT;`)
 			var engine *RecognitionEngine
 			engine, e = CompileRecognition(upgraded)
 			if e == nil {
-				s.recognition = engine
+				s.recognition.Store(engine)
 			}
 			if e == nil && changed {
 				raw, _ := json.Marshal(engine.Config())
@@ -280,7 +281,7 @@ PRAGMA user_version=1;COMMIT;`)
 					continue
 				}
 				endpoint := tagEndpoint(c)
-				if e = s.seedTagValues(context.Background(), tx, service, endpoint, c.TagSync, true, s.recognition.config.Rules); e != nil {
+				if e = s.seedTagValues(context.Background(), tx, service, endpoint, c.TagSync, true, s.recognition.Load().config.Rules); e != nil {
 					break
 				}
 				for field, on := range c.TagSync.fields() {
@@ -511,12 +512,13 @@ PRAGMA user_version=1;COMMIT;`)
 	}
 
 	if err = s.Get("recognition", &recognition); err == nil {
-		s.recognition, err = CompileRecognition(recognition.Rules)
-		if err != nil {
-			return fail(err)
+		engine, e := CompileRecognition(recognition.Rules)
+		if e != nil {
+			return fail(e)
 		}
+		s.recognition.Store(engine)
 	} else if err == sql.ErrNoRows {
-		if err = s.Put("recognition", s.recognition.Config()); err != nil {
+		if err = s.Put("recognition", s.recognition.Load().Config()); err != nil {
 			return fail(err)
 		}
 	} else {

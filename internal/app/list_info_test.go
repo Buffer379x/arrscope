@@ -146,7 +146,7 @@ func TestEntryLinksReadOnlyAndBoundToCachedMedia(t *testing.T) {
 		t.Fatal("Radarr fallback used internal ID")
 	}
 	// Local filename reprocessing must preserve the upstream UI identity.
-	cfg := store.recognition.Config()
+	cfg := store.recognition.Load().Config()
 	cfg.Rules[0].Name += " QA"
 	if _, err := store.SaveRecognition(context.Background(), cfg.Rules, cfg.Revision); err != nil {
 		t.Fatal(err)

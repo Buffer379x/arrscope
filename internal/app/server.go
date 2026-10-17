@@ -200,7 +200,7 @@ func (s *Server) Handler() http.Handler {
 				}
 				out["sync"] = states
 				out["tagSync"] = s.Tags.Statuses()
-				out["recognitionRevision"] = s.Store.Recognition().Revision
+				out["recognitionRevision"] = s.Store.RecognitionRevision()
 				out["releaseCheck"] = s.Background.ReleaseStatus()
 				var revision string
 				s.Store.Get("cacheRevision", &revision)

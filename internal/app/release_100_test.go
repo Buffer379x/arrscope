@@ -482,3 +482,53 @@ func TestRecognitionReadKeepsMatchingDataAndRules100(t *testing.T) {
 		t.Fatal(current, err)
 	}
 }
+
+func TestAuthenticatedStatusRemainsResponsiveDuringSnapshotWrite100(t *testing.T) {
+	s := testStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	server, err := NewServer(ctx, s, nil, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Sync.Shutdown()
+	sec := server.Security
+	if err = sec.Setup("audit", "synthetic-audit-password", sec.setupToken); err != nil {
+		t.Fatal(err)
+	}
+	login := httptest.NewRecorder()
+	if err = sec.CreateSession(login, httptest.NewRequest("POST", "/api/login", nil)); err != nil {
+		t.Fatal(err)
+	}
+	revision := s.Recognition().Revision
+	request := httptest.NewRequest("GET", "/api/status", nil)
+	request.AddCookie(login.Result().Cookies()[0])
+	response := httptest.NewRecorder()
+	s.recognitionMu.Lock()
+	tx, err := s.DB.Begin()
+	if err != nil {
+		s.recognitionMu.Unlock()
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { server.Handler().ServeHTTP(response, request); close(done) }()
+	blocked := false
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		blocked = true
+	}
+	tx.Rollback()
+	s.recognitionMu.Unlock()
+	<-done
+	if blocked {
+		t.Fatal("authenticated status waited for snapshot recognition work")
+	}
+	var result struct {
+		Authenticated       bool   `json:"authenticated"`
+		RecognitionRevision string `json:"recognitionRevision"`
+	}
+	if err = json.Unmarshal(response.Body.Bytes(), &result); err != nil || response.Code != 200 || !result.Authenticated || result.RecognitionRevision != revision {
+		t.Fatal(result, response.Code, err)
+	}
+}

@@ -252,7 +252,7 @@ func (s *Store) saveSettingsWithTagPolicies(ctx context.Context, stored Settings
 
 		endpoint := tagEndpoint(after)
 		if tagEndpoint(before) == endpoint && before.TagSync.Active() {
-			if err = s.seedTagValues(ctx, tx, service, endpoint, before.TagSync, false, s.recognition.config.Rules); err != nil {
+			if err = s.seedTagValues(ctx, tx, service, endpoint, before.TagSync, false, s.recognition.Load().config.Rules); err != nil {
 				return err
 			}
 		}

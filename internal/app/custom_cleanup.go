@@ -11,7 +11,7 @@ import (
 // Both custom-tag APIs hold recognitionMu before changing rules and references.
 func (s *Store) recognitionWithoutCustomTags(deleted map[int64]bool) (*RecognitionEngine, error) {
 	rules := []RecognitionRule{}
-	for _, rule := range s.recognition.config.Rules {
+	for _, rule := range s.recognition.Load().config.Rules {
 		id, _ := strconv.ParseInt(rule.Value, 10, 64)
 		if rule.Field != "custom" || !deleted[id] {
 			rules = append(rules, rule)

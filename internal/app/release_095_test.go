@@ -59,7 +59,7 @@ func TestMediaLinkIdentity095(t *testing.T) {
 				if err := store.Replace(service, files, SyncStatus{}); err != nil {
 					t.Fatal(err)
 				}
-				cfg := store.recognition.Config()
+				cfg := store.recognition.Load().Config()
 				cfg.Rules[0].Name += " changed"
 				if _, err := store.SaveRecognition(context.Background(), cfg.Rules, cfg.Revision); err != nil {
 					t.Fatal(err)

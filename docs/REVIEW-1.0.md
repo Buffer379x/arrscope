@@ -16,7 +16,7 @@ The review of 0.9.5 was repeated before implementation. Its five primary finding
 | Special characters changing the SQLite database location | Escape the database path as a file URI and establish private file permissions before SQLite opens it. |
 | Legacy `mediaMatch` suppressing Emby filter validation | Remove the orphaned bypass; continue validating and applying the supported `embyMatch` filter. |
 
-Snapshot writes now carry cancellation contexts through SQLite. Status readers and cancellation do not wait for the entire rewrite or memory reclamation. The final commit still checks the configuration generation under the status lock. Display-only settings changes do not wait for the global file/tag gate.
+Snapshot writes now carry cancellation contexts through SQLite. Status readers and cancellation do not wait for the entire rewrite or memory reclamation. The final commit still checks the configuration generation under the status lock. Immutable recognition engines are published through an atomic pointer, so the authenticated status endpoint can read their committed revision without waiting for recognition work. Display-only settings changes do not wait for the global file/tag gate.
 
 Password verification uses a small bounded capacity and short limiter-state locks. Existing per-address throttling and the password-hash check at session creation remain in place.
 

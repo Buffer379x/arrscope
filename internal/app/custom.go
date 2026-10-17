@@ -117,7 +117,7 @@ func (s *Store) DeleteCustomTag(ctx context.Context, id int64) error {
 	if err = tx.Commit(); err != nil {
 		return err
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.invalidateCustomFacets()
 	return nil
 }
@@ -467,7 +467,7 @@ func (s *Store) SaveCustomTags(ctx context.Context, original, tags []CustomTag) 
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.invalidateCustomFacets()
 	return s.CustomTags(ctx)
 }

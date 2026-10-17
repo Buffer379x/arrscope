@@ -65,7 +65,7 @@ func TestSchemaTenReprocessesUHDAndPreservesTagFlags(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	s.recognition = engine
+	s.recognition.Store(engine)
 	s.Put("recognition", engine.Config())
 	f := sample(1, "Film.UHD.JAP.BluRay.mkv")
 	EnrichWithRules(&f, APIInfo{}, engine)
